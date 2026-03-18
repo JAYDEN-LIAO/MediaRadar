@@ -9,6 +9,10 @@
       "style": { "navigationBarTitleText": "舆情列表" }
     },
     {
+      "path": "pages/list/detail",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
       "path": "pages/settings/settings",
       "style": { "navigationBarTitleText": "监控设置" }
     },

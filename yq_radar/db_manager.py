@@ -1,7 +1,7 @@
 # yq_radar/db_manager.py
 import sqlite3
 import os
-
+import json
 # 状态数据库路径
 STATE_DB_PATH = "radar_state.db"
 
@@ -29,6 +29,13 @@ def init_radar_db():
             core_issue TEXT,
             report TEXT,
             create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    # 【新增】：创建系统设置表（只存一行 JSON 数据）
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS system_settings (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            config_json TEXT
         )
     ''')
     
@@ -219,6 +226,39 @@ def get_unprocessed_posts(crawler_db_path, platform):
         conn.close()
         
     return unprocessed_posts
+
+# ================= 新增：系统设置读写 =================
+def get_system_settings():
+    conn = sqlite3.connect(STATE_DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT config_json FROM system_settings WHERE id = 1")
+    row = cursor.fetchone()
+    conn.close()
+    
+    if row:
+        return json.loads(row[0])
+    else:
+        # 默认出厂设置
+        default_config = {
+            "keywords": ["北京银行"],
+            "platforms": ["wb", "xhs"],
+            "push_summary": True,
+            "push_time": "18:00",
+            "alert_negative": True,
+            "monitor_frequency": 1.0 # 单位：小时
+        }
+        save_system_settings(default_config)
+        return default_config
+
+def save_system_settings(config_dict):
+    conn = sqlite3.connect(STATE_DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT OR REPLACE INTO system_settings (id, config_json)
+        VALUES (1, ?)
+    ''', (json.dumps(config_dict),))
+    conn.commit()
+    conn.close()
 
 # 模块加载时自动初始化状态库
 init_radar_db()
