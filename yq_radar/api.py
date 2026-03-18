@@ -16,12 +16,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class TaskRequest(BaseModel):
-    keyword: str
-
 @app.post("/api/start_task")
-def start_task(req: TaskRequest):
-    success, msg = api_start_task([req.keyword])
+def start_task():
+    # ✨ 不再需要传 req.keyword，直接唤醒引擎，引擎自己会去查数据库配置
+    success, msg = api_start_task()
     if success:
         return {"code": 200, "msg": msg}
     else:
@@ -36,6 +34,17 @@ def get_radar_status():
 def get_yq_list():
     # 调用 db_manager 取出最新的 50 条入库数据
     db_results = get_latest_results(limit=50)
+    
+    # ✨ 新增一个平台名称映射字典
+    plat_name_map = {
+        "wb": "微博",
+        "xhs": "小红书",
+        "bili": "B站",
+        "zhihu": "知乎",
+        "dy": "抖音",
+        "ks": "快手",
+        "tieba": "贴吧"
+    }
     
     formatted_data = []
     for r in db_results:
@@ -60,7 +69,8 @@ def get_yq_list():
 
         formatted_data.append({
             "id": r["post_id"],
-            "platform": "微博" if r["platform"] == "wb" else "小红书",
+            # 👇 核心修复：使用字典动态匹配平台名称，不再硬编码
+            "platform": plat_name_map.get(r["platform"], str(r["platform"]).upper()),
             "sentiment": sentiment,
             "risk": risk_text,
             "keyword": r.get("keyword", "未知"), 
@@ -75,7 +85,6 @@ def get_yq_list():
         "msg": "成功",
         "data": formatted_data
     }
-
 
 # 定义前端传过来的设置格式
 class SettingsRequest(BaseModel):

@@ -12,7 +12,7 @@
           {{ currentKeyword === 'all' ? '全部关键词' : currentKeyword }} ▾
         </view>
         <view class="filter-btn" @click="openModal('platform')">
-          {{ currentPlatform === 'all' ? '全部平台' : (currentPlatform === 'wb' ? '微博' : '小红书') }} ▾
+          {{ currentPlatformName }} ▾
         </view>
         <view class="filter-btn" @click="openModal('sentiment')">
           {{ currentSentiment === 'all' ? '全部情感' : (currentSentiment === 'negative' ? '负面' : (currentSentiment === 'positive' ? '正面' : '中性')) }} ▾
@@ -32,8 +32,8 @@
         @click="goToDetail(item)"
       >
         <view class="list-item-header">
-          <view class="platform-tag" :class="item.platform === 'wb' ? 'weibo' : 'xiaohongshu'">
-            {{ item.platform === 'wb' ? '📘 微博' : '📕 小红书' }}
+          <view class="platform-tag" :class="item.platform">
+            {{ getPlatformDisplay(item.platform) }}
           </view>
           <view class="sentiment-tag" :class="item.riskClass">{{ item.riskText }}</view>
         </view>
@@ -80,17 +80,15 @@
       <view class="modal-content" @click.stop>
         <view class="modal-header"><view class="title">选择平台</view></view>
         <view class="modal-options">
-          <view class="modal-option" :class="{ selected: currentPlatform === 'all' }" @click="selectFilter('platform', 'all')">
-            <view class="checkbox">{{ currentPlatform === 'all' ? '✓' : '' }}</view>
-            <view class="label">全部平台</view>
-          </view>
-          <view class="modal-option" :class="{ selected: currentPlatform === 'wb' }" @click="selectFilter('platform', 'wb')">
-            <view class="checkbox">{{ currentPlatform === 'wb' ? '✓' : '' }}</view>
-            <view class="label">📘 微博</view>
-          </view>
-          <view class="modal-option" :class="{ selected: currentPlatform === 'xhs' }" @click="selectFilter('platform', 'xhs')">
-            <view class="checkbox">{{ currentPlatform === 'xhs' ? '✓' : '' }}</view>
-            <view class="label">📕 小红书</view>
+          <view 
+            class="modal-option" 
+            v-for="plat in platformOptions" 
+            :key="plat.val"
+            :class="{ selected: currentPlatform === plat.val }" 
+            @click="selectFilter('platform', plat.val)"
+          >
+            <view class="checkbox">{{ currentPlatform === plat.val ? '✓' : '' }}</view>
+            <view class="label">{{ plat.icon }} {{ plat.label }}</view>
           </view>
         </view>
         <button class="modal-btn" @click="closeModal">确定</button>
@@ -138,24 +136,67 @@ const goBack = () => uni.navigateBack()
 const openModal = (type) => activeModal.value = type
 const closeModal = () => activeModal.value = null
 
+// ✨ 核心配置：所有支持的平台选项（包含图标）
+const platformOptions = [
+  { val: 'all', label: '全部平台', icon: '🌐' },
+  { val: 'wb', label: '微博', icon: '📘' },
+  { val: 'xhs', label: '小红书', icon: '📕' },
+  { val: 'bili', label: 'B站', icon: '📺' },
+  { val: 'zhihu', label: '知乎', icon: '📖' },
+  { val: 'dy', label: '抖音', icon: '🎵' },
+  { val: 'ks', label: '快手', icon: '📹' },
+  { val: 'tieba', label: '贴吧', icon: '💬' }
+]
+
+// 将 API 返回的中文平台名转换为我们内部的 value (例如 'B站' -> 'bili')
+const platNameToVal = {
+  '微博': 'wb',
+  '小红书': 'xhs',
+  'B站': 'bili',
+  '知乎': 'zhihu',
+  '抖音': 'dy',
+  '快手': 'ks',
+  '贴吧': 'tieba'
+}
+
+// 动态计算筛选栏当前显示的平台名称
+const currentPlatformName = computed(() => {
+  const plat = platformOptions.find(p => p.val === currentPlatform.value)
+  return plat ? plat.label : '全部平台'
+})
+
+// 用于在列表卡片上显示带图标的平台名字
+const getPlatformDisplay = (val) => {
+  const plat = platformOptions.find(p => p.val === val)
+  return plat ? `${plat.icon} ${plat.label}` : `🏷️ ${val}`
+}
+
 const selectFilter = (type, value) => {
   if (type === 'keyword') currentKeyword.value = value
   if (type === 'platform') currentPlatform.value = value
   if (type === 'sentiment') currentSentiment.value = value
-  // 可选：选中后立刻关弹窗，如果想等用户点确定，可以把下一行注释掉
+  // 可选：选中后立刻关弹窗
   // closeModal() 
 }
 
 // 自动提取库里存在的唯一关键词
 const uniqueKeywords = computed(() => {
-  const keys = new Set(dataList.value.map(item => item.keyword))
-  return Array.from(keys).filter(k => k)
+  const keys = new Set()
+  dataList.value.forEach(item => {
+    if (item.keyword) {
+      const kws = item.keyword.split(/[、\s,，]+/)
+      kws.forEach(k => {
+        if (k.trim()) keys.add(k.trim())
+      })
+    }
+  })
+  return Array.from(keys)
 })
 
-// ✨ 核心：通过前端响应式完美实现多重过滤
+// 通过前端响应式完美实现多重过滤
 const filteredList = computed(() => {
   return dataList.value.filter(item => {
-    const matchKeyword = currentKeyword.value === 'all' || item.keyword === currentKeyword.value
+    const matchKeyword = currentKeyword.value === 'all' || (item.keyword && item.keyword.includes(currentKeyword.value))
     const matchPlatform = currentPlatform.value === 'all' || item.platform === currentPlatform.value
     const matchSentiment = currentSentiment.value === 'all' || item.riskClass === currentSentiment.value
     return matchKeyword && matchPlatform && matchSentiment
@@ -166,7 +207,7 @@ const negativeCount = computed(() => {
   return filteredList.value.filter(item => item.riskClass === 'negative').length
 })
 
-// 跳转到详情页，并把这行数据传过去
+// 跳转到详情页
 const goToDetail = (item) => {
   uni.navigateTo({
     url: `/pages/list/detail?data=${encodeURIComponent(JSON.stringify(item))}`
@@ -185,8 +226,9 @@ const fetchYqData = () => {
         dataList.value = rawData.map(item => {
           return {
             id: item.id,
-            keyword: item.keyword || '北京银行',
-            platform: item.platform === '微博' ? 'wb' : 'xhs', 
+            keyword: item.keyword || '监控词',
+            // ✨ 核心修改：通过字典将后端的中文转换回我们前端的缩写标识 (bili, zhihu等)
+            platform: platNameToVal[item.platform] || item.platform, 
             riskClass: item.sentiment, 
             riskText: item.risk === '高风险' ? '负面' : (item.risk === '低风险' ? '正面' : '中性'),
             core_issue: item.core_issue,  
@@ -230,8 +272,15 @@ onMounted(() => {
 
 .list-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20rpx; }
 .platform-tag { display: flex; align-items: center; gap: 12rpx; font-size: 26rpx; font-weight: 500; }
-.platform-tag.xiaohongshu { color: #ff2442; }
-.platform-tag.weibo { color: #ff8200; }
+
+/* ✨ 各大平台的专属主题色！ */
+.platform-tag.xhs { color: #ff2442; }
+.platform-tag.wb { color: #ff8200; }
+.platform-tag.bili { color: #fb7299; }
+.platform-tag.zhihu { color: #0066ff; }
+.platform-tag.dy { color: #1c1c1e; }
+.platform-tag.ks { color: #ff5000; }
+.platform-tag.tieba { color: #3388ff; }
 
 .sentiment-tag { padding: 8rpx 20rpx; border-radius: 24rpx; font-size: 24rpx; font-weight: 500; }
 .sentiment-tag.negative { background-color: #fff2f0; color: #ff4d4f; }

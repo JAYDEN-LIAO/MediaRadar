@@ -152,11 +152,22 @@ def get_unprocessed_posts(crawler_db_path, platform):
 
     unprocessed_posts = []
     
-    if platform == "wb":
-        table_name = "weibo_note"
-    elif platform == "xhs":
-        table_name = "xhs_note"
-    else:
+# 建立平台简称到数据库表名的映射
+    platform_table_map = {
+        "wb": "weibo_note",
+        "xhs": "xhs_note",
+        "bilibili": "bilibili_video",  # 注意：在 MediaCrawler 中 B站通常存为 bilibili_video
+        "bili": "bilibili_video",      # 兼容两种简称
+        "zhihu": "zhihu_question",     # 知乎可能是 zhihu_question 或 zhihu_answer，取通用表
+        "dy": "douyin_aweme",
+        "ks": "kuaishou_aweme",
+        "tieba": "tieba_post"
+    }
+
+    # 根据传入的 platform 获取对应的表名
+    table_name = platform_table_map.get(platform)
+    
+    if not table_name:
         print(f"⚠️ 暂不支持的平台自动读取: {platform}")
         return []
 

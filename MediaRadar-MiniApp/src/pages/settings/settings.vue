@@ -123,7 +123,7 @@ const platformOptions = [
   { label: '小红书 (Xiaohongshu)', val: 'xhs', short: '小红书' },
   { label: '抖音 (Douyin)', val: 'dy', short: '抖音' },
   { label: '知乎 (Zhihu)', val: 'zhihu', short: '知乎' },
-  { label: 'B站 (Bilibili)', val: 'bilibili', short: 'B站' },
+  { label: 'B站 (Bilibili)', val: 'bili', short: 'B站' },
   { label: '贴吧 (Tieba)', val: 'tieba', short: '贴吧' },
   { label: '快手 (Kuaishou)', val: 'ks', short: '快手' }
 ]
