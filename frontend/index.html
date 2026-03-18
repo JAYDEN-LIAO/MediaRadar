@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=375, initial-scale=1.0">
+    <title>舆情监控小程序 - 完整原型图</title>
+    
+</head>
+<body>
+    <div class="phone-frame">
+        <!-- 状态栏 -->
+        <div class="status-bar">
+            <span class="time">9:41</span>
+            <div class="icons">
+                <span>📶</span>
+                <span>📡</span>
+                <span>🔋</span>
+            </div>
+        </div>
+        
+        <!-- ========== 引导页 ========== -->
+        <div class="page" id="page-onboarding">
+            <div class="onboarding-page">
+                <div class="logo">🔍</div>
+                <div class="title">舆情监控助手</div>
+                <div class="features">
+                    <div class="feature">📊 实时监控品牌口碑</div>
+                    <div class="feature">🤖 AI 智能分析情感</div>
+                    <div class="feature">🔔 负面预警及时推送</div>
+                </div>
+                <div class="dots">
+                    <div class="dot active"></div>
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                </div>
+                <button class="login-btn" onclick="navigateTo('page-setup')">微信授权登录</button>
+                <div class="agreement">
+                    登录即表示同意 <a href="#">《用户协议》</a> <a href="#">《隐私政策》</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ========== 添加关键词引导页 ========== -->
+        <div class="page" id="page-setup">
+            <div class="setup-page">
+                <div class="welcome">👋</div>
+                <div class="title">欢迎使用</div>
+                <div class="subtitle">请添加您要监控的关键词，比如：品牌名、产品名</div>
+                
+                <div class="input-group">
+                    <div class="input-label">关键词</div>
+                    <input type="text" class="input-field" placeholder="请输入第一个关键词">
+                </div>
+                
+                <div class="platform-section">
+                    <div class="input-label">选择监控平台</div>
+                    <div class="platform-options">
+                        <div class="platform-option selected">
+                            <div class="icon">📘</div>
+                            <div class="name">微博</div>
+                            <div class="check">✓</div>
+                        </div>
+                        <div class="platform-option selected">
+                            <div class="icon">📕</div>
+                            <div class="name">小红书</div>
+                            <div class="check">✓</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="actions">
+                    <button class="start-btn" onclick="navigateTo('page-home')">开始监控</button>
+                    <button class="skip-btn" onclick="navigateTo('page-home')">稍后再说</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ========== 首页 ========== -->
+        <div class="page active" id="page-home">
+            <div class="header">
+                <span class="back-btn">☰</span>
+                <span class="title">舆情监控</span>
+                <span class="action-btn" onclick="navigateTo('page-settings')">⚙️</span>
+            </div>
+            <div class="content">
+                <!-- 今日舆情简报卡片 -->
+                <div class="card summary-card">
+                    <div class="card-header">
+                        <span class="icon">📊</span>
+                        <span class="title">今日舆情简报</span>
+                        <span class="date">2024年1月15日</span>
+                    </div>
+                    <div class="stats-row">
+                        <div class="stat-item">
+                            <div class="number">23</div>
+                            <div class="label">新增提及</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="number">3</div>
+                            <div class="label">监控关键词</div>
+                        </div>
+                    </div>
+                    <div class="sentiment-section">
+                        <div class="section-title">情感分布</div>
+                        <div class="sentiment-row">
+                            <div class="sentiment-item">
+                                <div class="emoji">😊</div>
+                                <div class="type">正面</div>
+                                <div class="count">14</div>
+                            </div>
+                            <div class="sentiment-item">
+                                <div class="emoji">😐</div>
+                                <div class="type">中性</div>
+                                <div class="count">6</div>
+                            </div>
+                            <div class="sentiment-item">
+                                <div class="emoji">😡</div>
+                                <div class="type">负面</div>
+                                <div class="count">3</div>
+                            </div>
+                        </div>
+                        <div class="sentiment-bar">
+                            <div class="positive"></div>
+                            <div class="neutral"></div>
+                            <div class="negative"></div>
+                        </div>
+                        <div class="sentiment-labels">
+                            <span>61%</span>
+                            <span>26%</span>
+                            <span>13%</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- AI 摘要卡片 -->
+                <div class="card ai-summary-card">
+                    <div class="card-header">
+                        <span class="icon">🤖</span>
+                        <span class="title">AI 摘要</span>
+                    </div>
+                    <div class="summary-text">
+                        今日「XX品牌」舆情整体偏正面。用户主要好评集中在产品颜值和性价比方面。
+                    </div>
+                    <div class="warning-text">
+                        ⚠️ 发现3条负面信息，主要涉及售后服务响应慢的问题，建议重点关注。
+                    </div>
+                </div>
+                
+                <!-- 重点关注卡片 -->
+                <div class="card alert-card">
+                    <div class="card-header">
+                        <span class="icon">⚠️</span>
+                        <span class="title">重点关注（3条负面）</span>
+                        <span class="arrow" onclick="navigateTo('page-list')">›</span>
+                    </div>
+                    <div class="alert-item" onclick="navigateTo('page-detail')">
+                        <div class="source">
+                            <span class="platform">🔴 小红书</span>
+                            <span class="dot">·</span>
+                            <span class="time">2小时前</span>
+                        </div>
+                        <div class="text">"买了XX品牌的产品，售后太差了，等了三天都没人理..."</div>
+                    </div>
+                    <div class="alert-item" onclick="navigateTo('page-detail')">
+                        <div class="source">
+                            <span class="platform">🔴 微博</span>
+                            <span class="dot">·</span>
+                            <span class="time">5小时前</span>
+                        </div>
+                        <div class="text">"XX品牌这次真的让我失望，质量下降太明显了..."</div>
+                    </div>
+                </div>
+                
+                <!-- 7日趋势卡片 -->
+                <div class="card trend-card">
+                    <div class="card-header">
+                        <span class="icon">📈</span>
+                        <span class="title">7日趋势</span>
+                    </div>
+                    <div class="chart">
+                        <div class="chart-line">
+                            <svg viewBox="0 0 300 70" preserveAspectRatio="none">
+                                <defs>
+                                    <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                        <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+                                        <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+                                    </linearGradient>
+                                    <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                        <stop offset="0%" style="stop-color:#667eea;stop-opacity:0.3" />
+                                        <stop offset="100%" style="stop-color:#667eea;stop-opacity:0" />
+                                    </linearGradient>
+                                </defs>
+                                <path d="M0,50 L50,40 L100,45 L150,25 L200,20 L250,35 L300,15" 
+                                      fill="none" stroke="url(#lineGradient)" stroke-width="3"
+                                      stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M0,50 L50,40 L100,45 L150,25 L200,20 L250,35 L300,15 L300,70 L0,70 Z" 
+                                      fill="url(#areaGradient)"/>
+                                <circle cx="0" cy="50" r="4" fill="#667eea"/>
+                                <circle cx="50" cy="40" r="4" fill="#667eea"/>
+                                <circle cx="100" cy="45" r="4" fill="#667eea"/>
+                                <circle cx="150" cy="25" r="4" fill="#667eea"/>
+                                <circle cx="200" cy="20" r="4" fill="#764ba2"/>
+                                <circle cx="250" cy="35" r="4" fill="#764ba2"/>
+                                <circle cx="300" cy="15" r="5" fill="#764ba2" stroke="#fff" stroke-width="2"/>
+                            </svg>
+                        </div>
+                        <div class="chart-dates">
+                            <span>1/9</span>
+                            <span>1/10</span>
+                            <span>1/11</span>
+                            <span>1/12</span>
+                            <span>1/13</span>
+                            <span>1/14</span>
+                            <span>1/15</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <button class="view-all-btn" onclick="navigateTo('page-list')">查看全部舆情</button>
+            </div>
+            
+            <!-- 底部导航 -->
+            <div class="tab-bar">
+                <div class="tab-item active" onclick="navigateTo('page-home')">
+                    <span class="tab-icon">🏠</span>
+                    <span class="tab-label">首页</span>
+                </div>
+                <div class="tab-item" onclick="navigateTo('page-list')">
+                    <span class="tab-icon">📋</span>
+                    <span class="tab-label">列表</span>
+                </div>
+                <div class="tab-item" onclick="navigateTo('page-settings')">
+                    <span class="tab-icon">⚙️</span>
+                    <span class="tab-label">设置</span>
+                </div>
+                <div class="tab-item" onclick="navigateTo('page-profile')">
+                    <span class="tab-icon">👤</span>
+                    <span class="tab-label">我的</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ========== 舆情列表页 ========== -->
+        <div class="page" id="page-list">
+            <div class="header">
+                <span class="back-btn" onclick="navigateTo('page-home')">←</span>
+                <span class="title">舆情列表</span>
+                <span class="action-btn">🔍</span>
+            </div>
+            <div class="content">
+                <!-- 筛选栏 -->
+                <div class="filter-bar">
+                    <div class="filter-btn" onclick="showModal('modal-keyword')">
+                        全部关键词 ▾
+                    </div>
+                    <div class="filter-btn" onclick="showModal('modal-platform')">
+                        全部平台 ▾
+                    </div>
+                    <div class="filter-btn" onclick="showModal('modal-sentiment')">
+                        全部情感 ▾
+                    </div>
+                </div>
+                
+                <!-- 列表汇总 -->
+                <div class="list-summary">
+                    今日 <strong>23条</strong> · 负面 <span class="negative-count">3条</span> 🔴
+                </div>
+                
+                <!-- 列表项 - 负面 -->
+                <div class="list-item negative" onclick="navigateTo('page-detail')">
+                    <div class="list-item-header">
+                        <div class="platform-tag xiaohongshu">📕 小红书</div>
+                        <div class="sentiment-tag negative">负面</div>
+                    </div>
+                    <div class="list-item-content">
+                        买了XX品牌的产品，售后太差了，等了三天都没人理，客服态度也很敷衍，问什么都是让我等...
+                    </div>
+                    <div class="list-item-footer">
+                        <div class="list-item-meta">🏷️ XX品牌 · 2小时前</div>
+                        <div class="list-item-actions">
+                            <span class="action-link">查看原文</span>
+                            <span class="action-link">标记 ✓</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 列表项 - 负面 -->
+                <div class="list-item negative" onclick="navigateTo('page-detail')">
+                    <div class="list-item-header">
+                        <div class="platform-tag weibo">📘 微博</div>
+                        <div class="sentiment-tag negative">负面</div>
+                    </div>
+                    <div class="list-item-content">
+                        XX品牌这次真的让我失望，质量下降太明显了，再也不会回购了，希望品牌方能重视一下产品质量问题...
+                    </div>
+                    <div class="list-item-footer">
+                        <div class="list-item-meta">🏷️ XX品牌 · 5小时前</div>
+                        <div class="list-item-actions">
+                            <span class="action-link">查看原文</span>
+                            <span class="action-link">标记 ✓</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 列表项 - 正面 -->
+                <div class="list-item positive" onclick="navigateTo('page-detail')">
+                    <div class="list-item-header">
+                        <div class="platform-tag xiaohongshu">📕 小红书</div>
+                        <div class="sentiment-tag positive">正面</div>
+                    </div>
+                    <div class="list-item-content">
+                        最近入手了XX品牌的新品，颜值真的太高了！性价比也很不错，强烈推荐给大家...
+                    </div>
+                    <div class="list-item-footer">
+                        <div class="list-item-meta">🏷️ XX品牌 · 6小时前</div>
+                        <div class="list-item-actions">
+                            <span class="action-link">查看原文</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 列表项 - 中性 -->
+                <div class="list-item neutral" onclick="navigateTo('page-detail')">
+                    <div class="list-item-header">
+                        <div class="platform-tag weibo">📘 微博</div>
+                        <div class="sentiment-tag neutral">中性</div>
+                    </div>
+                    <div class="list-item-content">
+                        看到XX品牌又出新品了，不知道这次怎么样，观望中，等等看其他人的评价再决定要不要入手...
+                    </div>
+                    <div class="list-item-footer">
+                        <div class="list-item-meta">🏷️ XX品牌 · 8小时前</div>
+                        <div class="list-item-actions">
+                            <span class="action-link">查看原文</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="load-more">加载更多...</div>
+            </div>
+            
+            <!-- 底部导航 -->
+            <div class="tab-bar">
+                <div class="tab-item" onclick="navigateTo('page-home')">
+                    <span class="tab-icon">🏠</span>
+                    <span class="tab-label">首页</span>
+                </div>
+                <div class="tab-item active" onclick="navigateTo('page-list')">
+                    <span class="tab-icon">📋</span>
+                    <span class="tab-label">列表</span>
+                </div>
+                <div class="tab-item" onclick="navigateTo('page-settings')">
+                    <span class="tab-icon">⚙️</span>
+                    <span class="tab-label">设置</span>
+                </div>
+                <div class="tab-item" onclick="navigateTo('page-profile')">
+                    <span class="tab-icon">👤</span>
+                    <span class="tab-label">我的</span>
+                </div>
+            </div>
+            
+            <!-- 筛选弹窗 - 关键词 -->
+            <div class="modal-overlay" id="modal-keyword">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div class="title">选择关键词</div>
+                    </div>
+                    <div class="modal-options">
+                        <div class="modal-option selected">
+                            <div class="checkbox">✓</div>
+                            <div class="label">全部关键词</div>
+                        </div>
+                        <div class="modal-option">
+                            <div class="checkbox"></div>
+                            <div class="label">XX品牌</div>
+                        </div>
+                        <div class="modal-option">
+                            <div class="checkbox"></div>
+                            <div class="label">XX产品</div>
+                        </div>
+                        <div class="modal-option">
+                            <div class="checkbox"></div>
+                            <div class="label">行业关键词</div>
+                        </div>
+                    </div>
+                    <button class="modal-btn" onclick="hideModal('modal-keyword')">确定</button>
+                </div>
+            </div>
+            
+            <!-- 筛选弹窗 - 平台 -->
+            <div class="modal-overlay" id="modal-platform">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div class="title">选择平台</div>
+                    </div>
+                    <div class="modal-options">
+                        <div class="modal-option selected">
+                            <div class="checkbox">✓</div>
+                            <div class="label">全部平台</div>
+                        </div>
+                        <div class="modal-option">
+                            <div class="checkbox"></div>
+                            <div class="label">📘 微博</div>
+                        </div>
+                        <div class="modal-option">
+                            <div class="checkbox"></div>
+                            <div class="label">📕 小红书</div>
+                        </div>
+                    </div>
+                    <button class="modal-btn" onclick="hideModal('modal-platform')">确定</button>
+                </div>
+            </div>
+            
+            <!-- 筛选弹窗 - 情感 -->
+            <div class="modal-overlay" id="modal-sentiment">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div class="title">选择情感</div>
+                    </div>
+                    <div class="modal-options">
+                        <div class="modal-option selected">
+                            <div class="checkbox">✓</div>
+                            <div class="label">全部情感</div>
+                        </div>
+                        <div class="modal-option">
+                            <div class="checkbox"></div>
+                            <div class="label">😊 正面</div>
+                        </div>
+                        <div class="modal-option">
+                            <div class="checkbox"></div>
+                            <div class="label">😐 中性</div>
+                        </div>
+                        <div class="modal-option">
+                            <div class="checkbox"></div>
+                            <div class="label">😡 负面</div>
+                        </div>
+                    </div>
+                    <button class="modal-btn" onclick="hideModal('modal-sentiment')">确定</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ========== 舆情详情页 ========== -->
+        <div class="page" id="page-detail">
+            <div class="header">
+                <span class="back-btn" onclick="navigateTo('page-list')">←</span>
+                <span class="title">舆情详情</span>
+                <span class="action-btn">↗️</span>
+            </div>
+            <div class="content-no-tab">
+                <!-- 来源信息 -->
+                <div class="detail-source">
+                    <div class="platform-icon">📕</div>
+                    <div class="platform-info">
+                        <div class="name">小红书</div>
+                    </div>
+                    <div class="sentiment-tag negative">负面</div>
+                </div>
+                
+                <!-- 原文内容 -->
+                <div class="detail-content">
+                    <div class="text">
+                        买了XX品牌的产品，售后太差了，等了三天都没人理，客服态度也很敷衍，问什么都是让我等，这种服务态度真的让人很失望。
+                        <br><br>
+                        产品本身还行，但是售后体验太差了，以后不会再买了。希望品牌方能重视一下售后服务问题，不要只顾着卖产品。
+                    </div>
+                    <div class="tags">
+                        <span class="tag">#XX品牌</span>
+                        <span class="tag">#消费体验</span>
+                        <span class="tag">#售后服务</span>
+                    </div>
+                </div>
+                
+                <!-- 舆情信息 -->
+                <div class="detail-info">
+                    <div class="card-header">
+                        <span class="icon">📊</span>
+                        <span class="title">舆情信息</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">来源平台</span>
+                        <span class="info-value">小红书</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">关联关键词</span>
+                        <span class="info-value">XX品牌</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">发布时间</span>
+                        <span class="info-value">2024-01-15 10:23</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">情感判断</span>
+                        <span class="info-value negative">负面 (92%置信度)</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">处理状态</span>
+                        <span class="info-value unprocessed">⚪ 未处理</span>
+                    </div>
+                </div>
+                
+                <!-- 操作按钮 -->
+                <div class="detail-actions">
+                    <button class="detail-btn secondary">查看原文</button>
+                    <button class="detail-btn primary">标记已处理</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ========== 监控设置页 ========== -->
+        <div class="page" id="page-settings">
+            <div class="header">
+                <span class="back-btn" onclick="navigateTo('page-home')">←</span>
+                <span class="title">监控设置</span>
+                <span class="action-btn"></span>
+            </div>
+            <div class="content">
+                <!-- 关键词管理 -->
+                <div class="settings-section">
+                    <div class="section-header">
+                        <span class="icon">🏷️</span>
+                        <span class="title">监控关键词</span>
+                        <span class="count">(2/3)</span>
+                    </div>
+                    
+                    <div class="keyword-item">
+                        <div class="keyword-name">XX品牌</div>
+                        <div class="keyword-platforms">
+                            <span class="platform-check">☑️ 微博</span>
+                            <span class="platform-check">☑️ 小红书</span>
+                        </div>
+                        <div class="edit-btn">编辑</div>
+                    </div>
+                    
+                    <div class="keyword-item">
+                        <div class="keyword-name">XX产品</div>
+                        <div class="keyword-platforms">
+                            <span class="platform-check">☑️ 微博</span>
+                            <span class="platform-check">☑️ 小红书</span>
+                        </div>
+                        <div class="edit-btn">编辑</div>
+                    </div>
+                    
+                    <div class="add-keyword-btn" onclick="showModal('modal-add-keyword')">
+                        <div>＋ 添加关键词</div>
+                        <div class="sub-text">还可添加 1 个</div>
+                    </div>
+                </div>
+                
+                <!-- 推送设置 -->
+                <div class="settings-section">
+                    <div class="section-header">
+                        <span class="icon">📢</span>
+                        <span class="title">推送设置</span>
+                    </div>
+                    
+                    <div class="setting-row">
+                        <span class="label">每日摘要推送</span>
+                        <div class="toggle-switch"></div>
+                    </div>
+                    
+                    <div class="setting-row">
+                        <span class="label">推送时间</span>
+                        <select class="time-select">
+                            <option>08:00</option>
+                            <option selected>08:30</option>
+                            <option>09:00</option>
+                        </select>
+                    </div>
+                    
+                    <div class="setting-row">
+                        <span class="label">负面预警推送</span>
+                        <div class="toggle-switch"></div>
+                    </div>
+                </div>
+                
+                <!-- 监控频率 -->
+                <div class="settings-section">
+                    <div class="section-header">
+                        <span class="icon">⏰</span>
+                        <span class="title">监控频率</span>
+                    </div>
+                    
+                    <div class="setting-row">
+                        <span class="label">当前方案</span>
+                        <span class="value">每日 2 次</span>
+                    </div>
+                    
+                    <div class="setting-row">
+                        <span class="label">抓取时间</span>
+                        <span class="value">08:00 / 20:00</span>
+                    </div>
+                    
+                    <div class="info-box">
+                        <div class="tip">
+                            <span class="icon">💡</span>
+                            免费版每日抓取2次，更高频率敬请期待
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 底部导航 -->
+            <div class="tab-bar">
+                <div class="tab-item" onclick="navigateTo('page-home')">
+                    <span class="tab-icon">🏠</span>
+                    <span class="tab-label">首页</span>
+                </div>
+                <div class="tab-item" onclick="navigateTo('page-list')">
+                    <span class="tab-icon">📋</span>
+                    <span class="tab-label">列表</span>
+                </div>
+                <div class="tab-item active" onclick="navigateTo('page-settings')">
+                    <span class="tab-icon">⚙️</span>
+                    <span class="tab-label">设置</span>
+                </div>
+                <div class="tab-item" onclick="navigateTo('page-profile')">
+                    <span class="tab-icon">👤</span>
+                    <span class="tab-label">我的</span>
+                </div>
+            </div>
+            
+            <!-- 添加关键词弹窗 -->
+            <div class="modal-overlay" id="modal-add-keyword">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div class="title">添加监控关键词</div>
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <div style="font-size: 14px; color: #666; margin-bottom: 10px;">关键词</div>
+                        <input type="text" placeholder="请输入品牌/产品/话题" style="width: 100%; padding: 14px; border: 2px solid #e8e8e8; border-radius: 10px; font-size: 15px; outline: none;">
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <div style="font-size: 14px; color: #666; margin-bottom: 10px;">监控平台</div>
+                        <div class="modal-options" style="margin-bottom: 0;">
+                            <div class="modal-option selected">
+                                <div class="checkbox">✓</div>
+                                <div class="label">📘 微博</div>
+                            </div>
+                            <div class="modal-option selected">
+                                <div class="checkbox">✓</div>
+                                <div class="label">📕 小红书</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="font-size: 13px; color: #999; margin-bottom: 20px;">
+                        💡 建议输入准确的品牌名或产品名，避免过于宽泛
+                    </div>
+                    <div style="display: flex; gap: 12px;">
+                        <button onclick="hideModal('modal-add-keyword')" style="flex: 1; padding: 14px; background: #f5f5f5; border: none; border-radius: 12px; font-size: 16px; cursor: pointer;">取消</button>
+                        <button onclick="hideModal('modal-add-keyword')" class="modal-btn" style="flex: 1;">确定</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ========== 我的页面 ========== -->
+        <div class="page" id="page-profile">
+            <div class="header">
+                <span class="back-btn"></span>
+                <span class="title">我的</span>
+                <span class="action-btn"></span>
+            </div>
+            <div class="content">
+                <!-- 用户信息 -->
+                <div class="profile-header">
+                    <div class="avatar">🧑‍💼</div>
+                    <div class="nickname">微信用户</div>
+                </div>
+                
+                <!-- 使用统计 -->
+                <div class="stats-card">
+                    <div class="stat">
+                        <div class="number">15</div>
+                        <div class="label">累计监控(天)</div>
+                    </div>
+                    <div class="stat">
+                        <div class="number">326</div>
+                        <div class="label">累计分析(条)</div>
+                    </div>
+                </div>
+                
+                <!-- 菜单列表 -->
+                <div class="menu-list">
+                    <div class="menu-item">
+                        <span class="icon">📋</span>
+                        <span class="label">推送记录</span>
+                        <span class="arrow">›</span>
+                    </div>
+                    <div class="menu-item">
+                        <span class="icon">📖</span>
+                        <span class="label">使用说明</span>
+                        <span class="arrow">›</span>
+                    </div>
+                    <div class="menu-item">
+                        <span class="icon">💬</span>
+                        <span class="label">意见反馈</span>
+                        <span class="arrow">›</span>
+                    </div>
+                    <div class="menu-item">
+                        <span class="icon">⭐</span>
+                        <span class="label">给我们评分</span>
+                        <span class="arrow">›</span>
+                    </div>
+                    <div class="menu-item">
+                        <span class="icon">📄</span>
+                        <span class="label">用户协议 / 隐私政策</span>
+                        <span class="arrow">›</span>
+                    </div>
+                </div>
+                
+                <div class="version-info">版本号 v1.0.0</div>
+            </div>
+            
+            <!-- 底部导航 -->
+            <div class="tab-bar">
+                <div class="tab-item" onclick="navigateTo('page-home')">
+                    <span class="tab-icon">🏠</span>
+                    <span class="tab-label">首页</span>
+                </div>
+                <div class="tab-item" onclick="navigateTo('page-list')">
+                    <span class="tab-icon">📋</span>
+                    <span class="tab-label">列表</span>
+                </div>
+                <div class="tab-item" onclick="navigateTo('page-settings')">
+                    <span class="tab-icon">⚙️</span>
+                    <span class="tab-label">设置</span>
+                </div>
+                <div class="tab-item active" onclick="navigateTo('page-profile')">
+                    <span class="tab-icon">👤</span>
+                    <span class="tab-label">我的</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    
+</body>
+</html>
