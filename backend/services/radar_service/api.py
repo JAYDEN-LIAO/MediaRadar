@@ -1,41 +1,27 @@
-# yq_radar/api.py
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+# backend/services/radar_service/api.py
+from fastapi import APIRouter
 from pydantic import BaseModel
-import uvicorn
-from db_manager import get_latest_results, get_system_settings, save_system_settings
-from yq_main import api_start_task, RADAR_STATUS, reload_config
+from .db_manager import get_latest_results, get_system_settings, save_system_settings
+from .yq_main import api_start_task, RADAR_STATUS, reload_config
 
-app = FastAPI()
+router = APIRouter()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-@app.post("/api/start_task")
+@router.post("/api/start_task")
 def start_task():
-    # ✨ 不再需要传 req.keyword，直接唤醒引擎，引擎自己会去查数据库配置
     success, msg = api_start_task()
     if success:
         return {"code": 200, "msg": msg}
     else:
         return {"code": 400, "msg": msg}
 
-@app.get("/api/radar_status")
+@router.get("/api/radar_status")
 def get_radar_status():
     return {"code": 200, "data": RADAR_STATUS}
 
-# 3. 规范读取：直接从我们统一梳理好的 ai_results 库里读数据！
-@app.get("/api/yq_list")
+@router.get("/api/yq_list")
 def get_yq_list():
-    # 调用 db_manager 取出最新的 50 条入库数据
     db_results = get_latest_results(limit=50)
     
-    # ✨ 新增一个平台名称映射字典
     plat_name_map = {
         "wb": "微博",
         "xhs": "小红书",
@@ -56,12 +42,10 @@ def get_yq_list():
         else:
             sentiment, risk_text = "neutral", "中风险"
             
-        # 提取真实发帖内容，如果内容为空就取标题
         raw_content = r.get("content")
         if not raw_content or str(raw_content).strip() == "":
             raw_content = r.get("title") or "暂无内容"
             
-        # 魔法呈现：正常报道显示网友/媒体原话，负面事件显示 AI 深度研判报告
         display_report = raw_content if sentiment != "negative" else r.get("report", "")
         
         if len(display_report) > 80:
@@ -69,7 +53,6 @@ def get_yq_list():
 
         formatted_data.append({
             "id": r["post_id"],
-            # 👇 核心修复：使用字典动态匹配平台名称，不再硬编码
             "platform": plat_name_map.get(r["platform"], str(r["platform"]).upper()),
             "sentiment": sentiment,
             "risk": risk_text,
@@ -86,7 +69,6 @@ def get_yq_list():
         "data": formatted_data
     }
 
-# 定义前端传过来的设置格式
 class SettingsRequest(BaseModel):
     keywords: list
     platforms: list
@@ -95,18 +77,12 @@ class SettingsRequest(BaseModel):
     alert_negative: bool
     monitor_frequency: float
 
-# --- 新增的设置接口 ---
-@app.get("/api/settings")
+@router.get("/api/settings")
 def api_get_settings():
     return {"code": 200, "data": get_system_settings()}
 
-@app.post("/api/settings")
+@router.post("/api/settings")
 def api_save_settings(req: SettingsRequest):
-    # 保存进数据库
     save_system_settings(req.model_dump())
-    # 💥 魔法：通知核心系统立刻重新加载配置！
     reload_config()
-    return {"code": 200, "msg": "系统设置已更新并生效！"}
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    return {"code": 200, "msg": "系统设置已更新并生效"}
