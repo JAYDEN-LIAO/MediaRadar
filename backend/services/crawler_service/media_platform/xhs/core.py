@@ -94,6 +94,9 @@ class XiaoHongShuCrawler(AbstractCrawler):
             self.context_page = await self.browser_context.new_page()
             await self.context_page.goto(self.index_url)
 
+            utils.logger.info("[XiaoHongShuCrawler.start] 正在等待小红书页面加载及同步 Cookie (3秒)...")
+            await asyncio.sleep(3)
+
             # Create a client to interact with the Xiaohongshu website.
             self.xhs_client = await self.create_xhs_client(httpx_proxy_format)
             if not await self.xhs_client.pong():

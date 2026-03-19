@@ -67,7 +67,11 @@ class KuaiShouClient(AbstractApiClient, ProxyRefreshMixin):
 
         async with httpx.AsyncClient(proxy=self.proxy) as client:
             response = await client.request(method, url, timeout=self.timeout, **kwargs)
-        data: Dict = response.json()
+        try:
+            data: Dict = response.json()
+        except Exception as e:
+            utils.logger.error(f"🚨 [KuaiShouClient.request] 请求失败！状态码: {response.status_code}, 真实返回内容: {response.text[:300]}")
+            raise DataFetchError(f"快手接口返回非 JSON 数据, 状态码: {response.status_code}")
         if data.get("errors"):
             raise DataFetchError(data.get("errors", "unkonw error"))
         else:
@@ -133,7 +137,22 @@ class KuaiShouClient(AbstractApiClient, ProxyRefreshMixin):
         return ping_flag
 
     async def update_cookies(self, browser_context: BrowserContext):
-        cookie_str, cookie_dict = utils.convert_cookies(await browser_context.cookies())
+        raw_cookies = await browser_context.cookies()
+        filtered_cookies = []
+        for cookie in raw_cookies:
+            name = cookie.get("name", "")
+            value = cookie.get("value", "")
+            
+            if name in ["kuaishou.server.web_st", "kuaishou.server.web_ph", "did", "userId", "kpn", "kpf", "clientid", "client_key"]:
+                filtered_cookies.append(cookie)
+                continue
+                
+            if len(value) > 300:
+                continue
+                
+            filtered_cookies.append(cookie)
+            
+        cookie_str, cookie_dict = utils.convert_cookies(filtered_cookies)
         self.headers["Cookie"] = cookie_str
         self.cookie_dict = cookie_dict
 

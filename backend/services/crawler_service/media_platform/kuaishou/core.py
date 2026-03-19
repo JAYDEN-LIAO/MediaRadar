@@ -95,6 +95,9 @@ class KuaishouCrawler(AbstractCrawler):
             self.context_page = await self.browser_context.new_page()
             await self.context_page.goto(f"{self.index_url}?isHome=1")
 
+            utils.logger.info("[KuaishouCrawler.start] 正在等待快手页面加载及同步 Cookie (3秒)...")
+            await asyncio.sleep(3)
+
             # Create a client to interact with the kuaishou website.
             self.ks_client = await self.create_ks_client(httpx_proxy_format)
             if not await self.ks_client.pong():
@@ -304,9 +307,27 @@ class KuaishouCrawler(AbstractCrawler):
         utils.logger.info(
             "[KuaishouCrawler.create_ks_client] Begin create kuaishou API client ..."
         )
-        cookie_str, cookie_dict = utils.convert_cookies(
-            await self.browser_context.cookies()
-        )
+
+        raw_cookies = await self.browser_context.cookies()
+        filtered_cookies = []
+        for cookie in raw_cookies:
+            name = cookie.get("name", "")
+            value = cookie.get("value", "")
+            
+            # 1. 核心凭证绝对保留（无论多长）
+            if name in ["kuaishou.server.web_st", "kuaishou.server.web_ph", "did", "userId", "kpn", "kpf", "clientid", "client_key"]:
+                filtered_cookies.append(cookie)
+                continue
+                
+            # 2. 拒绝“巨无霸”：如果不是核心凭证，且长度超过 300 字符，大概率是垃圾行为追踪器，直接丢弃！
+            if len(value) > 300:
+                continue
+                
+            # 3. 其他所有短小精悍的 Cookie（往往是风控组件生成的动态指纹）全部放行
+            filtered_cookies.append(cookie)
+            
+        cookie_str, cookie_dict = utils.convert_cookies(filtered_cookies)
+
         ks_client_obj = KuaiShouClient(
             proxy=httpx_proxy,
             headers={
