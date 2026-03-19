@@ -235,8 +235,19 @@ class XiaoHongShuClient(AbstractApiClient, ProxyRefreshMixin):
         ping_flag = False
         try:
             self_info: Dict = await self.query_self()
-            if self_info and self_info.get("data", {}).get("result", {}).get("success"):
-                ping_flag = True
+            
+            utils.logger.info(f"[XiaoHongShuClient.pong] API 返回的自我信息: {self_info}")
+
+            if self_info:
+                # ====== 优化：放宽判断条件，兼容新老版本的 API 结构 ======
+                is_success_new = self_info.get("success", False) # 现在的通常在最外层
+                is_success_old = self_info.get("data", {}).get("result", {}).get("success", False)
+                is_code_zero = self_info.get("code") == 0
+                
+                if is_success_new or is_success_old or is_code_zero:
+                    ping_flag = True
+                # =======================================================
+                
         except Exception as e:
             utils.logger.error(
                 f"[XiaoHongShuClient.pong] Check login state failed: {e}, and try to login again..."
