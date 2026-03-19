@@ -393,9 +393,16 @@ class ZhihuCrawler(AbstractCrawler):
         utils.logger.info(
             "[ZhihuCrawler.create_zhihu_client] Begin create zhihu API client ..."
         )
-        cookie_str, cookie_dict = utils.convert_cookies(
-            await self.browser_context.cookies()
-        )
+        
+        raw_cookies = await self.browser_context.cookies()
+        whitelist = ["z_c0", "d_c0", "q_c1", "_xsrf", "sessionid"] 
+        filtered_cookies = []
+        for cookie in raw_cookies:
+            if cookie.get("name") in whitelist:
+                filtered_cookies.append(cookie)
+                
+        cookie_str, cookie_dict = utils.convert_cookies(filtered_cookies)
+        
         zhihu_client_obj = ZhiHuClient(
             proxy=httpx_proxy,
             headers={
@@ -412,7 +419,7 @@ class ZhihuCrawler(AbstractCrawler):
             },
             playwright_page=self.context_page,
             cookie_dict=cookie_dict,
-            proxy_ip_pool=self.ip_proxy_pool,  # Pass proxy pool for automatic refresh
+            proxy_ip_pool=self.ip_proxy_pool,
         )
         return zhihu_client_obj
 

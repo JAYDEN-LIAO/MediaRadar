@@ -162,13 +162,13 @@ class ZhiHuClient(AbstractApiClient, ProxyRefreshMixin):
     async def update_cookies(self, browser_context: BrowserContext):
         """
         Update cookies method provided by API client, typically called after successful login
-        Args:
-            browser_context: Browser context object
-
-        Returns:
-
         """
-        cookie_str, cookie_dict = utils.convert_cookies(await browser_context.cookies())
+        raw_cookies = await browser_context.cookies()
+        
+        whitelist = ["z_c0", "d_c0", "q_c1", "_xsrf", "sessionid"]
+        filtered_cookies = [c for c in raw_cookies if c.get("name") in whitelist]
+            
+        cookie_str, cookie_dict = utils.convert_cookies(filtered_cookies)
         self.default_headers["cookie"] = cookie_str
         self.cookie_dict = cookie_dict
 
