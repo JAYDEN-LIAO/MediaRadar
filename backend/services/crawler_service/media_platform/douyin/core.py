@@ -139,9 +139,21 @@ class DouYinCrawler(AbstractCrawler):
                         publish_time=PublishTimeType(config.PUBLISH_TIME_TYPE),
                         search_id=dy_search_id,
                     )
+                    
+                    # 判断是否真的没有数据了
                     if posts_res.get("data") is None or posts_res.get("data") == []:
-                        utils.logger.info(f"[DouYinCrawler.search] search douyin keyword: {keyword}, page: {page} is empty,{posts_res.get('data')}`")
+                        
+                        search_nil_info = posts_res.get("search_nil_info", {})
+                        if search_nil_info.get("search_nil_type") == "verify_check":
+                            utils.logger.error("🚨 触发抖音风控！IP或账号被要求验证。")
+                            utils.logger.error("👉 请立刻在弹出的浏览器窗口中，手动点击搜索框搜点东西，完成【滑块验证】！")
+                            utils.logger.error("⏳ 程序将暂停 30 秒等待你操作...")
+                            await asyncio.sleep(30)
+                            continue
+
+                        utils.logger.info(f"[DouYinCrawler.search] search douyin keyword: {keyword}, page: {page} is empty")
                         break
+                        
                 except DataFetchError:
                     utils.logger.error(f"[DouYinCrawler.search] search douyin keyword: {keyword} failed")
                     break
