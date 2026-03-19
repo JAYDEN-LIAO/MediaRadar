@@ -1,5 +1,5 @@
 # backend/services/radar_service/api.py
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks
 from pydantic import BaseModel
 from .db_manager import get_latest_results, get_system_settings, save_system_settings
 from .yq_main import api_start_task, RADAR_STATUS, reload_config
@@ -7,8 +7,8 @@ from .yq_main import api_start_task, RADAR_STATUS, reload_config
 router = APIRouter()
 
 @router.post("/api/start_task")
-def start_task():
-    success, msg = api_start_task()
+def start_task(background_tasks: BackgroundTasks):
+    success, msg = api_start_task(background_tasks)
     if success:
         return {"code": 200, "msg": msg}
     else:

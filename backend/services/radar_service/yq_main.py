@@ -130,7 +130,8 @@ def run_analysis_pipeline():
 输出JSON格式: {{"is_relevant": true/false, "matched_keyword": "匹配的具体实体名", "reason": "..."}}"""
             
             text_to_analyze = f"标题: {p['title']}\n正文: {p['content'][:500]}"
-            res = call_llm(screener_prompt, text_to_analyze)
+            # 确保传入正确的 JSON 参数和引擎调用
+            res = call_llm(screener_prompt, text_to_analyze, response_format="json", engine="deepseek")
             
             if res.get("is_relevant"):
                 matched_kw = res.get("matched_keyword")
@@ -141,7 +142,6 @@ def run_analysis_pipeline():
                 relevant_posts.append(p)
                 
             processed_records.append((p["post_id"], platform))
-            #time.sleep(0.5) 
 
         logger.info(f"Filter completed. Relevant: {len(relevant_posts)} | Irrelevant: {len(posts) - len(relevant_posts)}")
 
@@ -196,7 +196,7 @@ def run_analysis_pipeline():
                 else:
                     logger.info(f"Status check passed for topic: {topic_name}")
 
-def api_start_task():
+def api_start_task(background_tasks):
     if RADAR_STATUS["is_running"]:
         return False, "扫描任务正在运行中，请勿重复启动"
     
@@ -215,7 +215,8 @@ def api_start_task():
             RADAR_STATUS["is_running"] = False
             RADAR_STATUS["status_text"] = "系统闲置中"
 
-    threading.Thread(target=_run_in_background).start()
+    # 使用 FastAPI 提供的 background_tasks 替代 threading.Thread
+    background_tasks.add_task(_run_in_background)
     return True, "扫描任务已启动"
 
 def job():
