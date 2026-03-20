@@ -1,4 +1,4 @@
-# backend/services/radar_service/yq_main.py
+# backend/services/radar_service/main.py
 import subprocess
 import time
 import schedule
@@ -6,11 +6,8 @@ import os
 import sys
 import threading
 
-
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-
 BACKEND_DIR = os.path.dirname(os.path.dirname(CURRENT_DIR))
-
 PROJECT_ROOT = os.path.dirname(BACKEND_DIR)
 
 if BACKEND_DIR not in sys.path:
@@ -18,19 +15,14 @@ if BACKEND_DIR not in sys.path:
 
 CRAWLER_DIR = os.path.join(BACKEND_DIR, "services", "crawler_service")
 
-
 from core.logger import logger
 from core.config import settings
 from .db_manager import get_unprocessed_posts, mark_processed_batch, save_ai_result, get_system_settings
-from .llm_pipeline import process_post, call_llm, cluster_related_posts
+from .llm_pipeline import analyze_and_report, call_llm, cluster_related_posts, call_vision_llm, ScreenerResult
+from .prompt_templates import SCREENER_PROMPT
 from .notifier import send_alert
 
-RADAR_STATUS = {
-    "is_running": False,
-    "status_text": "系统闲置中",
-    "last_run_time": "暂无"
-}
-
+RADAR_STATUS = {"is_running": False, "status_text": "系统闲置中", "last_run_time": "暂无"}
 MONITOR_KEYWORDS = []
 MONITOR_PLATFORMS = []
 ALERT_NEGATIVE = True
@@ -39,80 +31,32 @@ def daily_summary_job():
     logger.info("Triggering daily summary notification.")
     current_keyword = "、".join(MONITOR_KEYWORDS) if MONITOR_KEYWORDS else "监控目标"
     send_alert(
-        keyword=current_keyword,
-        platform="系统",
-        risk_level="info",
-        core_issue="每日舆情简报", 
-        report=f"系统已按设定的时间自动汇总。今日监控目标【{current_keyword}】舆情态势平稳，详细数据请登录前端看板查看。",
-        urls=[] 
+        keyword=current_keyword, platform="全部平台", risk_level="info",
+        core_issue="每日舆情监测总结", report="今日监测已完成，详情请登录后台查看。", urls=[]
     )
 
 def reload_config():
     global MONITOR_KEYWORDS, MONITOR_PLATFORMS, ALERT_NEGATIVE
     try:
-        cfg = get_system_settings()
+        conf = get_system_settings()  # 修复：去掉了括号里的参数
     except Exception:
-        cfg = {} 
-    
-    MONITOR_KEYWORDS = cfg.get("keywords", ["北京银行"])
-    if not MONITOR_KEYWORDS: MONITOR_KEYWORDS = ["北京银行"] 
+        conf = {} 
         
-    MONITOR_PLATFORMS = cfg.get("platforms", ["wb"])
-    if not MONITOR_PLATFORMS: MONITOR_PLATFORMS = ["wb"]
-        
-    ALERT_NEGATIVE = cfg.get("alert_negative", True)
-    
-    schedule.clear()
-    
-    freq_hours = float(cfg.get("monitor_frequency", 1.0))
-    freq_minutes = int(freq_hours * 60)
-    if freq_minutes <= 0: freq_minutes = 60 
-    schedule.every(freq_minutes).minutes.do(job)
-    
-    if cfg.get("push_summary", True):
-        push_time = cfg.get("push_time", "18:00")
-        schedule.every().day.at(push_time).do(daily_summary_job)
-        
-    logger.info(f"Configuration reloaded. Keywords: {MONITOR_KEYWORDS}, Platforms: {MONITOR_PLATFORMS}, Freq: {freq_hours}h")
+    MONITOR_KEYWORDS = conf.get("keywords", [])
+    MONITOR_PLATFORMS = conf.get("platforms", [])
+    ALERT_NEGATIVE = conf.get("alert_negative", True)
+    logger.info(f"Loaded config: keywords={MONITOR_KEYWORDS}, platforms={MONITOR_PLATFORMS}")
 
 def run_crawler_for_platform(platform):
-    logger.info(f"Starting crawler for platform: {platform.upper()}")
+    logger.info(f"Starting crawler for {platform}")
     try:
-        clean_env = os.environ.copy()
-        if "VIRTUAL_ENV" in clean_env:
-            del clean_env["VIRTUAL_ENV"]
-            
-        if not MONITOR_KEYWORDS:
-            logger.warning("No keywords specified, skipping task.")
-            return
-            
-        keywords_str = ",".join(MONITOR_KEYWORDS)
-        logger.info(f"Executing task with keywords: {keywords_str}")
-        
-        logger.info(f"【路径探针】程序计算出的爬虫根目录为: {CRAWLER_DIR}")
-        if not os.path.exists(CRAWLER_DIR):
-            logger.error(f"【致命错误】找不到该目录！请检查你的真实爬虫文件夹叫什么名字！")
-            return
-
         subprocess.run(
-            [
-                "uv", "run", "main.py", 
-                "--platform", platform, 
-                "--type", "search", 
-                "--save_data_option", "sqlite", 
-                "--headless", "no",
-                "--keywords", keywords_str
-            ],
-            cwd=CRAWLER_DIR, 
-            env=clean_env, 
-            check=True,
-            timeout=600 
+            ["python", os.path.join(CRAWLER_DIR, f"{platform}_crawler.py")],
+            check=True
         )
-        logger.info(f"{platform.upper()} data extraction completed.")
-    except subprocess.TimeoutExpired:
-        logger.error(f"Task timeout for platform {platform}, terminated forcefully.")
+        logger.info(f"Crawler for {platform} finished successfully.")
     except subprocess.CalledProcessError as e:
-        logger.error(f"Execution failed for platform {platform}: {e}")
+        logger.error(f"Crawler for {platform} failed with error: {e}")
 
 def run_analysis_pipeline():
     for platform in MONITOR_PLATFORMS:
@@ -126,24 +70,41 @@ def run_analysis_pipeline():
         post_dict = {p["post_id"]: p for p in posts} 
         
         for idx, p in enumerate(posts, 1):
-            screener_prompt = f"""你是一个严谨的数据筛选员。请判断以下内容是否讨论目标实体之一：{MONITOR_KEYWORDS}。
-输出JSON格式: {{"is_relevant": true/false, "matched_keyword": "匹配的具体实体名", "reason": "..."}}"""
+            text_content = p.get('content', '')
+            image_urls = p.get('image_urls', [])
             
-            text_to_analyze = f"标题: {p['title']}\n正文: {p['content'][:500]}"
-            # 确保传入正确的 JSON 参数和引擎调用
-            res = call_llm(screener_prompt, text_to_analyze, response_format="json", engine="deepseek")
+            # ==========================================
+            # 🌟 接入 Vision Agent：看图说话
+            # ==========================================
+            if len(text_content) < 50 and image_urls:
+                logger.info(f"检测到含图帖 (ID:{p['post_id']})，呼叫 Vision Agent 解析图片...")
+                vision_text = call_vision_llm(image_urls[0])
+                if vision_text:
+                    text_content = f"{text_content}\n【图片提取内容】：{vision_text}"
+            
+            # ==========================================
+            # 🌟 接入 Screener Agent：精准初筛
+            # ==========================================
+            screener_prompt = SCREENER_PROMPT.format(keyword="、".join(MONITOR_KEYWORDS))
+            text_to_analyze = f"标题: {p['title']}\n正文: {text_content[:800]}"
+            
+            res = call_llm(
+                screener_prompt, text_to_analyze, 
+                response_format="json", engine="deepseek", pydantic_model=ScreenerResult
+            )
             
             if res.get("is_relevant"):
                 matched_kw = res.get("matched_keyword")
                 if not matched_kw or matched_kw not in MONITOR_KEYWORDS:
                     matched_kw = next((k for k in MONITOR_KEYWORDS if k in text_to_analyze), MONITOR_KEYWORDS[0])
                 
+                p["content"] = text_content
                 p["matched_keyword"] = matched_kw
                 relevant_posts.append(p)
                 
             processed_records.append((p["post_id"], platform))
 
-        logger.info(f"Filter completed. Relevant: {len(relevant_posts)} | Irrelevant: {len(posts) - len(relevant_posts)}")
+        logger.info(f"初筛完成. 相关: {len(relevant_posts)} | 过滤无关: {len(posts) - len(relevant_posts)}")
 
         if processed_records:
             mark_processed_batch(processed_records)
@@ -151,15 +112,15 @@ def run_analysis_pipeline():
         if not relevant_posts:
             continue
 
+        # 按实体分组
         grouped_posts = {}
         for p in relevant_posts:
             kw = p["matched_keyword"]
-            if kw not in grouped_posts:
-                grouped_posts[kw] = []
-            grouped_posts[kw].append(p)
+            grouped_posts.setdefault(kw, []).append(p)
 
+        # 聚类与深度分析
         for specific_keyword, group_posts in grouped_posts.items():
-            logger.info(f"Clustering {len(group_posts)} records for keyword: {specific_keyword}")
+            logger.info(f"正在对关键字 [{specific_keyword}] 的 {len(group_posts)} 条数据进行聚类...")
             clusters = cluster_related_posts(group_posts, specific_keyword)
             
             for cluster in clusters:
@@ -171,11 +132,13 @@ def run_analysis_pipeline():
                 urls = []
                 for pid in post_ids:
                     if pid in post_dict:
-                        combined_text += f"【帖子】{post_dict[pid]['title']}\n"
-                        urls.append(post_dict[pid]['url'])
+                        combined_text += f"【发帖】{post_dict[pid]['title']} - {post_dict[pid].get('content', '')[:200]}\n"
+                        urls.append(post_dict[pid].get('url', ''))
                         
-                mock_post = { "title": f"聚合话题：{topic_name}", "content": combined_text[:2000] }
-                result = process_post(mock_post, specific_keyword)
+                mock_post = { "title": f"聚合话题：{topic_name}", "content": combined_text[:2500] }
+                
+                # 🌟 调用重构后的 Analyze 流程
+                result = analyze_and_report(mock_post, specific_keyword)
                 
                 for pid in post_ids:
                     if pid in post_dict:
@@ -187,14 +150,15 @@ def run_analysis_pipeline():
                             risk_level=result.get("risk_level", "low"), core_issue=result.get("core_issue", "无异常"), report=result.get("report", result.get("reason", ""))
                         )
 
-                if result["status"] == "alert" and ALERT_NEGATIVE:
-                    logger.warning(f"Negative sentiment detected. Risk level: {result.get('risk_level')}")
+                if result.get("status") == "alert" and ALERT_NEGATIVE:
+                    logger.warning(f"🚨 高危预警产生！等级: {result.get('risk_level')}")
                     send_alert(
                         keyword=specific_keyword, platform=platform, risk_level=result["risk_level"],
                         core_issue=topic_name, report=result["report"], urls=urls 
                     )
                 else:
-                    logger.info(f"Status check passed for topic: {topic_name}")
+                    logger.info(f"✅ 话题检测安全通过: {topic_name}")
+
 
 def api_start_task(background_tasks):
     if RADAR_STATUS["is_running"]:
@@ -215,7 +179,6 @@ def api_start_task(background_tasks):
             RADAR_STATUS["is_running"] = False
             RADAR_STATUS["status_text"] = "系统闲置中"
 
-    # 使用 FastAPI 提供的 background_tasks 替代 threading.Thread
     background_tasks.add_task(_run_in_background)
     return True, "扫描任务已启动"
 
@@ -224,15 +187,14 @@ def job():
     if MONITOR_PLATFORMS:
         for platform in MONITOR_PLATFORMS:
             run_crawler_for_platform(platform)
-            time.sleep(3)
-    
     run_analysis_pipeline()
-    logger.info("Pipeline execution finished.")
 
 if __name__ == "__main__":
-    logger.info("YQ Radar Engine Initialized.")
     reload_config()
-    job()
+    schedule.every().day.at("09:00").do(job)
+    schedule.every().day.at("18:00").do(daily_summary_job)
+    
+    logger.info("Radar service started. Waiting for scheduled tasks...")
     while True:
         schedule.run_pending()
-        time.sleep(10)
+        time.sleep(60)

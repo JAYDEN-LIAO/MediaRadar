@@ -2,7 +2,7 @@
 from fastapi import APIRouter, BackgroundTasks
 from pydantic import BaseModel
 from .db_manager import get_latest_results, get_system_settings, save_system_settings
-from .yq_main import api_start_task, RADAR_STATUS, reload_config
+from .main import api_start_task, RADAR_STATUS, reload_config
 
 router = APIRouter()
 

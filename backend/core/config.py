@@ -14,14 +14,29 @@ ENV_PATH = os.path.join(PROJECT_ROOT, ".env")
 load_dotenv(dotenv_path=ENV_PATH)
 
 class Settings:
+    # ======== 配置1: Screener & Analyst (DeepSeek) ========
     DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
     DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1").strip()
     DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
     
+    # ======== 配置2: Reviewer & Director (Kimi) ========
     KIMI_API_KEY = os.getenv("KIMI_API_KEY", "")
     KIMI_BASE_URL = os.getenv("KIMI_BASE_URL", "https://api.moonshot.cn/v1").strip()
     KIMI_MODEL = os.getenv("KIMI_MODEL", "kimi-k2.5")
     
+    # ======== 配置3: The Cluster (向量聚类引擎) ========
+    # 默认以硅基流动的免费 BGE-m3 API 为例，你可以在 .env 中覆盖它
+    EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY", "")
+    EMBEDDING_BASE_URL = os.getenv("EMBEDDING_BASE_URL", "https://api.siliconflow.cn/v1").strip()
+    EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")
+
+    # ======== 配置4: Vision Agent (多模态图片识别 - 通义千问 Qwen) ========
+    # 默认使用阿里云百炼 (DashScope) 的 OpenAI 兼容接口
+    VISION_API_KEY = os.getenv("VISION_API_KEY", "")
+    VISION_BASE_URL = os.getenv("VISION_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1").strip()
+    VISION_MODEL = os.getenv("VISION_MODEL", "qwen-vl-max") 
+    
+    # ======== 系统路径配置 ========
     STATE_DB_PATH = os.getenv("STATE_DB_PATH", os.path.join(DATA_DIR, "radar_state.db"))
     CRAWLER_DB_PATH = os.getenv("CRAWLER_DB_PATH", os.path.join(BACKEND_DIR, "data", "sqlite_tables.db"))
     LOG_DIR = os.getenv("LOG_DIR", os.path.join(PROJECT_ROOT, "logs"))
