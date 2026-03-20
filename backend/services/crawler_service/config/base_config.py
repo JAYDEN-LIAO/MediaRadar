@@ -18,8 +18,8 @@
 # 使用本代码即表示您同意遵守上述原则和LICENSE中的所有条款。
 
 # Basic configuration
-PLATFORM = "wb"  # Platform, xhs | dy | ks | bili | wb | tieba | zhihu
-KEYWORDS = "北京银行"  # Keyword search configuration, separated by English commas
+PLATFORM = ""  # Platform, xhs | dy | ks | bili | wb | tieba | zhihu
+KEYWORDS = ""  # Keyword search configuration, separated by English commas
 LOGIN_TYPE = "qrcode"  # qrcode or phone or cookie
 COOKIES = ""
 CRAWLER_TYPE = (
@@ -89,7 +89,9 @@ CRAWLER_MAX_NOTES_COUNT = 3
 MAX_CONCURRENCY_NUM = 1
 
 # Whether to enable crawling media mode (including image or video resources), crawling media is not enabled by default
-ENABLE_GET_MEIDAS = True
+ENABLE_GET_IMAGES = True
+
+ENABLE_GET_VIDEOS = False
 
 # Whether to enable comment crawling mode. Comment crawling is enabled by default.
 ENABLE_GET_COMMENTS = False

@@ -405,7 +405,7 @@ class DouYinCrawler(AbstractCrawler):
         Args:
             aweme_item (Dict): 抖音作品详情
         """
-        if not config.ENABLE_GET_MEIDAS:
+        if not config.ENABLE_GET_IMAGES:
             utils.logger.info(f"[DouYinCrawler.get_aweme_media] Crawling image mode is not enabled")
             return
         # List of note urls. If it is a short video type, an empty list will be returned.
@@ -425,7 +425,7 @@ class DouYinCrawler(AbstractCrawler):
         Args:
             aweme_item (Dict): 抖音作品详情
         """
-        if not config.ENABLE_GET_MEIDAS:
+        if not config.ENABLE_GET_IMAGES:
             return
         aweme_id = aweme_item.get("aweme_id")
         # List of note urls. If it is a short video type, an empty list will be returned.
@@ -452,7 +452,7 @@ class DouYinCrawler(AbstractCrawler):
         Args:
             aweme_item (Dict): 抖音作品详情
         """
-        if not config.ENABLE_GET_MEIDAS:
+        if not config.ENABLE_GET_VIDEOS:
             return
         aweme_id = aweme_item.get("aweme_id")
 

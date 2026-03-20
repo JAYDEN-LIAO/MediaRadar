@@ -104,10 +104,10 @@ def run_analysis_pipeline():
             
             if image_urls:
                 logger.info(f"📸 检测到图片 (ID:{p['post_id']})，结合上下文呼叫 Vision Agent 解析...")
-                # 将 image_urls[0] 和 text_content 一起传进去
-                vision_text = call_vision_llm(image_urls[0], text_content, platform=platform)
+                vision_text = call_vision_llm(image_urls[0], text_content, platform=platform, post_id=p.get('post_id'))
                 if vision_text:
                     text_content = f"{text_content}\n【视觉补充】：{vision_text}"
+                    logger.info(f"✅ 图片特征已成功拼接入帖子正文，进入后续分析链！")
             
             screener_prompt = SCREENER_PROMPT.format(keyword="、".join(MONITOR_KEYWORDS))
             text_to_analyze = f"标题: {p['title']}\n正文: {text_content[:800]}"

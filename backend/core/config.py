@@ -15,14 +15,14 @@ load_dotenv(dotenv_path=ENV_PATH)
 
 class Settings:
     # ======== 配置1: Screener & Analyst (DeepSeek) ========
-    DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
-    DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1").strip()
-    DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+    ANALYST_API_KEY = os.getenv("ANALYST_API_KEY", "")
+    ANALYST_BASE_URL = os.getenv("ANALYST_BASE_URL", "https://api.deepseek.com/v1").strip()
+    ANALYST_MODEL = os.getenv("ANALYST_MODEL", "deepseek-chat")
     
     # ======== 配置2: Reviewer & Director (Kimi) ========
-    KIMI_API_KEY = os.getenv("KIMI_API_KEY", "")
-    KIMI_BASE_URL = os.getenv("KIMI_BASE_URL", "https://api.moonshot.cn/v1").strip()
-    KIMI_MODEL = os.getenv("KIMI_MODEL", "kimi-k2.5")
+    REVIEWER_API_KEY = os.getenv("REVIEWER_API_KEY", "")
+    REVIEWER_BASE_URL = os.getenv("REVIEWER_BASE_URL", "https://api.moonshot.cn/v1").strip()
+    REVIEWER_MODEL = os.getenv("REVIEWER_MODEL", "kimi-k2.5")
     
     # ======== 配置3: The Cluster (向量聚类引擎) ========
     # 默认以硅基流动的免费 BGE-m3 API 为例，你可以在 .env 中覆盖它

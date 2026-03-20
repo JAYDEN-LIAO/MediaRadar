@@ -173,3 +173,6 @@ agent_zone
 debug_tools
 
 database/*.db
+
+radar_state.db
+sqlite_tables.db

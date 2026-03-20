@@ -277,20 +277,11 @@ class XiaoHongShuCrawler(AbstractCrawler):
         xsec_token: str,
         semaphore: asyncio.Semaphore,
     ) -> Optional[Dict]:
-        """Get note detail
-
-        Args:
-            note_id:
-            xsec_source:
-            xsec_token:
-            semaphore:
-
-        Returns:
-            Dict: note detail
-        """
+        """Get note detail"""
         note_detail = None
-        utils.logger.info(f"[get_note_detail_async_task] Begin get note detail, note_id: {note_id}")
+
         async with semaphore:
+            utils.logger.info(f"[get_note_detail_async_task] 🚀 开始抓取详情 (排队进入), note_id: {note_id}")
             try:
                 try:
                     note_detail = await self.xhs_client.get_note_by_id(note_id, xsec_source, xsec_token)
@@ -301,13 +292,14 @@ class XiaoHongShuCrawler(AbstractCrawler):
                     note_detail = await self.xhs_client.get_note_by_id_from_html(note_id, xsec_source, xsec_token,
                                                                                  enable_cookie=True)
                     if not note_detail:
-                        raise Exception(f"[get_note_detail_async_task] Failed to get note detail, Id: {note_id}")
+                        utils.logger.warning(f"[get_note_detail_async_task] ⚠️ 抓取失败(可能遇风控), Id: {note_id}，自动跳过该条...")
+                        return None
 
                 note_detail.update({"xsec_token": xsec_token, "xsec_source": xsec_source})
 
                 # Sleep after fetching note detail
                 await asyncio.sleep(config.CRAWLER_MAX_SLEEP_SEC)
-                utils.logger.info(f"[get_note_detail_async_task] Sleeping for {config.CRAWLER_MAX_SLEEP_SEC} seconds after fetching note {note_id}")
+                utils.logger.info(f"[get_note_detail_async_task] 💤 抓取成功，安全休眠 {config.CRAWLER_MAX_SLEEP_SEC} 秒后继续...")
 
                 return note_detail
 
@@ -456,7 +448,7 @@ class XiaoHongShuCrawler(AbstractCrawler):
         utils.logger.info("[XiaoHongShuCrawler.close] Browser context closed ...")
 
     async def get_notice_media(self, note_detail: Dict):
-        if not config.ENABLE_GET_MEIDAS:
+        if not config.ENABLE_GET_IMAGES:
             utils.logger.info(f"[XiaoHongShuCrawler.get_notice_media] Crawling image mode is not enabled")
             return
         await self.get_note_images(note_detail)
@@ -468,7 +460,7 @@ class XiaoHongShuCrawler(AbstractCrawler):
         Args:
             note_item: Note item dictionary
         """
-        if not config.ENABLE_GET_MEIDAS:
+        if not config.ENABLE_GET_IMAGES:
             return
         note_id = note_item.get("note_id")
         image_list: List[Dict] = note_item.get("image_list", [])
@@ -498,7 +490,7 @@ class XiaoHongShuCrawler(AbstractCrawler):
         Args:
             note_item: Note item dictionary
         """
-        if not config.ENABLE_GET_MEIDAS:
+        if not config.ENABLE_GET_VIDEOS:
             return
         note_id = note_item.get("note_id")
 

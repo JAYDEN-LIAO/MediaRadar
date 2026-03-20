@@ -26,13 +26,13 @@ global_http_client = httpx.Client()
 
 # 初始化各个大模型 Client
 deepseek_client = OpenAI(
-    api_key=settings.DEEPSEEK_API_KEY, 
-    base_url=settings.DEEPSEEK_BASE_URL,
+    api_key=settings.ANALYST_API_KEY, 
+    base_url=settings.ANALYST_BASE_URL,
     http_client=global_http_client
 )
 kimi_client = OpenAI(
-    api_key=settings.KIMI_API_KEY, 
-    base_url=settings.KIMI_BASE_URL,
+    api_key=settings.REVIEWER_API_KEY, 
+    base_url=settings.REVIEWER_BASE_URL,
     http_client=global_http_client
 )
 embedding_client = OpenAI(
@@ -82,7 +82,7 @@ def clean_json_string(raw_text):
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def call_llm(prompt, text, response_format="text", engine="deepseek", pydantic_model=None):
     active_client = kimi_client if engine == "kimi" else deepseek_client
-    active_model = settings.KIMI_MODEL if engine == "kimi" else settings.DEEPSEEK_MODEL
+    active_model = settings.REVIEWER_MODEL if engine == "kimi" else settings.ANALYST_MODEL
 
     try:
         kwargs = {
@@ -126,9 +126,10 @@ def call_llm(prompt, text, response_format="text", engine="deepseek", pydantic_m
 # ==========================================
 # Agent +1: 视觉多模态分析师 (Vision Agent)
 # ==========================================
-def call_vision_llm(image_url: str, post_text: str = "", platform: str = "wb"):
+def call_vision_llm(image_url: str, post_text: str = "", platform: str = "wb", post_id: str = ""):
+    clean_image_url = image_url.strip('"\' ')
     prompt = VISION_PROMPT.format(text_content=post_text if post_text else "无配文")
-    final_image_url = image_url
+    final_image_url = clean_image_url
 
     platform_dir_map = {
         "wb": "weibo",
@@ -140,8 +141,11 @@ def call_vision_llm(image_url: str, post_text: str = "", platform: str = "wb"):
     dir_name = platform_dir_map.get(platform.lower(), platform.lower())
     
     try:
-        filename = os.path.basename(urllib.parse.urlparse(image_url).path)
-        local_path = os.path.join(BASE_DIR, "services", "crawler_service", "data", dir_name, "images", filename)
+        if platform.lower() == "xhs" and post_id:
+            local_path = os.path.join(BASE_DIR, "services", "crawler_service", "data", dir_name, "images", str(post_id), "0.jpg")
+        else:
+            filename = os.path.basename(urllib.parse.urlparse(clean_image_url).path)
+            local_path = os.path.join(BASE_DIR, "services", "crawler_service", "data", dir_name, "images", filename)
         
         if os.path.exists(local_path):
             with open(local_path, "rb") as image_file:
@@ -156,7 +160,8 @@ def call_vision_llm(image_url: str, post_text: str = "", platform: str = "wb"):
         logger.error(f"本地图片转换 Base64 异常: {e}")
 
     try:
-        # ✨ 修复点：使用专门初始化的 vision_client，并将默认模型名改为 qwen-vl-max
+        logger.info(f"👉 [VISION INPUT] 传给视觉模型的提示词: {prompt}")
+        
         response = vision_client.chat.completions.create(
             model=getattr(settings, "VISION_MODEL", "qwen-vl-max"), 
             messages=[{
@@ -168,7 +173,9 @@ def call_vision_llm(image_url: str, post_text: str = "", platform: str = "wb"):
             }],
             max_tokens=300
         )
-        return response.choices[0].message.content.strip()
+        result_text = response.choices[0].message.content.strip()
+        logger.info(f"💡 [VISION OUTPUT] 视觉解析结果: {result_text}")
+        return result_text
     except Exception as e:
         logger.error(f"[VISION AGENT] 视觉模型调用失败: {e}")
         return ""
