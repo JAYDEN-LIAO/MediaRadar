@@ -230,6 +230,7 @@ class WeiboNote(Base):
     shared_count = Column(Text, comment='分享数')
     note_url = Column(Text, comment='笔记URL')
     source_keyword = Column(Text, default='', comment='来源关键词')
+    image_list = Column(Text, default='', comment='图片列表')
 
 class WeiboNoteComment(Base):
     __tablename__ = 'weibo_note_comment'

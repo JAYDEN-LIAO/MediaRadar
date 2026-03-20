@@ -281,7 +281,7 @@ class WeiboCrawler(AbstractCrawler):
         pics: List = mblog.get("pics")
         if not pics:
             return
-        for pic in pics:
+        for pic in pics[:2]:
             if isinstance(pic, str):
                 url = pic
                 pid = url.split("/")[-1].split(".")[0]

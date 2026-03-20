@@ -480,7 +480,7 @@ class XiaoHongShuCrawler(AbstractCrawler):
         if not image_list:
             return
         picNum = 0
-        for pic in image_list:
+        for pic in image_list[:2]:
             url = pic.get("url")
             if not url:
                 continue

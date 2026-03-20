@@ -154,6 +154,7 @@ def get_unprocessed_posts(crawler_db_path, platform):
         content_col = find_col(['desc', 'content', 'text', 'detail', 'article'])
         url_col = find_col(['note_url', 'url', 'video_url', 'article_url', 'link'])
         title_col = find_col(['title', 'name'])
+        image_col = find_col(['image_list', 'pic_list', 'images', 'pics', 'image_url'])
 
         if not id_col or not content_col:
             return []
@@ -161,6 +162,7 @@ def get_unprocessed_posts(crawler_db_path, platform):
         query_cols = [id_col, content_col]
         if url_col: query_cols.append(url_col)
         if title_col: query_cols.append(title_col)
+        if image_col: query_cols.append(image_col)
         
         query_cols_str = ", ".join(query_cols)
 
@@ -177,11 +179,23 @@ def get_unprocessed_posts(crawler_db_path, platform):
         for row in rows:
             post_id = str(row[id_col])
             if post_id not in processed_ids_set:
+                image_urls = []
+                if image_col and row[image_col]:
+                    val = str(row[image_col])
+                    if val.startswith('['):
+                        try:
+                            image_urls = json.loads(val)
+                        except:
+                            pass
+                    else:
+                        image_urls = [u.strip() for u in val.split(',') if u.strip()]
+
                 unprocessed_posts.append({
                     "post_id": post_id,
                     "title": row[title_col] if title_col else "无标题",
                     "content": row[content_col] or "无正文",
                     "url": row[url_col] if url_col else f"未知链接 ({post_id})",
+                    "image_urls": image_urls, # 塞入提取好的图片列表
                     "platform": platform
                 })
                 

@@ -101,11 +101,13 @@ def run_analysis_pipeline():
             image_urls = p.get('image_urls', [])
             
             logger.info(f"正在使用 Screener 初筛数据: {idx}/{len(posts)} (PostID: {p['post_id']})")
-            if len(text_content) < 50 and image_urls:
-                logger.info(f"检测到含图帖 (ID:{p['post_id']})，呼叫 Vision Agent 解析图片...")
-                vision_text = call_vision_llm(image_urls[0])
+            
+            if image_urls:
+                logger.info(f"📸 检测到图片 (ID:{p['post_id']})，结合上下文呼叫 Vision Agent 解析...")
+                # 将 image_urls[0] 和 text_content 一起传进去
+                vision_text = call_vision_llm(image_urls[0], text_content, platform=platform)
                 if vision_text:
-                    text_content = f"{text_content}\n【图片提取内容】：{vision_text}"
+                    text_content = f"{text_content}\n【视觉补充】：{vision_text}"
             
             screener_prompt = SCREENER_PROMPT.format(keyword="、".join(MONITOR_KEYWORDS))
             text_to_analyze = f"标题: {p['title']}\n正文: {text_content[:800]}"

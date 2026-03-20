@@ -69,11 +69,6 @@ async def batch_update_weibo_notes(note_list: List[Dict]):
 async def update_weibo_note(note_item: Dict):
     """
     Update weibo note
-    Args:
-        note_item:
-
-    Returns:
-
     """
     if not note_item:
         return
@@ -83,6 +78,20 @@ async def update_weibo_note(note_item: Dict):
     note_id = mblog.get("id")
     content_text = mblog.get("text")
     clean_text = re.sub(r"<.*?>", "", content_text)
+
+    pics = mblog.get("pics", [])
+    image_urls = []
+    if pics:
+        for pic in pics[:1]:  # 我们之前讨论过，只取第一张图即可
+            if isinstance(pic, str):
+                image_urls.append(pic)
+            elif isinstance(pic, dict):
+                # 兼容不同结构的图床链接
+                pic_url = pic.get("url") or pic.get("large", {}).get("url") or ""
+                if pic_url:
+                    image_urls.append(pic_url)
+    image_list_str = ",".join(image_urls)
+
     save_content_item = {
         # Weibo information
         "note_id": note_id,
@@ -95,6 +104,8 @@ async def update_weibo_note(note_item: Dict):
         "last_modify_ts": utils.get_current_timestamp(),
         "note_url": f"https://m.weibo.cn/detail/{note_id}",
         "ip_location": mblog.get("region_name", "").replace("发布于 ", ""),
+        
+        "image_list": image_list_str, 
 
         # User information
         "user_id": str(user_info.get("id")),

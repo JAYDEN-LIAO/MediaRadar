@@ -4,6 +4,9 @@ import sys
 import os
 import httpx
 import numpy as np
+import base64
+import urllib.parse
+import mimetypes
 from sklearn.cluster import DBSCAN
 from typing import List, Optional
 from pydantic import BaseModel, Field, ValidationError
@@ -17,7 +20,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from core.logger import logger
 from core.config import settings
-from .prompt_templates import SCREENER_PROMPT, ANALYST_PROMPT, DIRECTOR_PROMPT, REVIEWER_PROMPT
+from .prompt_templates import SCREENER_PROMPT, ANALYST_PROMPT, DIRECTOR_PROMPT, REVIEWER_PROMPT, VISION_PROMPT
 
 global_http_client = httpx.Client()
 
@@ -39,7 +42,7 @@ embedding_client = OpenAI(
 )
 vision_client = OpenAI(
     api_key=getattr(settings, "VISION_API_KEY", ""), 
-    base_url=getattr(settings, "VISION_BASE_URL", ""),
+    base_url=getattr(settings, "VISION_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
     http_client=global_http_client
 )
 
@@ -123,21 +126,49 @@ def call_llm(prompt, text, response_format="text", engine="deepseek", pydantic_m
 # ==========================================
 # Agent +1: 视觉多模态分析师 (Vision Agent)
 # ==========================================
-def call_vision_llm(image_url: str):
-    prompt = "请提取图片中的核心文字内容，并简要判断是否包含针对企业的负面投诉、系统报错或极端情绪。"
+def call_vision_llm(image_url: str, post_text: str = "", platform: str = "wb"):
+    prompt = VISION_PROMPT.format(text_content=post_text if post_text else "无配文")
+    final_image_url = image_url
+
+    platform_dir_map = {
+        "wb": "weibo",
+        "dy": "douyin",
+        "bili": "bilibili",
+        "xhs": "xhs",
+        "ks": "kuaishou"
+    }
+    dir_name = platform_dir_map.get(platform.lower(), platform.lower())
+    
     try:
+        filename = os.path.basename(urllib.parse.urlparse(image_url).path)
+        local_path = os.path.join(BASE_DIR, "services", "crawler_service", "data", dir_name, "images", filename)
+        
+        if os.path.exists(local_path):
+            with open(local_path, "rb") as image_file:
+                base64_encoded = base64.b64encode(image_file.read()).decode('utf-8')
+                mime_type, _ = mimetypes.guess_type(local_path)
+                if not mime_type: mime_type = "image/jpeg"
+                final_image_url = f"data:{mime_type};base64,{base64_encoded}"
+                logger.info(f"📸 成功加载本地图片 ({local_path})，准备发送至 Vision Agent...")
+        else:
+            logger.warning(f"⚠️ 本地图片未找到({local_path})，将尝试使用原始公网URL...")
+    except Exception as e:
+        logger.error(f"本地图片转换 Base64 异常: {e}")
+
+    try:
+        # ✨ 修复点：使用专门初始化的 vision_client，并将默认模型名改为 qwen-vl-max
         response = vision_client.chat.completions.create(
-            model=getattr(settings, "VISION_MODEL", "glm-4v"),
+            model=getattr(settings, "VISION_MODEL", "qwen-vl-max"), 
             messages=[{
                 "role": "user",
                 "content": [
                     {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {"url": image_url}}
+                    {"type": "image_url", "image_url": {"url": final_image_url}}
                 ]
             }],
             max_tokens=300
         )
-        return response.choices[0].message.content
+        return response.choices[0].message.content.strip()
     except Exception as e:
         logger.error(f"[VISION AGENT] 视觉模型调用失败: {e}")
         return ""
@@ -170,7 +201,6 @@ def cluster_related_posts(relevant_posts, keyword):
         clusters_dict.setdefault(label, []).append(relevant_posts[idx])
         
     final_clusters = []
-    # 【修复点1】将 Prompt 拆分为纯系统设定
     naming_system_prompt = "你是一个专业的舆情话题总结专家。请根据用户提供的多条网民发帖内容，用15个字以内提炼出一个核心舆情话题名称。只输出具体事件名称，不要带任何标点符号。"
     
     for label, posts in clusters_dict.items():
@@ -181,7 +211,6 @@ def cluster_related_posts(relevant_posts, keyword):
             
         sample_texts = "\n".join([f"- {p['title']} | {p['content'][:50]}" for p in posts[:3]])
         
-        # 【修复点2】将 sample_texts 传给第二个参数 (即传入 User role)，解决为空的报错
         topic_name = call_llm(
             prompt=naming_system_prompt, 
             text=sample_texts, 
