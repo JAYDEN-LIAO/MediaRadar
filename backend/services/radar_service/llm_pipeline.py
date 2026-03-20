@@ -170,7 +170,8 @@ def cluster_related_posts(relevant_posts, keyword):
         clusters_dict.setdefault(label, []).append(relevant_posts[idx])
         
     final_clusters = []
-    naming_prompt_template = "你是一个舆情专家。请根据以下几条网民发帖的内容，用15个字以内提炼一个核心舆情话题名称。只输出名称，不要标点：\n{texts}"
+    # 【修复点1】将 Prompt 拆分为纯系统设定
+    naming_system_prompt = "你是一个专业的舆情话题总结专家。请根据用户提供的多条网民发帖内容，用15个字以内提炼出一个核心舆情话题名称。只输出具体事件名称，不要带任何标点符号。"
     
     for label, posts in clusters_dict.items():
         if label == -1:
@@ -179,7 +180,13 @@ def cluster_related_posts(relevant_posts, keyword):
             continue
             
         sample_texts = "\n".join([f"- {p['title']} | {p['content'][:50]}" for p in posts[:3]])
-        topic_name = call_llm(naming_prompt_template.format(texts=sample_texts), "", engine="kimi").strip('\"')
+        
+        # 【修复点2】将 sample_texts 传给第二个参数 (即传入 User role)，解决为空的报错
+        topic_name = call_llm(
+            prompt=naming_system_prompt, 
+            text=sample_texts, 
+            engine="kimi"
+        ).strip('\"')
         
         final_clusters.append({
             "topic_name": topic_name if topic_name else posts[0]['title'][:15],
@@ -204,9 +211,11 @@ def analyze_and_report(mock_post, keyword):
     risk_level = analysis_res.get("risk_level", 1)
     sentiment = analysis_res.get("sentiment", "Neutral")
     core_issue = analysis_res.get("core_issue", "未知")
-    
+    current_topic_name = mock_post.get("title", "未知话题")
+
     if risk_level >= 3 or sentiment == "Negative":
         # [Agent 3] The Reviewer (Kimi 交叉验证)
+        logger.warning(f"🚨 [ANALYST 判定] 话题 {current_topic_name} 触发预警！判定等级: Level {risk_level} | 情感倾向: {sentiment} | 核心问题: {core_issue}")
         logger.info(f"[REVIEWER AGENT] 触发高危预警 (Level {risk_level})，移交异源模型进行交叉验证...")
         reviewer_prompt = REVIEWER_PROMPT.format(keyword=keyword, initial_risk=risk_level)
         review_res = call_llm(

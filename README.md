@@ -54,12 +54,10 @@ python backend/gateway/main.py
 
 ## 📝 最近更新
 
-* ✅ 多模型接入
+* ✅ 多模型接入(KIMI QWEN EMBEDDING) 新角色(交叉审核员 图片分析员)
 * ✅ 修复了小红书提取cookie过快导致401
 * ✅ 修复了知乎cookie过大导致400错误
 * ✅ 修复了抖音反爬验证导致空返回的问题
-* ✅ 小红书登录状态校验失败导致无法爬取的问题
-* ✅ 完成后端目录结构专业化重构
 
 ---
 *© 2026 MediaRadar Project.*

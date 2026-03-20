@@ -38,7 +38,7 @@ def daily_summary_job():
 def reload_config():
     global MONITOR_KEYWORDS, MONITOR_PLATFORMS, ALERT_NEGATIVE
     try:
-        conf = get_system_settings()  # 修复：去掉了括号里的参数
+        conf = get_system_settings()
     except Exception:
         conf = {} 
         
@@ -48,15 +48,42 @@ def reload_config():
     logger.info(f"Loaded config: keywords={MONITOR_KEYWORDS}, platforms={MONITOR_PLATFORMS}")
 
 def run_crawler_for_platform(platform):
-    logger.info(f"Starting crawler for {platform}")
+    logger.info(f"Starting crawler for platform: {platform.upper()}")
     try:
+        clean_env = os.environ.copy()
+        if "VIRTUAL_ENV" in clean_env:
+            del clean_env["VIRTUAL_ENV"]
+            
+        if not MONITOR_KEYWORDS:
+            logger.warning("No keywords specified, skipping task.")
+            return
+            
+        keywords_str = ",".join(MONITOR_KEYWORDS)
+        logger.info(f"Executing task with keywords: {keywords_str}")
+        
+        if not os.path.exists(CRAWLER_DIR):
+            logger.error(f"【致命错误】找不到爬虫目录: {CRAWLER_DIR}")
+            return
+
         subprocess.run(
-            ["python", os.path.join(CRAWLER_DIR, f"{platform}_crawler.py")],
-            check=True
+            [
+                "uv", "run", "main.py", 
+                "--platform", platform, 
+                "--type", "search", 
+                "--save_data_option", "sqlite", 
+                "--headless", "no",
+                "--keywords", keywords_str
+            ],
+            cwd=CRAWLER_DIR, 
+            env=clean_env, 
+            check=True,
+            timeout=600 
         )
-        logger.info(f"Crawler for {platform} finished successfully.")
+        logger.info(f"{platform.upper()} data extraction completed.")
+    except subprocess.TimeoutExpired:
+        logger.error(f"Task timeout for platform {platform}, terminated forcefully.")
     except subprocess.CalledProcessError as e:
-        logger.error(f"Crawler for {platform} failed with error: {e}")
+        logger.error(f"Execution failed for platform {platform}: {e}")
 
 def run_analysis_pipeline():
     for platform in MONITOR_PLATFORMS:
@@ -73,18 +100,13 @@ def run_analysis_pipeline():
             text_content = p.get('content', '')
             image_urls = p.get('image_urls', [])
             
-            # ==========================================
-            # 🌟 接入 Vision Agent：看图说话
-            # ==========================================
+            logger.info(f"正在使用 Screener 初筛数据: {idx}/{len(posts)} (PostID: {p['post_id']})")
             if len(text_content) < 50 and image_urls:
                 logger.info(f"检测到含图帖 (ID:{p['post_id']})，呼叫 Vision Agent 解析图片...")
                 vision_text = call_vision_llm(image_urls[0])
                 if vision_text:
                     text_content = f"{text_content}\n【图片提取内容】：{vision_text}"
             
-            # ==========================================
-            # 🌟 接入 Screener Agent：精准初筛
-            # ==========================================
             screener_prompt = SCREENER_PROMPT.format(keyword="、".join(MONITOR_KEYWORDS))
             text_to_analyze = f"标题: {p['title']}\n正文: {text_content[:800]}"
             
@@ -112,13 +134,11 @@ def run_analysis_pipeline():
         if not relevant_posts:
             continue
 
-        # 按实体分组
         grouped_posts = {}
         for p in relevant_posts:
             kw = p["matched_keyword"]
             grouped_posts.setdefault(kw, []).append(p)
 
-        # 聚类与深度分析
         for specific_keyword, group_posts in grouped_posts.items():
             logger.info(f"正在对关键字 [{specific_keyword}] 的 {len(group_posts)} 条数据进行聚类...")
             clusters = cluster_related_posts(group_posts, specific_keyword)
@@ -128,6 +148,8 @@ def run_analysis_pipeline():
                 post_ids = cluster.get("post_ids", [])
                 if not post_ids: continue
                 
+                logger.info(f"📊 [聚类结果明细] 提取到话题: 【{topic_name}】 -> 包含 {len(post_ids)} 条讨论帖子")
+
                 combined_text = ""
                 urls = []
                 for pid in post_ids:
@@ -137,7 +159,6 @@ def run_analysis_pipeline():
                         
                 mock_post = { "title": f"聚合话题：{topic_name}", "content": combined_text[:2500] }
                 
-                # 🌟 调用重构后的 Analyze 流程
                 result = analyze_and_report(mock_post, specific_keyword)
                 
                 for pid in post_ids:
