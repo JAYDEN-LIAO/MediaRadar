@@ -1,9 +1,7 @@
 <template>
   <view class="page-container">
     <view class="header">
-      <view class="back-btn" @click="goBack">←</view>
       <view class="title">舆情列表</view>
-      <view class="action-btn">🔍</view>
     </view>
 
     <scroll-view scroll-y class="content">
@@ -17,6 +15,9 @@
         <view class="filter-btn" @click="openModal('sentiment')">
           {{ currentSentiment === 'all' ? '全部情感' : (currentSentiment === 'negative' ? '负面' : (currentSentiment === 'positive' ? '正面' : '中性')) }} ▾
         </view>
+        <view class="filter-btn" @click="openModal('status')">
+          {{ currentStatus === 'all' ? '全部状态' : (currentStatus === 1 ? '已处理' : '未处理') }} ▾
+        </view>
       </view>
 
       <view class="list-summary">
@@ -26,7 +27,7 @@
 
       <view 
         class="list-item" 
-        :class="item.riskClass"
+        :class="item.platform"
         v-for="(item, index) in filteredList" 
         :key="index"
         @click="goToDetail(item)"
@@ -44,7 +45,9 @@
         <view class="list-item-footer">
           <view class="list-item-meta">🏷️ {{ item.keyword || '监控词' }} · {{ item.create_time }}</view>
           <view class="list-item-actions">
-            <text class="action-link">查看详情</text>
+            <text class="action-link" :style="{ color: item.is_processed === 1 ? '#999' : '#667eea' }">
+              {{ item.is_processed === 1 ? '已处理' : '待处理 ↗' }}
+            </text>
           </view>
         </view>
       </view>
@@ -119,6 +122,27 @@
         <button class="modal-btn" @click="closeModal">确定</button>
       </view>
     </view>
+
+    <view class="modal-overlay" :class="{ active: activeModal === 'status' }" @click="closeModal">
+      <view class="modal-content" @click.stop>
+        <view class="modal-header"><view class="title">选择状态</view></view>
+        <view class="modal-options">
+          <view class="modal-option" :class="{ selected: currentStatus === 'all' }" @click="selectFilter('status', 'all')">
+            <view class="checkbox">{{ currentStatus === 'all' ? '✓' : '' }}</view>
+            <view class="label">全部状态</view>
+          </view>
+          <view class="modal-option" :class="{ selected: currentStatus === 0 }" @click="selectFilter('status', 0)">
+            <view class="checkbox">{{ currentStatus === 0 ? '✓' : '' }}</view>
+            <view class="label">未处理</view>
+          </view>
+          <view class="modal-option" :class="{ selected: currentStatus === 1 }" @click="selectFilter('status', 1)">
+            <view class="checkbox">{{ currentStatus === 1 ? '✓' : '' }}</view>
+            <view class="label">已处理</view>
+          </view>
+        </view>
+        <button class="modal-btn" @click="closeModal">确定</button>
+      </view>
+    </view>
   </view>
 </template>
 
@@ -131,6 +155,8 @@ const activeModal = ref(null)
 const currentKeyword = ref('all')
 const currentPlatform = ref('all')
 const currentSentiment = ref('all')
+// 新增：状态筛选变量
+const currentStatus = ref('all') 
 
 const goBack = () => uni.navigateBack()
 const openModal = (type) => activeModal.value = type
@@ -175,6 +201,7 @@ const selectFilter = (type, value) => {
   if (type === 'keyword') currentKeyword.value = value
   if (type === 'platform') currentPlatform.value = value
   if (type === 'sentiment') currentSentiment.value = value
+  if (type === 'status') currentStatus.value = value // 新增逻辑
   // 可选：选中后立刻关弹窗
   // closeModal() 
 }
@@ -199,7 +226,9 @@ const filteredList = computed(() => {
     const matchKeyword = currentKeyword.value === 'all' || (item.keyword && item.keyword.includes(currentKeyword.value))
     const matchPlatform = currentPlatform.value === 'all' || item.platform === currentPlatform.value
     const matchSentiment = currentSentiment.value === 'all' || item.riskClass === currentSentiment.value
-    return matchKeyword && matchPlatform && matchSentiment
+    // 新增：状态过滤逻辑
+    const matchStatus = currentStatus.value === 'all' || (item.is_processed || 0) === currentStatus.value
+    return matchKeyword && matchPlatform && matchSentiment && matchStatus
   })
 })
 
@@ -234,7 +263,8 @@ const fetchYqData = () => {
             core_issue: item.core_issue,  
             report: item.report,
             url: item.url,          
-            create_time: item.create_time ? item.create_time.substring(5, 16) : '刚刚' 
+            create_time: item.create_time ? item.create_time.substring(5, 16) : '刚刚',
+            is_processed: item.is_processed || 0 // 绑定处理状态
           }
         })
       }
@@ -253,22 +283,35 @@ onMounted(() => {
 
 <style scoped>
 .page-container { height: 100vh; display: flex; flex-direction: column; background-color: #f5f5f5; }
-.header { height: 100rpx; background-color: #ffffff; display: flex; justify-content: space-between; align-items: center; padding: 0 32rpx; border-bottom: 2rpx solid #eee; z-index: 10; }
-.header .back-btn, .header .action-btn { font-size: 40rpx; color: #333; cursor: pointer; width: 60rpx; }
-.header .title { font-size: 36rpx; font-weight: 600; color: #333; }
+
+.header { 
+  height: 100rpx; background-color: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);
+  display: flex; justify-content: center; align-items: center; /* 这里改为 center */
+  padding: 0 32rpx; border-bottom: 1px solid rgba(0,0,0,0.05); z-index: 10; 
+}
+.header .title { font-size: 34rpx; font-weight: 600; color: #111827; letter-spacing: 1rpx;}
 
 .content { flex: 1; overflow-y: auto; padding: 32rpx; box-sizing: border-box; }
 
-.filter-bar { display: flex; gap: 16rpx; margin-bottom: 24rpx; }
-.filter-btn { flex: 1; padding: 20rpx 16rpx; background-color: #fff; border: 2rpx solid #e8e8e8; border-radius: 16rpx; font-size: 26rpx; color: #666; display: flex; align-items: center; justify-content: center; gap: 8rpx; }
+.filter-bar { display: flex; gap: 12rpx; margin-bottom: 24rpx; }
+/* 修改：稍微缩小了字体和间距，确保4个筛选按钮能并排不换行 */
+.filter-btn { flex: 1; padding: 16rpx 8rpx; background-color: #fff; border: 2rpx solid #e8e8e8; border-radius: 16rpx; font-size: 24rpx; color: #666; display: flex; align-items: center; justify-content: center; gap: 4rpx; white-space: nowrap; overflow: hidden; }
 
 .list-summary { padding: 24rpx 32rpx; background-color: #fff; border-radius: 16rpx; margin-bottom: 24rpx; font-size: 28rpx; color: #666; }
 .list-summary .negative-count { color: #ff4d4f; font-weight: 600; }
 
 .list-item { background-color: #fff; border-radius: 24rpx; padding: 32rpx; margin-bottom: 24rpx; box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.05); cursor: pointer; }
-.list-item.negative { border-left: 8rpx solid #ff4d4f; }
-.list-item.positive { border-left: 8rpx solid #52c41a; }
-.list-item.neutral { border-left: 8rpx solid #faad14; }
+
+/* 核心修改：左侧边框颜色改为根据具体平台变色 */
+.list-item.xhs { border-left: 8rpx solid #ff2442; }
+.list-item.wb { border-left: 8rpx solid #ff8200; }
+.list-item.bili { border-left: 8rpx solid #fb7299; }
+.list-item.zhihu { border-left: 8rpx solid #0066ff; }
+.list-item.dy { border-left: 8rpx solid #1c1c1e; }
+.list-item.ks { border-left: 8rpx solid #ff5000; }
+.list-item.tieba { border-left: 8rpx solid #3388ff; }
+/* 默认 fallback 颜色 */
+.list-item { border-left: 8rpx solid #d9d9d9; }
 
 .list-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20rpx; }
 .platform-tag { display: flex; align-items: center; gap: 12rpx; font-size: 26rpx; font-weight: 500; }
@@ -290,7 +333,7 @@ onMounted(() => {
 .list-item-content { font-size: 28rpx; color: #333; line-height: 1.6; margin-bottom: 24rpx; }
 .list-item-footer { display: flex; justify-content: space-between; align-items: center; padding-top: 24rpx; border-top: 2rpx solid #f0f0f0; }
 .list-item-meta { font-size: 24rpx; color: #999; }
-.action-link { font-size: 26rpx; color: #667eea; }
+.action-link { font-size: 26rpx; font-weight: bold; }
 
 .load-more { text-align: center; padding: 32rpx; color: #999; font-size: 28rpx; }
 

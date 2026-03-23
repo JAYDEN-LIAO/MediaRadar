@@ -1,116 +1,131 @@
 <template>
   <view class="page-container">
     <view class="header">
-      <view class="back-btn">☰</view>
       <view class="title">舆情监控</view>
-      <view class="action-btn" @click="goToSettings">⚙️</view>
     </view>
     
-    <scroll-view scroll-y class="content">
-      
-      <view class="card summary-card">
-        <view class="card-header">
-          <text class="icon">📊</text>
-          <text class="title">今日舆情简报</text>
-          <text class="date">{{ today }}</text>
-        </view>
-        <view class="stats-row">
-          <view class="stat-item">
-            <view class="number">{{ todayNewCount }}</view>
-            <view class="label">今日新增</view>
-          </view>
-          <view class="stat-item">
-            <view class="number" :style="{ color: highRiskCount > 0 ? '#ff4d4f' : '#333' }">{{ highRiskCount }}</view>
-            <view class="label">高风险</view>
-          </view>
-          <view class="stat-item">
-            <view class="number">100%</view>
-            <view class="label">入库率</view>
-          </view>
-        </view>
+    <scroll-view scroll-y class="content-scroll">
+      <view class="content-inner">
         
-        <view class="sentiment-section">
-          <view class="section-title">情感分布</view>
-          <view class="sentiment-row">
-            <view class="sentiment-item">
-              <view class="emoji">😊</view>
-              <view class="type">正面</view>
-              <view class="count">{{ posCount }}</view>
+        <view class="settings-card">
+          <view class="card-header">
+            <view class="header-left">
+              <text class="icon">📊</text>
+              <text class="title">今日舆情简报</text>
             </view>
-            <view class="sentiment-item">
-              <view class="emoji">😐</view>
-              <view class="type">中性</view>
-              <view class="count">{{ neuCount }}</view>
+            <text class="date-tag">{{ today }}</text>
+          </view>
+          
+          <view class="stats-row">
+            <view class="stat-item">
+              <view class="number">{{ todayNewCount }}</view>
+              <view class="label">今日新增</view>
             </view>
-            <view class="sentiment-item">
-              <view class="emoji">😠</view>
-              <view class="type">负面</view>
-              <view class="count">{{ negCount }}</view>
+            <view class="stat-item">
+              <view class="number" :class="{ 'text-danger': highRiskCount > 0 }">{{ highRiskCount }}</view>
+              <view class="label">高风险</view>
+            </view>
+            <view class="stat-item">
+              <view class="number text-success">100%</view>
+              <view class="label">入库率</view>
             </view>
           </view>
           
-          <view class="sentiment-bar">
-            <view class="positive" :style="{ width: posPct + '%' }"></view>
-            <view class="neutral" :style="{ width: neuPct + '%' }"></view>
-            <view class="negative" :style="{ width: negPct + '%' }"></view>
-          </view>
-          <view class="sentiment-labels">
-            <text>{{ posPct }}%</text>
-            <text>{{ neuPct }}%</text>
-            <text>{{ negPct }}%</text>
-          </view>
-        </view>
-      </view>
-
-      <view class="card ai-summary-card">
-        <view class="card-header">
-          <text class="icon">🤖</text>
-          <text class="title">AI 智能研判摘要</text>
-        </view>
-        <view class="summary-text">
-          近期关于“{{ keyword }}”的讨论整体呈现以 <text style="font-weight: bold; color: #667eea;">{{ mainSentimentText }}</text> 为主的态势。今日共捕获到相关讨论 {{ todayNewCount }} 条。
-        </view>
-        
-        <block v-if="highRiskCount > 0">
-          <view class="warning-text">
-            ⚠️ 发现 {{ highRiskCount }} 起高风险事件，建议公关/客服团队立刻排查并跟进。
-          </view>
-          <view class="alert-box" v-if="latestAlert">
-            <view class="alert-item" @click="goToList">
-              <view class="source">
-                <text class="platform">{{ latestAlert.platform }}</text>
-                <text class="dot">·</text>
-                <text class="time">{{ latestAlert.create_time.substring(11, 16) }}</text>
+          <view class="sentiment-section">
+            <view class="section-title">情感分布</view>
+            <view class="sentiment-row">
+              <view class="sentiment-item">
+                <view class="emoji">😊</view>
+                <view class="type">正面</view>
+                <view class="count">{{ posCount }}</view>
               </view>
-              <view class="text">{{ latestAlert.report }}</view>
+              <view class="sentiment-item">
+                <view class="emoji">😐</view>
+                <view class="type">中性</view>
+                <view class="count">{{ neuCount }}</view>
+              </view>
+              <view class="sentiment-item">
+                <view class="emoji">😠</view>
+                <view class="type">负面</view>
+                <view class="count">{{ negCount }}</view>
+              </view>
+            </view>
+            
+            <view class="sentiment-bar">
+              <view class="bar-segment positive" :style="{ width: posPct + '%' }"></view>
+              <view class="bar-segment neutral" :style="{ width: neuPct + '%' }"></view>
+              <view class="bar-segment negative" :style="{ width: negPct + '%' }"></view>
+            </view>
+            <view class="sentiment-labels">
+              <text>{{ posPct }}%</text>
+              <text>{{ neuPct }}%</text>
+              <text>{{ negPct }}%</text>
             </view>
           </view>
-        </block>
-        
-        <block v-else>
-          <view class="warning-text" style="background-color: #f6ffed; color: #389e0d;">
-            ✅ 今日暂未发现明显的高风险负面舆情，品牌口碑平稳。
+        </view>
+
+        <view class="settings-card">
+          <view class="card-header">
+            <view class="header-left">
+              <text class="icon">🤖</text>
+              <text class="title">AI 智能研判摘要</text>
+            </view>
           </view>
-        </block>
-      </view>
-
-      <view class="card trend-card">
-         <view class="card-header">
-          <text class="icon">📈</text>
-          <text class="title">近7日声量趋势</text>
+          
+          <view class="summary-text">
+            近期关于“{{ keyword }}”的讨论整体呈现以 <text class="highlight-text">{{ mainSentimentText }}</text> 为主的态势。今日共捕获到相关讨论 {{ todayNewCount }} 条。
+          </view>
+          
+          <block v-if="highRiskCount > 0">
+            <view class="warning-box danger">
+              ⚠️ 发现 {{ highRiskCount }} 起高风险事件，建议公关/客服团队立刻排查并跟进。
+            </view>
+            
+            <view class="alert-box" v-if="latestAlert">
+              <view class="alert-item" @click="goToList">
+                <view class="source">
+                  <text class="platform">{{ latestAlert.platform }}</text>
+                  <text class="dot">·</text>
+                  <text class="time">{{ latestAlert.create_time.substring(11, 16) }}</text>
+                </view>
+                <view class="alert-text">{{ latestAlert.report }}</view>
+              </view>
+            </view>
+          </block>
+          
+          <block v-else>
+            <view class="warning-box safe">
+              ✅ 今日暂未发现明显的高风险负面舆情，品牌口碑平稳。
+            </view>
+          </block>
         </view>
-        <view class="chart-placeholder">
-          [ 数据折线图展示区 ]
-        </view>
-      </view>
 
-      <button class="view-all-btn" @click="startRadar">启动新一轮全网扫描</button>
+        <view class="settings-card">
+           <view class="card-header">
+            <view class="header-left">
+              <text class="icon">📈</text>
+              <text class="title">近7日声量趋势</text>
+            </view>
+          </view>
+          <view class="chart-placeholder">
+            [ 数据折线图展示区 ]
+          </view>
+        </view>
+
+        <view class="action-container">
+          <button class="primary-btn" @click="startRadar">
+            {{ isWaitingForScan ? '扫描进行中...' : '启动新一轮全网扫描' }}
+          </button>
+        </view>
+        
+        <view class="bottom-spacer"></view>
+      </view>
     </scroll-view>
   </view>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 
 // 基础变量
 const keyword = ref('加载中...') 
@@ -123,11 +138,20 @@ const posCount = ref(0)
 const neuCount = ref(0)
 const negCount = ref(0)
 
+// 轮询控制变量
+const isWaitingForScan = ref(false)
+let pollTimer = null
+
+// 组件销毁时清理定时器
+onUnmounted(() => {
+  if (pollTimer) clearInterval(pollTimer)
+})
+
 // 动态计算百分比
 const total = computed(() => posCount.value + neuCount.value + negCount.value)
 const posPct = computed(() => total.value === 0 ? 0 : Math.round((posCount.value / total.value) * 100))
 const negPct = computed(() => total.value === 0 ? 0 : Math.round((negCount.value / total.value) * 100))
-const neuPct = computed(() => total.value === 0 ? 0 : (100 - posPct.value - negPct.value)) // 保证加起来100%
+const neuPct = computed(() => total.value === 0 ? 0 : (100 - posPct.value - negPct.value)) 
 
 // 动态 AI 文案
 const mainSentimentText = computed(() => {
@@ -138,13 +162,11 @@ const mainSentimentText = computed(() => {
   return '中性声量'
 })
 
-const latestAlert = ref(null) // 最新的高风险帖子
+const latestAlert = ref(null) 
 
-// 路由
-const goToSettings = () => uni.navigateTo({ url: '/pages/settings/settings' })
 const goToList = () => uni.switchTab({ url: '/pages/list/list' })
 
-// 🚀 读取真实的系统配置
+// 读取真实的系统配置
 const loadSystemConfig = () => {
   uni.request({
     url: 'http://127.0.0.1:8000/api/settings',
@@ -158,7 +180,7 @@ const loadSystemConfig = () => {
   })
 }
 
-// 🚀 读取数据库舆情列表，并计算首页展示的数据
+// 读取数据库舆情列表，并计算首页展示的数据
 const loadDashboardData = () => {
   uni.request({
     url: 'http://127.0.0.1:8000/api/yq_list',
@@ -167,11 +189,9 @@ const loadDashboardData = () => {
       if (res.data && res.data.code === 200) {
         const list = res.data.data
         
-        // 构造今天的日期前缀，例如 "2026-03-18"
         const d = new Date()
         const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
         
-        // 过滤出今天的帖子
         const todayData = list.filter(item => item.create_time && item.create_time.startsWith(todayStr))
         
         todayNewCount.value = todayData.length
@@ -183,7 +203,7 @@ const loadDashboardData = () => {
           if (item.sentiment === 'positive') pos++
           else if (item.sentiment === 'negative') {
             neg++
-            if (!recentNeg) recentNeg = item // 取第一条遇到的负面（因为后端排序是倒序，所以第一条就是最新的）
+            if (!recentNeg) recentNeg = item 
           }
           else neu++
         })
@@ -198,17 +218,65 @@ const loadDashboardData = () => {
   })
 }
 
+// 🌟 轮询后端状态
+const startPollingStatus = () => {
+  if (pollTimer) clearInterval(pollTimer)
+  
+  pollTimer = setInterval(() => {
+    uni.request({
+      url: 'http://127.0.0.1:8000/api/radar_status',
+      method: 'GET',
+      success: (res) => {
+        if (res.data && res.data.code === 200) {
+          const statusData = res.data.data
+          
+          // 如果后端停止运行了，且前端正在等待结果
+          if (!statusData.is_running && isWaitingForScan.value) {
+            isWaitingForScan.value = false
+            clearInterval(pollTimer)
+            
+            // 弹窗提示结果
+            if (statusData.last_new_count > 0) {
+              uni.showToast({ 
+                title: `扫描完毕！新增 ${statusData.last_new_count} 条预警`, 
+                icon: 'success', 
+                duration: 3000 
+              })
+            } else {
+              uni.showToast({ 
+                title: '扫描完毕，暂无相关舆情', 
+                icon: 'none', 
+                duration: 3000 
+              })
+            }
+            
+            // 重新拉取一次列表数据刷新看板
+            loadDashboardData()
+          }
+        }
+      },
+      fail: () => {
+        console.error('获取状态失败，停止轮询')
+        clearInterval(pollTimer)
+      }
+    })
+  }, 3000) // 3秒问一次后端
+}
+
 // 🚀 触发后端扫描
 const startRadar = () => {
-  uni.showLoading({ title: '正在启动扫描...' })
+  if (isWaitingForScan.value) return // 防止连点
+  
+  uni.showLoading({ title: '启动扫描中...' })
   uni.request({
     url: 'http://127.0.0.1:8000/api/start_task',
     method: 'POST',
     success: (res) => {
       uni.hideLoading()
       if (res.data && res.data.code === 200) {
-        uni.showToast({ title: '全网扫描已启动!', icon: 'success' })
-        setTimeout(() => goToList(), 1500)
+        uni.showToast({ title: '开始全面扫描，请稍候', icon: 'none' })
+        isWaitingForScan.value = true // 标记开始等待
+        startPollingStatus() // 启动轮询
       } else {
         uni.showToast({ title: res.data.msg || '启动失败', icon: 'none' })
       }
@@ -227,82 +295,97 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* ✨ 核心修复区：引入 box-sizing: border-box 解决右侧被裁切问题 */
+/* 保持全局设置以防止右侧裁切 */
 view, text, scroll-view, button {
   box-sizing: border-box;
 }
 
+/* 统一高级灰底色及布局 */
 .page-container {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: #f5f5f5;
-  width: 100vw;
-  overflow-x: hidden;
+  background-color: #F4F5F7;
+  overflow: hidden;
 }
 
-.header {
-  height: 100rpx;
-  background-color: #ffffff;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 32rpx;
-  border-bottom: 2rpx solid #eee;
-  z-index: 10;
+/* 统一头部样式，带磨砂玻璃效果 */
+.header { 
+  height: 100rpx; background-color: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);
+  display: flex; justify-content: center; align-items: center;
+  padding: 0 32rpx; border-bottom: 1px solid rgba(0,0,0,0.05); z-index: 10; 
 }
-.header .back-btn { font-size: 40rpx; color: #333; cursor: pointer; width: 60rpx; }
-.header .action-btn { font-size: 40rpx; color: #333; cursor: pointer; width: 60rpx; text-align: right; }
-.header .title { font-size: 36rpx; font-weight: 600; color: #333; }
+.header .title { font-size: 34rpx; font-weight: 600; color: #111827; letter-spacing: 1rpx;}
 
-.content { padding: 32rpx; padding-bottom: 120rpx; width: 100%; }
+/* 统一滚动区域，修复卡顿Bug */
+.content-scroll { flex: 1; height: 0; width: 100%; }
+.content-inner { padding: 32rpx; }
+.bottom-spacer { height: 60rpx; }
 
-/* ✨ 新增全局的 card 样式，解决居中和背景问题 */
-.card {
-  background-color: #fff;
-  border-radius: 24rpx;
-  padding: 32rpx;
-  margin-bottom: 24rpx;
-  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.05);
-  width: 100%;
+/* 统一极简卡片风格 */
+.settings-card { 
+  background-color: #ffffff; border-radius: 24rpx; padding: 32rpx; 
+  margin-bottom: 28rpx; box-shadow: 0 4rpx 24rpx rgba(0,0,0,0.02); width: 100%;
 }
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32rpx; }
+.header-left { display: flex; align-items: center; }
+.header-left .icon { font-size: 36rpx; margin-right: 16rpx; }
+.header-left .title { font-size: 32rpx; font-weight: 600; color: #111827; }
 
-.card-header { display: flex; align-items: center; margin-bottom: 24rpx; }
-.card-header .icon { font-size: 40rpx; margin-right: 16rpx; }
-.card-header .title { font-size: 32rpx; font-weight: 600; color: #333; }
-.card-header .date { font-size: 24rpx; color: #999; margin-left: auto; }
+/* 日期标签 */
+.date-tag { font-size: 24rpx; color: #4F46E5; background: rgba(79, 70, 229, 0.1); padding: 4rpx 16rpx; border-radius: 20rpx; font-weight: 500;}
 
-.stats-row { display: flex; justify-content: space-around; padding: 16rpx 0 32rpx 0; border-bottom: 1px solid #f0f0f0; }
+/* 数据概览区 */
+.stats-row { display: flex; justify-content: space-around; padding: 16rpx 0 32rpx 0; border-bottom: 1px solid #F3F4F6; margin-bottom: 24rpx;}
 .stat-item { text-align: center; }
-.stat-item .number { font-size: 56rpx; font-weight: 700; color: #333; }
-.stat-item .label { font-size: 24rpx; color: #999; margin-top: 8rpx; }
+.stat-item .number { font-size: 48rpx; font-weight: 700; color: #111827; margin-bottom: 8rpx; }
+.stat-item .label { font-size: 24rpx; color: #6B7280; }
+.text-danger { color: #EF4444 !important; }
+.text-success { color: #10B981 !important; }
 
-.sentiment-section { padding: 32rpx 0 0 0; }
-.section-title { font-size: 28rpx; color: #666; margin-bottom: 24rpx; }
+/* 情感分布区 */
+.section-title { font-size: 28rpx; color: #374151; margin-bottom: 24rpx; font-weight: 500;}
 .sentiment-row { display: flex; justify-content: space-around; margin-bottom: 24rpx; }
 .sentiment-item { text-align: center; }
-.sentiment-item .emoji { font-size: 56rpx; margin-bottom: 8rpx; }
-.sentiment-item .type { font-size: 24rpx; color: #999; }
-.sentiment-item .count { font-size: 36rpx; font-weight: 600; color: #333; margin-top: 4rpx; }
+.sentiment-item .emoji { font-size: 50rpx; margin-bottom: 12rpx; }
+.sentiment-item .type { font-size: 24rpx; color: #6B7280; }
+.sentiment-item .count { font-size: 32rpx; font-weight: 600; color: #111827; margin-top: 8rpx; }
 
-.sentiment-bar { display: flex; height: 16rpx; border-radius: 8rpx; overflow: hidden; margin-top: 24rpx; background-color: #eee;}
-.sentiment-bar .positive { background: linear-gradient(90deg, #52c41a, #73d13d); transition: width 0.5s ease; }
-.sentiment-bar .neutral { background: linear-gradient(90deg, #faad14, #ffc53d); transition: width 0.5s ease; }
-.sentiment-bar .negative { background: linear-gradient(90deg, #ff4d4f, #ff7875); transition: width 0.5s ease; }
-.sentiment-labels { display: flex; justify-content: space-between; margin-top: 16rpx; font-size: 24rpx; color: #999; }
+/* 进度条保持动态绑定 */
+.sentiment-bar { height: 16rpx; border-radius: 8rpx; display: flex; overflow: hidden; background: #eee; margin-top: 24rpx; }
+.bar-segment { transition: width 0.5s ease; }
+.bar-segment.positive { background-color: #10B981; }
+.bar-segment.neutral { background-color: #FBBF24; }
+.bar-segment.negative { background-color: #EF4444; }
+.sentiment-labels { display: flex; justify-content: space-between; margin-top: 16rpx; font-size: 22rpx; color: #9CA3AF; }
 
-.summary-text { font-size: 28rpx; line-height: 1.8; color: #666; }
-.warning-text { margin-top: 24rpx; padding: 24rpx; background-color: #fff7e6; border-radius: 16rpx; font-size: 28rpx; line-height: 1.6; color: #d46b08; }
+/* AI 摘要区 */
+.summary-text { font-size: 28rpx; line-height: 1.6; color: #4B5563; }
+.highlight-text { font-weight: 600; color: #4F46E5; }
+
+/* 提示框高级感 */
+.warning-box { padding: 24rpx; border-radius: 12rpx; margin-top: 24rpx; font-size: 26rpx; line-height: 1.5; }
+.warning-box.danger { background-color: #FEF2F2; color: #991B1B; border-left: 6rpx solid #EF4444; }
+.warning-box.safe { background-color: #F0FDF4; color: #065F46; border-left: 6rpx solid #10B981; }
 
 .alert-box { margin-top: 24rpx; }
-.alert-item { padding: 24rpx; background-color: #fff2f0; border-radius: 16rpx; border-left: 6rpx solid #ff4d4f; }
+.alert-item { padding: 24rpx; background-color: #F9FAFB; border-radius: 16rpx; border: 1px solid #F3F4F6; }
 .alert-item .source { display: flex; align-items: center; margin-bottom: 12rpx; }
-.alert-item .platform { font-size: 24rpx; color: #ff4d4f; font-weight: 500; }
-.alert-item .dot { margin: 0 12rpx; color: #ccc; }
-.alert-item .time { font-size: 24rpx; color: #999; }
-.alert-item .text { font-size: 28rpx; color: #333; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.alert-item .platform { font-size: 24rpx; color: #EF4444; font-weight: 600; }
+.alert-item .dot { margin: 0 12rpx; color: #D1D5DB; }
+.alert-item .time { font-size: 24rpx; color: #9CA3AF; }
+.alert-text { font-size: 28rpx; color: #374151; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 
-.chart-placeholder { height: 240rpx; background-color: #f9f9f9; border-radius: 16rpx; display: flex; align-items: center; justify-content: center; color: #999; font-size: 28rpx; margin-top: 24rpx; }
+.chart-placeholder { height: 240rpx; background-color: #F9FAFB; border-radius: 16rpx; border: 1px dashed #E5E7EB; display: flex; align-items: center; justify-content: center; color: #9CA3AF; font-size: 28rpx; margin-top: 24rpx; }
 
-.view-all-btn { width: 100%; padding: 20rpx 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; border-radius: 24rpx; color: #fff; font-size: 32rpx; font-weight: 500; margin-top: 8rpx; box-shadow: 0 10rpx 40rpx rgba(102, 126, 234, 0.4); }
+/* 统一按钮风格 */
+.action-container { padding: 12rpx 0; }
+.primary-btn { 
+  width: 100%; padding: 24rpx 0; background-color: #4F46E5; 
+  border-radius: 16rpx; color: #ffffff; font-size: 30rpx; 
+  display: flex; justify-content: center; align-items: center; font-weight: 500;
+  box-shadow: 0 8rpx 20rpx rgba(79, 70, 229, 0.2);
+  border: none; margin: 0;
+}
+.primary-btn:active { opacity: 0.9; transform: scale(0.99); }
 </style>

@@ -35,6 +35,7 @@ def init_radar_db():
                 risk_level TEXT,
                 core_issue TEXT,
                 report TEXT,
+                publish_time TEXT,
                 create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
@@ -46,20 +47,19 @@ def init_radar_db():
         ''')
         
         try:
-            cursor.execute("ALTER TABLE ai_results ADD COLUMN title TEXT")
-            cursor.execute("ALTER TABLE ai_results ADD COLUMN content TEXT")
-            cursor.execute("ALTER TABLE ai_results ADD COLUMN url TEXT")
+            cursor.execute("ALTER TABLE ai_results ADD COLUMN publish_time TEXT")
         except sqlite3.OperationalError:
             pass
 
-def save_ai_result(post_id, platform, keyword, title, content, url, risk_level, core_issue, report):
+def save_ai_result(post_id, platform, keyword, title, content, url, risk_level, core_issue, report, publish_time="未知时间"):
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute('''
             INSERT OR REPLACE INTO ai_results 
-            (post_id, platform, keyword, title, content, url, risk_level, core_issue, report)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (post_id, platform, keyword, title, content, url, risk_level, core_issue, report))
+            (post_id, platform, keyword, title, content, url, risk_level, core_issue, report, publish_time)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (post_id, platform, keyword, title, content, url, risk_level, core_issue, report, publish_time))
+        conn.commit()
 
 def get_latest_results(limit=50):
     with get_db_connection() as conn:
@@ -190,10 +190,28 @@ def get_unprocessed_posts(crawler_db_path, platform):
                     else:
                         image_urls = [u.strip() for u in val.split(',') if u.strip()]
 
+                post_time = "未知时间"
+                time_fields = ['time', 'create_time', 'add_ts', 'date']
+                for field in time_fields:
+                    if field in row.keys():
+                        val = row[field]
+                        if val:
+                            # 处理 MediaCrawler 常见的13位或10位时间戳
+                            if isinstance(val, (int, float)) or (isinstance(val, str) and str(val).isdigit()):
+                                val_int = int(val)
+                                if val_int > 1e11:  # 13位毫秒级时间戳
+                                    val_int = val_int / 1000
+                                import datetime
+                                post_time = datetime.datetime.fromtimestamp(val_int).strftime('%Y-%m-%d %H:%M:%S')
+                            else:
+                                post_time = str(val) # 如果已经是字符串日期，直接用
+                            break
+
                 unprocessed_posts.append({
                     "post_id": post_id,
                     "title": row[title_col] if title_col else "无标题",
                     "content": row[content_col] or "无正文",
+                    "publish_time": post_time,
                     "url": row[url_col] if url_col else f"未知链接 ({post_id})",
                     "image_urls": image_urls, # 塞入提取好的图片列表
                     "platform": platform

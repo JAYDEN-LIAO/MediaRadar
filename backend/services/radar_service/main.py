@@ -22,7 +22,12 @@ from .llm_pipeline import analyze_and_report, call_llm, cluster_related_posts, c
 from .prompt_templates import SCREENER_PROMPT
 from .notifier import send_alert
 
-RADAR_STATUS = {"is_running": False, "status_text": "系统闲置中", "last_run_time": "暂无"}
+RADAR_STATUS = {
+    "is_running": False, 
+    "status_text": "系统闲置中", 
+    "last_run_time": "暂无",
+    "last_new_count": 0
+}
 MONITOR_KEYWORDS = []
 MONITOR_PLATFORMS = []
 ALERT_NEGATIVE = True
@@ -50,9 +55,9 @@ def reload_config():
 def run_crawler_for_platform(platform):
     logger.info(f"Starting crawler for platform: {platform.upper()}")
     try:
-        clean_env = os.environ.copy()
-        if "VIRTUAL_ENV" in clean_env:
-            del clean_env["VIRTUAL_ENV"]
+        # clean_env = os.environ.copy()
+        # if "VIRTUAL_ENV" in clean_env:
+        #     del clean_env["VIRTUAL_ENV"]
             
         if not MONITOR_KEYWORDS:
             logger.warning("No keywords specified, skipping task.")
@@ -67,7 +72,7 @@ def run_crawler_for_platform(platform):
 
         subprocess.run(
             [
-                "uv", "run", "main.py", 
+                sys.executable, "main.py", 
                 "--platform", platform, 
                 "--type", "search", 
                 "--save_data_option", "sqlite", 
@@ -75,7 +80,7 @@ def run_crawler_for_platform(platform):
                 "--keywords", keywords_str
             ],
             cwd=CRAWLER_DIR, 
-            env=clean_env, 
+            # env=clean_env, 
             check=True,
             timeout=600 
         )
@@ -86,6 +91,8 @@ def run_crawler_for_platform(platform):
         logger.error(f"Execution failed for platform {platform}: {e}")
 
 def run_analysis_pipeline():
+    total_new_count = 0
+
     for platform in MONITOR_PLATFORMS:
         logger.info(f"Analyzing unprocessed data for {platform.upper()}...")
         posts = get_unprocessed_posts(settings.CRAWLER_DB_PATH, platform)
@@ -167,11 +174,18 @@ def run_analysis_pipeline():
                     if pid in post_dict:
                         real_post = post_dict[pid] 
                         save_ai_result(
-                            post_id=real_post["post_id"], platform=platform, 
+                            post_id=pid, 
+                            platform=platform,
                             keyword=specific_keyword, 
-                            title=real_post.get("title", ""), content=real_post.get("content", ""), url=real_post.get("url", ""),              
-                            risk_level=result.get("risk_level", "low"), core_issue=result.get("core_issue", "无异常"), report=result.get("report", result.get("reason", ""))
+                            title=real_post.get("title", ""), 
+                            content=real_post.get("content", ""),
+                            url=real_post.get("url", ""),
+                            risk_level=result["risk_level"],
+                            core_issue=result["core_issue"],
+                            report=result["report"],
+                            publish_time=real_post.get("publish_time", "未知时间") 
                         )
+                        total_new_count += 1 
 
                 if result.get("status") == "alert" and ALERT_NEGATIVE:
                     logger.warning(f"🚨 高危预警产生！等级: {result.get('risk_level')}")
@@ -181,6 +195,8 @@ def run_analysis_pipeline():
                     )
                 else:
                     logger.info(f"✅ 话题检测安全通过: {topic_name}")
+
+    return total_new_count
 
 
 def api_start_task(background_tasks):
@@ -193,11 +209,17 @@ def api_start_task(background_tasks):
     def _run_in_background():
         RADAR_STATUS["is_running"] = True
         RADAR_STATUS["status_text"] = f"正在监控: {current_keyword}"
+        RADAR_STATUS["last_new_count"] = 0
+        
         try:
-            job() 
+            new_count = job() 
+            if new_count is not None:
+                RADAR_STATUS["last_new_count"] = new_count
+                
             RADAR_STATUS["last_run_time"] = time.strftime('%Y-%m-%d %H:%M:%S')
         except Exception as e:
             logger.error(f"Background task exception: {e}")
+            RADAR_STATUS["last_new_count"] = 0
         finally:
             RADAR_STATUS["is_running"] = False
             RADAR_STATUS["status_text"] = "系统闲置中"
@@ -210,7 +232,8 @@ def job():
     if MONITOR_PLATFORMS:
         for platform in MONITOR_PLATFORMS:
             run_crawler_for_platform(platform)
-    run_analysis_pipeline()
+    new_risk_count = run_analysis_pipeline()
+    return new_risk_count
 
 if __name__ == "__main__":
     reload_config()

@@ -3,6 +3,7 @@ from fastapi import APIRouter, BackgroundTasks
 from pydantic import BaseModel
 from .db_manager import get_latest_results, get_system_settings, save_system_settings
 from .main import api_start_task, RADAR_STATUS, reload_config
+from typing import List
 
 router = APIRouter()
 
@@ -60,7 +61,7 @@ def get_yq_list():
             "core_issue": r.get("core_issue", "无异常"), 
             "report": display_report,          
             "url": r.get("url", ""),           
-            "create_time": r.get("create_time", "")
+            "create_time": r.get("publish_time") or r.get("create_time", "")
         })
         
     return {
@@ -71,6 +72,7 @@ def get_yq_list():
 
 class SettingsRequest(BaseModel):
     keywords: list
+    inactive_keywords: list = []
     platforms: list
     push_summary: bool
     push_time: str
