@@ -31,6 +31,7 @@ RADAR_STATUS = {
 MONITOR_KEYWORDS = []
 MONITOR_PLATFORMS = []
 ALERT_NEGATIVE = True
+MONITOR_KEYWORD_LEVELS = {}
 
 def daily_summary_job():
     logger.info("Triggering daily summary notification.")
@@ -41,16 +42,28 @@ def daily_summary_job():
     )
 
 def reload_config():
-    global MONITOR_KEYWORDS, MONITOR_PLATFORMS, ALERT_NEGATIVE
+    global MONITOR_KEYWORDS, MONITOR_KEYWORD_LEVELS, MONITOR_PLATFORMS, ALERT_NEGATIVE
     try:
         conf = get_system_settings()
     except Exception:
         conf = {} 
         
-    MONITOR_KEYWORDS = conf.get("keywords", [])
+    MONITOR_KEYWORDS = []
+    MONITOR_KEYWORD_LEVELS = {}
+    
+    for kw in conf.get("keywords", []):
+        if isinstance(kw, str):
+            MONITOR_KEYWORDS.append(kw)
+            MONITOR_KEYWORD_LEVELS[kw] = "balanced"
+        elif isinstance(kw, dict):
+            text = kw.get("text")
+            if text:
+                MONITOR_KEYWORDS.append(text)
+                MONITOR_KEYWORD_LEVELS[text] = kw.get("level", "balanced")
+                
     MONITOR_PLATFORMS = conf.get("platforms", [])
     ALERT_NEGATIVE = conf.get("alert_negative", True)
-    logger.info(f"Loaded config: keywords={MONITOR_KEYWORDS}, platforms={MONITOR_PLATFORMS}")
+    logger.info(f"Loaded config: keywords={MONITOR_KEYWORDS}, levels={MONITOR_KEYWORD_LEVELS}")
 
 def run_crawler_for_platform(platform):
     logger.info(f"Starting crawler for platform: {platform.upper()}")
@@ -116,7 +129,8 @@ def run_analysis_pipeline():
                     text_content = f"{text_content}\n【视觉补充】：{vision_text}"
                     logger.info(f"✅ 图片特征已成功拼接入帖子正文，进入后续分析链！")
             
-            screener_prompt = SCREENER_PROMPT.format(keyword="、".join(MONITOR_KEYWORDS))
+            kw_with_levels = "、".join([f"{k}(监控等级:{MONITOR_KEYWORD_LEVELS.get(k, 'balanced')})" for k in MONITOR_KEYWORDS])
+            screener_prompt = SCREENER_PROMPT.format(keyword=kw_with_levels)
             text_to_analyze = f"标题: {p['title']}\n正文: {text_content[:800]}"
             
             res = call_llm(

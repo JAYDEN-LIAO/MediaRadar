@@ -235,6 +235,18 @@ def cluster_related_posts(relevant_posts, keyword):
 # 核心管线：风险定性、复核与报告生成 (Analyst -> Reviewer -> Director)
 # ==========================================
 def analyze_and_report(mock_post, keyword):
+    # 🌟 动态获取该关键字的监控等级 (局部导入防止循环引用)
+    from .main import MONITOR_KEYWORD_LEVELS
+    sensitivity = MONITOR_KEYWORD_LEVELS.get(keyword, "balanced")
+    
+    # 🌟 根据等级匹配不同的最终复核指令
+    if sensitivity == "aggressive":
+        level_instruction = "- 激进放行指令：高度敏感！由于该品牌当前处于重点监控期，**禁止轻易降级**！只要是明确的负面吐槽（哪怕是“吃出异物”、“服务态度极差”这种单点客诉），也有引爆全网的风险，请维持高风险等级（>=3），宁可误报不可漏报！"
+    elif sensitivity == "conservative":
+        level_instruction = "- 保守降级指令：极度严格！把所有“客服回复慢”、“App稍微有点卡”等单点问题统统强制驳回，降级为 1-2 级。只有权威媒体介入、重大违规、群体维权、资金安全等极其严重的灾难级事件才允许维持 3 级及以上！"
+    else:
+        level_instruction = "- 平衡复核指令：把“回复慢”、“轻微吐槽”等单点客诉降级为 1-2 级。确认为“群体性维权”、“重大违规”、“高管丑闻”、“大V点名”等可能引发大面积传播的事件时，才维持 3 级及以上。"
+
     text_to_analyze = f"标题：{mock_post['title']}\n内容：{mock_post['content']}"
     
     # [Agent 2] The Analyst (DeepSeek)
@@ -252,8 +264,16 @@ def analyze_and_report(mock_post, keyword):
     if risk_level >= 3 or sentiment == "Negative":
         # [Agent 3] The Reviewer (Kimi 交叉验证)
         logger.warning(f"🚨 [ANALYST 判定] 话题 {current_topic_name} 触发预警！判定等级: Level {risk_level} | 情感倾向: {sentiment} | 核心问题: {core_issue}")
-        logger.info(f"[REVIEWER AGENT] 触发高危预警 (Level {risk_level})，移交异源模型进行交叉验证...")
-        reviewer_prompt = REVIEWER_PROMPT.format(keyword=keyword, initial_risk=risk_level)
+        logger.info(f"[REVIEWER AGENT] 触发高危预警 (Level {risk_level})，监控等级[{sensitivity}]，移交异源模型进行交叉验证...")
+        
+        # 🌟 注入带有监控等级的动态指令
+        reviewer_prompt = REVIEWER_PROMPT.format(
+            keyword=keyword, 
+            initial_risk=risk_level,
+            sensitivity=sensitivity,
+            level_instruction=level_instruction
+        )
+        
         review_res = call_llm(
             reviewer_prompt, text_to_analyze, response_format="json", 
             engine="kimi", pydantic_model=ReviewerResult
