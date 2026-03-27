@@ -121,6 +121,23 @@
         <view class="bottom-spacer"></view>
       </view>
     </scroll-view>
+
+    <movable-area class="fab-area">
+      <movable-view 
+        class="agent-fab-view" 
+        direction="all" 
+        :x="fabX" 
+        :y="fabY" 
+        :animation="true"
+        @change="onFabChange"
+        @touchend="onFabTouchEnd"
+      >
+        <view class="agent-fab" @click.stop="goToAgentChat">
+          <text class="fab-text">AI</text>
+        </view>
+      </movable-view>
+    </movable-area>
+
   </view>
 </template>
 
@@ -288,10 +305,58 @@ const startRadar = () => {
   })
 }
 
+const goToAgentChat = () => {
+  uni.navigateTo({
+    url: '/pages/chat/agentChat'
+  });
+}
+
+// ==========================================
+// 【新增】智能体拖拽与吸附边缘逻辑
+// ==========================================
+const sysInfo = uni.getSystemInfoSync();
+const screenWidth = sysInfo.windowWidth;
+const screenHeight = sysInfo.windowHeight;
+
+// 将设计稿的 120rpx 转换为真实像素，用于精确计算边界
+const fabSizePx = uni.upx2px(120); 
+const marginPx = uni.upx2px(30); // 留出一点边距，避免贴太死
+
+// 按钮初始位置：靠右、偏下
+const fabX = ref(screenWidth - fabSizePx - marginPx);
+const fabY = ref(screenHeight - uni.upx2px(260)); 
+
+// 记录当前拖动的实时位置
+let currentX = fabX.value;
+let currentY = fabY.value;
+
+const onFabChange = (e) => {
+  // 只响应用户手指拖动 (排除动画过程触发的 change)
+  if (e.detail.source === 'touch') {
+    currentX = e.detail.x;
+    currentY = e.detail.y;
+  }
+};
+
+const onFabTouchEnd = () => {
+  // 核心吸附逻辑：松手时，判断中心点在屏幕左半边还是右半边
+  const isLeftHalf = (currentX + fabSizePx / 2) < (screenWidth / 2);
+  
+  if (isLeftHalf) {
+    fabX.value = marginPx; // 吸附到左边缘
+  } else {
+    fabX.value = screenWidth - fabSizePx - marginPx; // 吸附到右边缘
+  }
+  
+  // Y轴保持松手时的位置不变
+  fabY.value = currentY; 
+};
+
 onMounted(() => {
   loadSystemConfig()
   loadDashboardData()
 })
+
 </script>
 
 <style scoped>
@@ -388,4 +453,47 @@ view, text, scroll-view, button {
   border: none; margin: 0;
 }
 .primary-btn:active { opacity: 0.9; transform: scale(0.99); }
+
+/* ==========================================
+   新增：全屏拖拽区域与悬浮按钮样式
+========================================== */
+.fab-area {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9999;
+  pointer-events: none; /* 让用户能够穿透拖拽层，点击到下方的列表 */
+}
+
+.agent-fab-view {
+  width: 120rpx;
+  height: 120rpx;
+  pointer-events: auto; /* 让按钮自身恢复点击和触摸响应 */
+}
+
+.agent-fab {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #4F46E5, #3B82F6);
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 10rpx 30rpx rgba(79, 70, 229, 0.4);
+  transition: transform 0.2s ease; /* 点击缩放效果 */
+}
+
+.agent-fab:active {
+  transform: scale(0.9);
+}
+
+.fab-text {
+  color: #FFFFFF;
+  font-size: 44rpx;
+  font-weight: 800;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  letter-spacing: 2rpx;
+}
 </style>

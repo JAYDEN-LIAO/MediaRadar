@@ -49,6 +49,7 @@ MediaRadar/
 │   ├── gateway/            # 统一 API 网关入口 (FastAPI)
 │   ├── services/           # 独立业务微服务
 │   │   ├── crawler_service/# 🕷️ 核心爬虫引擎服务
+│   │   ├── agent_service/  # 🕷️ 舆情管家服务
 │   │   └── radar_service/  # 🧠 舆情分析与逻辑调度中心
 │   │       ├── llm_pipeline.py     # 六大 Agent 编排与调用入口
 │   │       ├── prompt_templates.py # 系统级高阶提示词库

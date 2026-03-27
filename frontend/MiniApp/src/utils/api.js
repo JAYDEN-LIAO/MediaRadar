@@ -51,3 +51,50 @@ export const getDashboardStats = () => {
     method: 'GET'
   });
 };
+
+export const streamRequest = (url, data, onChunk, onDone, onError) => {
+  // 注意：小程序支持 enableChunked
+  const requestTask = uni.request({
+    url: BASE_URL + url,
+    method: 'POST',
+    data: data,
+    enableChunked: true, // 开启流式接收
+    header: {
+      'Content-Type': 'application/json'
+    },
+    success: (res) => {
+      if (res.statusCode !== 200) {
+        uni.showToast({ title: 'Agent 开小差了', icon: 'none' });
+        if(onError) onError(res);
+      } else {
+        if(onDone) onDone();
+      }
+    },
+    fail: (err) => {
+      console.error('Agent请求失败:', err);
+      if(onError) onError(err);
+    }
+  });
+
+  // 监听数据块到达
+  requestTask.onChunkReceived((res) => {
+    try {
+      // 微信小程序返回的是 ArrayBuffer，需要转成字符串
+      const uint8Array = new Uint8Array(res.data);
+      // 兼容小程序的 TextDecoder 解析 UTF-8
+      let text = '';
+      if (typeof TextDecoder !== 'undefined') {
+        const decoder = new TextDecoder('utf-8');
+        text = decoder.decode(uint8Array);
+      } else {
+        // 极低版本基础库兼容写法（若报错可忽略，现在几乎都支持 TextDecoder）
+        text = decodeURIComponent(escape(String.fromCharCode.apply(null, uint8Array)));
+      }
+      onChunk(text);
+    } catch (e) {
+      console.error('流数据解析失败', e);
+    }
+  });
+
+  return requestTask; // 返回 task 以便外部可以随时 abort (停止生成)
+};

@@ -19,6 +19,13 @@
     {
       "path": "pages/profile/profile",
       "style": { "navigationBarTitleText": "个人中心" }
+    },
+    {
+      "path": "pages/chat/agentChat",
+      "style": {
+        "navigationBarTitleText": "智能助理",
+        "navigationBarBackgroundColor": "#F3F4F6"
+      }
     }
   ],
   "globalStyle": {

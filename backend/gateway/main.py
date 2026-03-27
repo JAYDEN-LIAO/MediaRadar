@@ -14,8 +14,8 @@ if BASE_DIR not in sys.path:
 
 # 按照新目录结构导入雷达业务模块的路由
 from services.radar_service.api import router as radar_router
+from services.agent_service.api import router as agent_router
 
-# 尝试导入公共日志组件（如果尚未迁移至 core 目录则会有降级处理）
 try:
     from core.logger import logger
 except ImportError:
@@ -48,7 +48,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 # 挂载雷达业务子路由
 # 注：为严格保持原有前端接口调用路径 (/api/...) 不变，此处暂不添加统一前缀
 app.include_router(radar_router, tags=["舆情雷达业务层"])
-
+app.include_router(agent_router, tags=["AI助手业务层"])
 if __name__ == "__main__":
     # 启动命令说明：请在 backend 目录下执行 python gateway/main.py
     uvicorn.run("gateway.main:app", host="0.0.0.0", port=8000, reload=True)

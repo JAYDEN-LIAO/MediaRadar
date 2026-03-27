@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(for skill:*)",
+      "Bash(do ln:*)",
+      "Bash(done)",
+      "Bash(python -m py_compile app/api/routes/thread.py)",
+      "Bash(python -m py_compile app/api/routes/user.py)",
+      "Bash(uv run:*)",
+      "Bash(pnpm --filter @selgetabel/web typecheck)",
+      "Bash(pnpm --filter @selgetabel/web build)",
+      "Bash(curl -s \"http://localhost:8000/threads?user_id=d3325e4f-bb99-4ead-969d-996bfe296bd2&limit=5\")",
+      "Bash(find apps/api -name *.log -type f)",
+      "Bash(psql -h localhost -U postgres -d selgetabel -c \"SELECT COUNT\\(*\\) FROM threads WHERE user_id = ''d3325e4f-bb99-4ead-969d-996bfe296bd2'';\")",
+      "Bash(docker ps:*)",
+      "Bash(PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d selgetabel -c \"SELECT COUNT\\(*\\) FROM threads WHERE user_id = ''d3325e4f-bb99-4ead-969d-996bfe296bd2'';\")",
+      "Bash(PGPASSWORD=llm-excel psql -h localhost -p 5433 -U llm-excel -d llm-excel -c \"SELECT COUNT\\(*\\) FROM threads WHERE user_id = ''d3325e4f-bb99-4ead-969d-996bfe296bd2'';\")",
+      "Bash(docker exec:*)"
+    ]
+  }
+}

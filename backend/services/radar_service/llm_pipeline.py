@@ -8,8 +8,9 @@ import base64
 import urllib.parse
 import mimetypes
 from sklearn.cluster import DBSCAN
-from typing import List, Optional
+from typing import List, Optional,TypedDict
 from pydantic import BaseModel, Field, ValidationError
+from langgraph.graph import StateGraph, END
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if BASE_DIR not in sys.path:
@@ -54,6 +55,7 @@ class ScreenerResult(BaseModel):
     is_relevant: bool = Field(default=False, description="是否相关")
     matched_keyword: str = Field(default="", description="匹配到的具体实体名")
     reason: str = Field(default="", description="判断理由")
+    needs_vision: bool = Field(default=False, description="是否需要调用视觉模型看图确认")
 
 class AnalystResult(BaseModel):
     analysis_process: str = Field(default="", description="风险评估的思考过程")
@@ -231,72 +233,173 @@ def cluster_related_posts(relevant_posts, keyword):
 
     return final_clusters
 
-# ==========================================
-# 核心管线：风险定性、复核与报告生成 (Analyst -> Reviewer -> Director)
-# ==========================================
-def analyze_and_report(mock_post, keyword):
-    # 🌟 动态获取该关键字的监控等级 (局部导入防止循环引用)
-    from .main import MONITOR_KEYWORD_LEVELS
-    sensitivity = MONITOR_KEYWORD_LEVELS.get(keyword, "balanced")
-    
-    # 🌟 根据等级匹配不同的最终复核指令
-    if sensitivity == "aggressive":
-        level_instruction = "- 激进放行指令：高度敏感！由于该品牌当前处于重点监控期，**禁止轻易降级**！只要是明确的负面吐槽（哪怕是“吃出异物”、“服务态度极差”这种单点客诉），也有引爆全网的风险，请维持高风险等级（>=3），宁可误报不可漏报！"
-    elif sensitivity == "conservative":
-        level_instruction = "- 保守降级指令：极度严格！把所有“客服回复慢”、“App稍微有点卡”等单点问题统统强制驳回，降级为 1-2 级。只有权威媒体介入、重大违规、群体维权、资金安全等极其严重的灾难级事件才允许维持 3 级及以上！"
-    else:
-        level_instruction = "- 平衡复核指令：把“回复慢”、“轻微吐槽”等单点客诉降级为 1-2 级。确认为“群体性维权”、“重大违规”、“高管丑闻”、“大V点名”等可能引发大面积传播的事件时，才维持 3 级及以上。"
+# =====================================================================
+# 以下为全新升级的 LangGraph 多智能体图架构
+# =====================================================================
 
-    text_to_analyze = f"标题：{mock_post['title']}\n内容：{mock_post['content']}"
+# 1. 定义全局状态字典 (State) - 贯穿整个节点的数据流
+class RadarGraphState(TypedDict):
+    mock_post: dict          # 输入的帖子/话题数据
+    keyword: str             # 监控关键字
+    sensitivity: str         # 监控等级 (如: balanced, aggressive)
+    level_instruction: str   # 动态生成的监控指令
     
-    # [Agent 2] The Analyst (DeepSeek)
-    analyst_prompt = ANALYST_PROMPT.format(keyword=keyword)
-    analysis_res = call_llm(
-        analyst_prompt, text_to_analyze, response_format="json", 
-        engine="deepseek", pydantic_model=AnalystResult
+    # 节点执行结果保存
+    analyst_result: dict     
+    reviewer_result: dict    
+    final_report: str        
+    
+    # 最终输出结果
+    status: str              # "safe" 或 "alert"
+    risk_level: int
+    reason: str
+    core_issue: str
+
+# 2. 定义节点 (Nodes) - 对应你原有的 Agent 角色
+def analyst_node(state: RadarGraphState):
+    """DeepSeek 深度分析节点"""
+    logger.info(f"🧠 [ANALYST NODE] DeepSeek 正在分析关于 [{state['keyword']}] 的舆情...")
+    text_to_analyze = f"标题：{state['mock_post'].get('title', '')}\n内容：{state['mock_post'].get('content', '')}"
+    prompt = ANALYST_PROMPT.format(keyword=state['keyword'])
+    
+    # 复用你写好的 call_llm 和 AnalystResult
+    res = call_llm(prompt, text_to_analyze, response_format="json", 
+                   engine="deepseek", pydantic_model=AnalystResult)
+    
+    # 将结果写回状态字典
+    return {"analyst_result": res}
+
+def reviewer_node(state: RadarGraphState):
+    """Kimi 二次复核节点 (交叉验证)"""
+    risk_level = state["analyst_result"].get("risk_level", 1)
+    logger.info(f"🧐 [REVIEWER NODE] 触发高危预警 (Level {risk_level})，移交 Kimi 进行复核...")
+    
+    text_to_analyze = f"标题：{state['mock_post'].get('title', '')}\n内容：{state['mock_post'].get('content', '')}"
+    
+    # 注入动态指令
+    reviewer_prompt = REVIEWER_PROMPT.format(
+        keyword=state["keyword"], 
+        initial_risk=risk_level,
+        sensitivity=state["sensitivity"],
+        level_instruction=state["level_instruction"]
     )
     
-    risk_level = analysis_res.get("risk_level", 1)
-    sentiment = analysis_res.get("sentiment", "Neutral")
-    core_issue = analysis_res.get("core_issue", "未知")
-    current_topic_name = mock_post.get("title", "未知话题")
+    res = call_llm(reviewer_prompt, text_to_analyze, response_format="json", 
+                   engine="kimi", pydantic_model=ReviewerResult)
+    
+    return {"reviewer_result": res}
 
-    if risk_level >= 3 or sentiment == "Negative":
-        # [Agent 3] The Reviewer (Kimi 交叉验证)
-        logger.warning(f"🚨 [ANALYST 判定] 话题 {current_topic_name} 触发预警！判定等级: Level {risk_level} | 情感倾向: {sentiment} | 核心问题: {core_issue}")
-        logger.info(f"[REVIEWER AGENT] 触发高危预警 (Level {risk_level})，监控等级[{sensitivity}]，移交异源模型进行交叉验证...")
-        
-        # 🌟 注入带有监控等级的动态指令
-        reviewer_prompt = REVIEWER_PROMPT.format(
-            keyword=keyword, 
-            initial_risk=risk_level,
-            sensitivity=sensitivity,
-            level_instruction=level_instruction
-        )
-        
-        review_res = call_llm(
-            reviewer_prompt, text_to_analyze, response_format="json", 
-            engine="kimi", pydantic_model=ReviewerResult
-        )
-        
-        if not review_res.get("is_confirmed", False):
-            risk_level = review_res.get("adjusted_risk_level", 2)
-            reason = review_res.get("reason", "降级处理")
-            logger.info(f"⚠️ [REVIEWER AGENT] 驳回高危判定！已降级为 Level {risk_level}。理由: {reason}")
-            if risk_level < 3:
-                return {"status": "safe", "risk_level": risk_level, "reason": f"Reviewer复核已降级: {reason}"}
-        else:
-            logger.info("🚨 [REVIEWER AGENT] 确认高风险真实有效，允许放行！")
+def director_node(state: RadarGraphState):
+    """Kimi 决策与报告生成节点"""
+    logger.info("🚨 [DIRECTOR NODE] 高风险确认！Director 正在生成最终简报...")
+    text_to_analyze = f"标题：{state['mock_post'].get('title', '')}\n内容：{state['mock_post'].get('content', '')}"
+    prompt = DIRECTOR_PROMPT.format(keyword=state['keyword'])
+    
+    report = call_llm(prompt, text_to_analyze, response_format="text", engine="kimi")
+    return {"final_report": report}
 
-        # [Agent 4] The Director (Kimi 报告生成)
-        director_prompt = DIRECTOR_PROMPT.format(keyword=keyword)
-        report = call_llm(director_prompt, text_to_analyze, response_format="text", engine="kimi")
-        
+# 3. 定义条件路由 (Conditional Edges) - 智能体的“决策十字路口”
+def route_after_analyst(state: RadarGraphState):
+    """决定是否需要 Reviewer 介入"""
+    risk = state["analyst_result"].get("risk_level", 1)
+    sentiment = state["analyst_result"].get("sentiment", "Neutral")
+    
+    if risk >= 3 or sentiment == "Negative":
+        return "reviewer" # 走向复核节点
+    
+    # 安全，直接结束图的运行
+    logger.info(f"✅ [ROUTER] 分析无明显风险 (Level {risk})，流程结束。")
+    return END 
+
+def route_after_reviewer(state: RadarGraphState):
+    """决定是否需要 Director 生成报告"""
+    is_confirmed = state["reviewer_result"].get("is_confirmed", False)
+    
+    if is_confirmed:
+        return "director" # 确认高危，去写报告
+    
+    logger.info(f"⚠️ [ROUTER] Reviewer 驳回了高危判定，流程结束。")
+    return END
+
+# 4. 组装 LangGraph (构建状态机)
+workflow = StateGraph(RadarGraphState)
+
+# 添加节点
+workflow.add_node("analyst", analyst_node)
+workflow.add_node("reviewer", reviewer_node)
+workflow.add_node("director", director_node)
+
+# 设定入口和边
+workflow.set_entry_point("analyst")
+workflow.add_conditional_edges("analyst", route_after_analyst)
+workflow.add_conditional_edges("reviewer", route_after_reviewer)
+workflow.add_edge("director", END) # Director 写完报告后一定结束
+
+# 编译生成可执行应用
+radar_app = workflow.compile()
+
+def analyze_and_report(mock_post, keyword, sensitivity="balanced"):
+    """
+    这是暴露给外部(main.py)调用的新入口。
+    """
+    # 动态构建 level_instruction
+    level_instruction = ""
+    if sensitivity == "aggressive":
+        level_instruction = "- 激进放行指令：哪怕只有极其轻微的负面情绪也必须维持原判，决不降级。"
+    elif sensitivity == "conservative":
+        level_instruction = "- 保守放行指令：必须是极其明确的公关危机才维持原判，普通客诉一律驳回降级。"
+    else:
+        level_instruction = "- 平衡放行指令：按照正常的公关危机标准进行交叉验证。"
+
+    # 1. 初始化 State
+    initial_state = {
+        "mock_post": mock_post, 
+        "keyword": keyword, 
+        "sensitivity": sensitivity,
+        "level_instruction": level_instruction,
+        "status": "safe",    # 默认兜底状态
+        "risk_level": 1,
+        "reason": "正常讨论",
+        "core_issue": "无",
+        "analyst_result": {},
+        "reviewer_result": {}
+    }
+    
+    # 2. 执行 Agent 图网络 (一键触发完整流程！)
+    final_state = radar_app.invoke(initial_state)
+    
+    # 3. 解析并组装返回值 (与你原版的返回值格式完全一致)
+    analyst_res = final_state.get("analyst_result", {})
+    reviewer_res = final_state.get("reviewer_result", {})
+    
+    # 场景 A: Analyst 觉得没问题，安全结束
+    if not reviewer_res: 
         return {
-            "status": "alert",
-            "risk_level": risk_level,
-            "core_issue": core_issue,
-            "report": report
+            "status": "safe", 
+            "risk_level": analyst_res.get("risk_level", 1), 
+            "reason": analyst_res.get("reason", "无明显风险"),
+            "core_issue": analyst_res.get("core_issue", "无明显风险"),
+            "report": "舆情安全，无需生成报告。"
         }
         
-    return {"status": "safe", "reason": "正常讨论，无明显风险", "risk_level": risk_level}
+    # 场景 B: Reviewer 介入了，但是降级/驳回了
+    if not reviewer_res.get("is_confirmed", False):
+        return {
+            "status": "safe",
+            "risk_level": reviewer_res.get("adjusted_risk_level", 2),
+            "reason": f"Reviewer复核已降级: {reviewer_res.get('reason', '')}",
+            "core_issue": analyst_res.get("core_issue", "被降级的普通问题"),
+            "report": "复核被降级，暂无高危报告。"
+        }
+        
+    # 场景 C: Director 介入了，确认高危并生成了报告
+    if final_state.get("final_report"):
+        return {
+            "status": "alert",
+            "risk_level": analyst_res.get("risk_level", 3), # 或者用 reviewer 确认后的等级
+            "core_issue": analyst_res.get("core_issue", "未知核心问题"),
+            "report": final_state["final_report"]
+        }
+
+    # 兜底返回
+    return {"status": "safe", "risk_level": 1, "reason": "系统判定安全"}

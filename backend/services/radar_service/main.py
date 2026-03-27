@@ -116,28 +116,52 @@ def run_analysis_pipeline():
         processed_records = [] 
         post_dict = {p["post_id"]: p for p in posts} 
         
+        # backend/services/radar_service/main.py (替换 run_analysis_pipeline 内部循环)
+
         for idx, p in enumerate(posts, 1):
             text_content = p.get('content', '')
             image_urls = p.get('image_urls', [])
+            has_image = bool(image_urls)
             
             logger.info(f"正在使用 Screener 初筛数据: {idx}/{len(posts)} (PostID: {p['post_id']})")
             
-            if image_urls:
-                logger.info(f"📸 检测到图片 (ID:{p['post_id']})，结合上下文呼叫 Vision Agent 解析...")
-                vision_text = call_vision_llm(image_urls[0], text_content, platform=platform, post_id=p.get('post_id'))
-                if vision_text:
-                    text_content = f"{text_content}\n【视觉补充】：{vision_text}"
-                    logger.info(f"✅ 图片特征已成功拼接入帖子正文，进入后续分析链！")
-            
             kw_with_levels = "、".join([f"{k}(监控等级:{MONITOR_KEYWORD_LEVELS.get(k, 'balanced')})" for k in MONITOR_KEYWORDS])
             screener_prompt = SCREENER_PROMPT.format(keyword=kw_with_levels)
-            text_to_analyze = f"标题: {p['title']}\n正文: {text_content[:800]}"
             
+            # 💡 妙招：用系统提示告诉大模型这里有图，让它自己决定要不要看
+            image_hint = "\n【系统提示】：该帖子附带了图片，如果文本存疑或需要证据，可申请看图。" if has_image else ""
+            text_to_analyze = f"标题: {p['title']}\n正文: {text_content[:800]}{image_hint}"
+            
+            # 【第一道关卡：纯文本初筛】
             res = call_llm(
                 screener_prompt, text_to_analyze, 
                 response_format="json", engine="deepseek", pydantic_model=ScreenerResult
             )
             
+            # 如果判定无关，且不申请看图（例如纯广告、日常打卡），直接早退 (Early Exit)！
+            if not res.get("is_relevant") and not res.get("needs_vision"):
+                logger.info(f"⏭️ [早退] 文本判定为无关噪音，无需看图，直接跳过 (ID:{p['post_id']})")
+                processed_records.append((p["post_id"], platform))
+                continue
+            
+            # 如果大模型申请看图，且确实有图，则调用 Vision Agent
+            if res.get("needs_vision") and has_image:
+                logger.info(f"📸 [级联触发] Screener 申请看图 (ID:{p['post_id']})，呼叫 Vision Agent 解析...")
+                vision_text = call_vision_llm(image_urls[0], text_content, platform=platform, post_id=p.get('post_id'))
+                
+                if vision_text:
+                    # 将视觉特征拼接到正文
+                    text_content = f"{text_content}\n【视觉补充】：{vision_text}"
+                    text_to_analyze = f"标题: {p['title']}\n正文: {text_content[:800]}"
+                    
+                    logger.info("🔄 [二次确认] 图文融合完毕，交回 Screener 做最终判定...")
+                    # 【第二道关卡：图文综合复判】
+                    res = call_llm(
+                        screener_prompt, text_to_analyze, 
+                        response_format="json", engine="deepseek", pydantic_model=ScreenerResult
+                    )
+
+            # 经过重重关卡，最终判定为相关的，才放入队列
             if res.get("is_relevant"):
                 matched_kw = res.get("matched_keyword")
                 if not matched_kw or matched_kw not in MONITOR_KEYWORDS:
@@ -146,10 +170,11 @@ def run_analysis_pipeline():
                 p["content"] = text_content
                 p["matched_keyword"] = matched_kw
                 relevant_posts.append(p)
+                logger.info(f"✅ [通过] 成功捕获有效舆情: {p['title'][:15]}...")
                 
             processed_records.append((p["post_id"], platform))
 
-        logger.info(f"初筛完成. 相关: {len(relevant_posts)} | 过滤无关: {len(posts) - len(relevant_posts)}")
+        logger.info(f"初筛漏斗完成. 相关入库: {len(relevant_posts)} | 过滤无关: {len(posts) - len(relevant_posts)}")
 
         if processed_records:
             mark_processed_batch(processed_records)
@@ -182,7 +207,8 @@ def run_analysis_pipeline():
                         
                 mock_post = { "title": f"聚合话题：{topic_name}", "content": combined_text[:2500] }
                 
-                result = analyze_and_report(mock_post, specific_keyword)
+                current_sensitivity = MONITOR_KEYWORD_LEVELS.get(specific_keyword, "balanced")
+                result = analyze_and_report(mock_post, specific_keyword, sensitivity=current_sensitivity)
                 
                 for pid in post_ids:
                     if pid in post_dict:
@@ -241,11 +267,27 @@ def api_start_task(background_tasks):
     background_tasks.add_task(_run_in_background)
     return True, "扫描任务已启动"
 
-def job():
-    logger.info("Starting radar job pipeline")
+def job(target_keyword=None):
+    """
+    雷达核心任务流
+    :param target_keyword: 如果指定了该关键字，本次爬虫和分析将只针对该词进行（用于 Agent 动态触发）
+    """
+    logger.info(f"Starting radar job pipeline (target_keyword={target_keyword})")
+    
+    reload_config()
+
+    if target_keyword:
+        global MONITOR_KEYWORDS, MONITOR_KEYWORD_LEVELS
+        MONITOR_KEYWORDS = [target_keyword]
+        MONITOR_KEYWORD_LEVELS = {target_keyword: "balanced"} # 临时任务默认给予 balanced 敏感度
+        logger.info(f"🎯 临时接管监控配置，本次将专注抓取: {target_keyword}")
+
     if MONITOR_PLATFORMS:
         for platform in MONITOR_PLATFORMS:
             run_crawler_for_platform(platform)
+    else:
+        logger.warning("⚠️ MONITOR_PLATFORMS 为空，请检查系统设置！爬虫任务被跳过。")
+        
     new_risk_count = run_analysis_pipeline()
     return new_risk_count
 
