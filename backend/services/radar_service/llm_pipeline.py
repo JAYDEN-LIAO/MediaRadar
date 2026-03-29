@@ -7,7 +7,7 @@ import numpy as np
 import base64
 import urllib.parse
 import mimetypes
-from sklearn.cluster import DBSCAN
+import hdbscan
 from typing import List, Optional,TypedDict
 from pydantic import BaseModel, Field, ValidationError
 from langgraph.graph import StateGraph, END
@@ -128,6 +128,7 @@ def call_llm(prompt, text, response_format="text", engine="deepseek", pydantic_m
 # ==========================================
 # Agent +1: 视觉多模态分析师 (Vision Agent)
 # ==========================================
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def call_vision_llm(image_url: str, post_text: str = "", platform: str = "wb", post_id: str = ""):
     clean_image_url = image_url.strip('"\' ')
     prompt = VISION_PROMPT.format(text_content=post_text if post_text else "无配文")
@@ -202,8 +203,13 @@ def cluster_related_posts(relevant_posts, keyword):
         logger.error(f"Embedding API 调用失败: {e}")
         return [{"topic_name": p['title'][:15], "post_ids": [p['post_id']]} for p in relevant_posts]
     
-    # DBSCAN 本地聚类
-    clustering = DBSCAN(eps=0.5, min_samples=2, metric='cosine').fit(embeddings)
+    # HDBSCAN 本地聚类（自适应 eps，无需手动调参）
+    clustering = hdbscan.HDBSCAN(
+        min_cluster_size=2,
+        min_samples=2,
+        metric='euclidean',
+        cluster_selection_method='eom'
+    ).fit(embeddings)
     
     clusters_dict = {}
     for idx, label in enumerate(clustering.labels_):
@@ -245,57 +251,57 @@ class RadarGraphState(TypedDict):
     level_instruction: str   # 动态生成的监控指令
     
     # 节点执行结果保存
-    analyst_result: dict     
-    reviewer_result: dict    
-    final_report: str        
-    
+    analyst_result: dict
+    reviewer_result: dict
+    final_report: str
+
     # 最终输出结果
     status: str              # "safe" 或 "alert"
     risk_level: int
     reason: str
     core_issue: str
 
+    # 中间状态（各 node 共享）
+    text_to_analyze: str     # 在 analyst_node 一次性构造，后续节点复用
+
 # 2. 定义节点 (Nodes) - 对应你原有的 Agent 角色
 def analyst_node(state: RadarGraphState):
     """DeepSeek 深度分析节点"""
     logger.info(f"🧠 [ANALYST NODE] DeepSeek 正在分析关于 [{state['keyword']}] 的舆情...")
+
+    # 在入口节点一次性构造 text_to_analyze，后续节点复用
     text_to_analyze = f"标题：{state['mock_post'].get('title', '')}\n内容：{state['mock_post'].get('content', '')}"
     prompt = ANALYST_PROMPT.format(keyword=state['keyword'])
-    
-    # 复用你写好的 call_llm 和 AnalystResult
-    res = call_llm(prompt, text_to_analyze, response_format="json", 
+
+    res = call_llm(prompt, text_to_analyze, response_format="json",
                    engine="deepseek", pydantic_model=AnalystResult)
-    
-    # 将结果写回状态字典
-    return {"analyst_result": res}
+
+    return {"analyst_result": res, "text_to_analyze": text_to_analyze}
 
 def reviewer_node(state: RadarGraphState):
     """Kimi 二次复核节点 (交叉验证)"""
     risk_level = state["analyst_result"].get("risk_level", 1)
     logger.info(f"🧐 [REVIEWER NODE] 触发高危预警 (Level {risk_level})，移交 Kimi 进行复核...")
-    
-    text_to_analyze = f"标题：{state['mock_post'].get('title', '')}\n内容：{state['mock_post'].get('content', '')}"
-    
-    # 注入动态指令
+
+    # 复用 analyst_node 已构造的 text_to_analyze
     reviewer_prompt = REVIEWER_PROMPT.format(
-        keyword=state["keyword"], 
+        keyword=state["keyword"],
         initial_risk=risk_level,
         sensitivity=state["sensitivity"],
         level_instruction=state["level_instruction"]
     )
-    
-    res = call_llm(reviewer_prompt, text_to_analyze, response_format="json", 
+
+    res = call_llm(reviewer_prompt, state["text_to_analyze"], response_format="json",
                    engine="kimi", pydantic_model=ReviewerResult)
-    
+
     return {"reviewer_result": res}
 
 def director_node(state: RadarGraphState):
     """Kimi 决策与报告生成节点"""
     logger.info("🚨 [DIRECTOR NODE] 高风险确认！Director 正在生成最终简报...")
-    text_to_analyze = f"标题：{state['mock_post'].get('title', '')}\n内容：{state['mock_post'].get('content', '')}"
     prompt = DIRECTOR_PROMPT.format(keyword=state['keyword'])
-    
-    report = call_llm(prompt, text_to_analyze, response_format="text", engine="kimi")
+
+    report = call_llm(prompt, state["text_to_analyze"], response_format="text", engine="kimi")
     return {"final_report": report}
 
 # 3. 定义条件路由 (Conditional Edges) - 智能体的“决策十字路口”
@@ -393,10 +399,11 @@ def analyze_and_report(mock_post, keyword, sensitivity="balanced"):
         }
         
     # 场景 C: Director 介入了，确认高危并生成了报告
+    # 风险等级以 Reviewer 调整后的 adjusted_risk_level 为准
     if final_state.get("final_report"):
         return {
             "status": "alert",
-            "risk_level": analyst_res.get("risk_level", 3), # 或者用 reviewer 确认后的等级
+            "risk_level": reviewer_res.get("adjusted_risk_level", analyst_res.get("risk_level", 3)),
             "core_issue": analyst_res.get("core_issue", "未知核心问题"),
             "report": final_state["final_report"]
         }

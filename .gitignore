@@ -178,3 +178,5 @@ radar_state.db
 sqlite_tables.db
 
 test.py
+
+plans/

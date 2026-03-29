@@ -7,6 +7,23 @@ from typing import List
 
 router = APIRouter()
 
+# ============================================================
+# MCP Server 健康检查（Task 4.3）
+# ============================================================
+
+@router.get("/api/mcp/health")
+def mcp_health_check():
+    """
+    MCP Server 健康检查端点
+    用于外部服务（如 MCP Server）探测 radar_service 是否可用
+    """
+    return {
+        "status": "ok",
+        "service": "radar_service",
+        "radar_status": RADAR_STATUS.get("status_text", "idle"),
+        "is_running": RADAR_STATUS.get("is_running", False)
+    }
+
 @router.post("/api/start_task")
 def start_task(background_tasks: BackgroundTasks):
     success, msg = api_start_task(background_tasks)

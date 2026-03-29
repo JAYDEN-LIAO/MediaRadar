@@ -15,7 +15,28 @@
       "Bash(docker ps:*)",
       "Bash(PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d selgetabel -c \"SELECT COUNT\\(*\\) FROM threads WHERE user_id = ''d3325e4f-bb99-4ead-969d-996bfe296bd2'';\")",
       "Bash(PGPASSWORD=llm-excel psql -h localhost -p 5433 -U llm-excel -d llm-excel -c \"SELECT COUNT\\(*\\) FROM threads WHERE user_id = ''d3325e4f-bb99-4ead-969d-996bfe296bd2'';\")",
-      "Bash(docker exec:*)"
+      "Bash(docker exec:*)",
+      "Bash(python -c \"import hdbscan; print\\(hdbscan.__version__\\)\")",
+      "Bash(pip show:*)",
+      "Bash(pip3 show:*)",
+      "Bash(python:*)",
+      "Bash(python -c \":*)",
+      "Bash(pip index:*)",
+      "Bash(pip install:*)",
+      "Bash(PYTHONPATH=\"D:/jayden/develop/work/mediaradar/backend\" python -m backend.services.mcp_service.mcp_server)",
+      "Bash(pip list:*)",
+      "Bash(D:/JAYDEN/develop/work/MediaRadar/venv/Scripts/python -c \"from backend.services.mcp_service import mcp_server\")",
+      "Bash(D:/JAYDEN/develop/work/MediaRadar/venv/Scripts/pip list:*)",
+      "Bash(D:/JAYDEN/develop/work/MediaRadar/venv/Scripts/pip install:*)",
+      "Bash(D:/JAYDEN/develop/work/MediaRadar/venv/Scripts/python -c \"from backend.services.mcp_service import mcp_server; print\\('MCP import OK'\\)\" 2>&1)",
+      "mcp__mediaradar__run_full_pipeline",
+      "mcp__mediaradar__get_radar_status",
+      "mcp__mediaradar__get_recent_alerts",
+      "WebSearch"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "mediaradar"
+  ]
 }

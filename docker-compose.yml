@@ -1,0 +1,60 @@
+# MediaRadar MCP Server docker-compose.yml
+# 使用方式:
+#   本地 stdio 模式: docker compose up mcp-stdio
+#   云端 HTTP 模式:  docker compose up mcp-http
+
+services:
+  # MCP Server - stdio 模式（本地 Claude Code 用）
+  mcp-stdio:
+    build:
+      context: .
+      dockerfile: backend/services/mcp_service/Dockerfile
+    container_name: mediaradar-mcp-stdio
+    environment:
+      - PYTHONPATH=/app/backend
+      # API Keys（通过环境变量传入，不要写死在镜像里）
+      - ANALYST_API_KEY=${ANALYST_API_KEY:-}
+      - REVIEWER_API_KEY=${REVIEWER_API_KEY:-}
+      - EMBEDDING_API_KEY=${EMBEDDING_API_KEY:-}
+      - VISION_API_KEY=${VISION_API_KEY:-}
+    volumes:
+      # 持久化数据库
+      - ./backend/data:/app/backend/data
+      # 持久化 cookies（爬虫用）
+      - ./backend/services/crawler_service/data:/app/backend/services/crawler_service/data:ro
+    networks:
+      - mediaradar-net
+    restart: unless-stopped
+    # stdio 模式不需要映射端口，通过 docker compose exec 调用
+
+  # MCP Server - HTTP 模式（云端部署 / 多客户端）
+  mcp-http:
+    build:
+      context: .
+      dockerfile: backend/services/mcp_service/Dockerfile
+    container_name: mediaradar-mcp-http
+    command: ["python", "backend/services/mcp_service/mcp_server.py", "--transport", "http", "--host", "0.0.0.0", "--port", "8001"]
+    ports:
+      - "8001:8001"
+    environment:
+      - PYTHONPATH=/app/backend
+      - ANALYST_API_KEY=${ANALYST_API_KEY:-}
+      - REVIEWER_API_KEY=${REVIEWER_API_KEY:-}
+      - EMBEDDING_API_KEY=${EMBEDDING_API_KEY:-}
+      - VISION_API_KEY=${VISION_API_KEY:-}
+    volumes:
+      - ./backend/data:/app/backend/data
+      - ./backend/services/crawler_service/data:/app/backend/services/crawler_service/data:ro
+    networks:
+      - mediaradar-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  mediaradar-net:
+    driver: bridge

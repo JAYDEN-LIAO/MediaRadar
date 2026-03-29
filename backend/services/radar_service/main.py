@@ -18,9 +18,9 @@ CRAWLER_DIR = os.path.join(BACKEND_DIR, "services", "crawler_service")
 from core.logger import logger
 from core.config import settings
 from .db_manager import get_unprocessed_posts, mark_processed_batch, save_ai_result, get_system_settings
-from .llm_pipeline import analyze_and_report, call_llm, cluster_related_posts, call_vision_llm, ScreenerResult
-from .prompt_templates import SCREENER_PROMPT
+from .llm_pipeline import ScreenerResult
 from .notifier import send_alert
+from .pipeline import RadarPipeline, PipelineConfig
 
 RADAR_STATUS = {
     "is_running": False, 
@@ -103,140 +103,57 @@ def run_crawler_for_platform(platform):
     except subprocess.CalledProcessError as e:
         logger.error(f"Execution failed for platform {platform}: {e}")
 
-def run_analysis_pipeline():
+async def run_analysis_pipeline_async():
+    """使用 RadarPipeline 执行完整分析流程（asyncio 并行）。"""
+    import asyncio
     total_new_count = 0
 
     for platform in MONITOR_PLATFORMS:
-        logger.info(f"Analyzing unprocessed data for {platform.upper()}...")
+        logger.info(f"[Pipeline Mode] Analyzing {platform.upper()}...")
         posts = get_unprocessed_posts(settings.CRAWLER_DB_PATH, platform)
         if not posts:
             continue
-            
-        relevant_posts = []
-        processed_records = [] 
-        post_dict = {p["post_id"]: p for p in posts} 
-        
-        # backend/services/radar_service/main.py (替换 run_analysis_pipeline 内部循环)
 
-        for idx, p in enumerate(posts, 1):
-            text_content = p.get('content', '')
-            image_urls = p.get('image_urls', [])
-            has_image = bool(image_urls)
-            
-            logger.info(f"正在使用 Screener 初筛数据: {idx}/{len(posts)} (PostID: {p['post_id']})")
-            
-            kw_with_levels = "、".join([f"{k}(监控等级:{MONITOR_KEYWORD_LEVELS.get(k, 'balanced')})" for k in MONITOR_KEYWORDS])
-            screener_prompt = SCREENER_PROMPT.format(keyword=kw_with_levels)
-            
-            # 💡 妙招：用系统提示告诉大模型这里有图，让它自己决定要不要看
-            image_hint = "\n【系统提示】：该帖子附带了图片，如果文本存疑或需要证据，可申请看图。" if has_image else ""
-            text_to_analyze = f"标题: {p['title']}\n正文: {text_content[:800]}{image_hint}"
-            
-            # 【第一道关卡：纯文本初筛】
-            res = call_llm(
-                screener_prompt, text_to_analyze, 
-                response_format="json", engine="deepseek", pydantic_model=ScreenerResult
-            )
-            
-            # 如果判定无关，且不申请看图（例如纯广告、日常打卡），直接早退 (Early Exit)！
-            if not res.get("is_relevant") and not res.get("needs_vision"):
-                logger.info(f"⏭️ [早退] 文本判定为无关噪音，无需看图，直接跳过 (ID:{p['post_id']})")
-                processed_records.append((p["post_id"], platform))
-                continue
-            
-            # 如果大模型申请看图，且确实有图，则调用 Vision Agent
-            if res.get("needs_vision") and has_image:
-                logger.info(f"📸 [级联触发] Screener 申请看图 (ID:{p['post_id']})，呼叫 Vision Agent 解析...")
-                vision_text = call_vision_llm(image_urls[0], text_content, platform=platform, post_id=p.get('post_id'))
-                
-                if vision_text:
-                    # 将视觉特征拼接到正文
-                    text_content = f"{text_content}\n【视觉补充】：{vision_text}"
-                    text_to_analyze = f"标题: {p['title']}\n正文: {text_content[:800]}"
-                    
-                    logger.info("🔄 [二次确认] 图文融合完毕，交回 Screener 做最终判定...")
-                    # 【第二道关卡：图文综合复判】
-                    res = call_llm(
-                        screener_prompt, text_to_analyze, 
-                        response_format="json", engine="deepseek", pydantic_model=ScreenerResult
-                    )
+        # 收集所有待处理的 post_id，用于批量标记已处理
+        all_post_ids = [p["post_id"] for p in posts]
 
-            # 经过重重关卡，最终判定为相关的，才放入队列
-            if res.get("is_relevant"):
-                matched_kw = res.get("matched_keyword")
-                if not matched_kw or matched_kw not in MONITOR_KEYWORDS:
-                    matched_kw = next((k for k in MONITOR_KEYWORDS if k in text_to_analyze), MONITOR_KEYWORDS[0])
-                
-                p["content"] = text_content
-                p["matched_keyword"] = matched_kw
-                relevant_posts.append(p)
-                logger.info(f"✅ [通过] 成功捕获有效舆情: {p['title'][:15]}...")
-                
-            processed_records.append((p["post_id"], platform))
+        config = PipelineConfig(
+            keywords=MONITOR_KEYWORDS,
+            keyword_levels=MONITOR_KEYWORD_LEVELS,
+            platform=platform,
+            alert_negative=ALERT_NEGATIVE,
+        )
+        pipeline = RadarPipeline(config)
+        results = await pipeline.run(posts)
 
-        logger.info(f"初筛漏斗完成. 相关入库: {len(relevant_posts)} | 过滤无关: {len(posts) - len(relevant_posts)}")
-
-        if processed_records:
+        # 批量标记已处理
+        if all_post_ids:
+            processed_records = [(pid, platform) for pid in all_post_ids]
             mark_processed_batch(processed_records)
 
-        if not relevant_posts:
-            continue
-
-        grouped_posts = {}
-        for p in relevant_posts:
-            kw = p["matched_keyword"]
-            grouped_posts.setdefault(kw, []).append(p)
-
-        for specific_keyword, group_posts in grouped_posts.items():
-            logger.info(f"正在对关键字 [{specific_keyword}] 的 {len(group_posts)} 条数据进行聚类...")
-            clusters = cluster_related_posts(group_posts, specific_keyword)
-            
-            for cluster in clusters:
-                topic_name = cluster.get("topic_name", "未知话题")
-                post_ids = cluster.get("post_ids", [])
-                if not post_ids: continue
-                
-                logger.info(f"📊 [聚类结果明细] 提取到话题: 【{topic_name}】 -> 包含 {len(post_ids)} 条讨论帖子")
-
-                combined_text = ""
-                urls = []
-                for pid in post_ids:
-                    if pid in post_dict:
-                        combined_text += f"【发帖】{post_dict[pid]['title']} - {post_dict[pid].get('content', '')[:200]}\n"
-                        urls.append(post_dict[pid].get('url', ''))
-                        
-                mock_post = { "title": f"聚合话题：{topic_name}", "content": combined_text[:2500] }
-                
-                current_sensitivity = MONITOR_KEYWORD_LEVELS.get(specific_keyword, "balanced")
-                result = analyze_and_report(mock_post, specific_keyword, sensitivity=current_sensitivity)
-                
-                for pid in post_ids:
-                    if pid in post_dict:
-                        real_post = post_dict[pid] 
-                        save_ai_result(
-                            post_id=pid, 
-                            platform=platform,
-                            keyword=specific_keyword, 
-                            title=real_post.get("title", ""), 
-                            content=real_post.get("content", ""),
-                            url=real_post.get("url", ""),
-                            risk_level=result["risk_level"],
-                            core_issue=result["core_issue"],
-                            report=result["report"],
-                            publish_time=real_post.get("publish_time", "未知时间") 
-                        )
-                        total_new_count += 1 
-
-                if result.get("status") == "alert" and ALERT_NEGATIVE:
-                    logger.warning(f"🚨 高危预警产生！等级: {result.get('risk_level')}")
-                    send_alert(
-                        keyword=specific_keyword, platform=platform, risk_level=result["risk_level"],
-                        core_issue=topic_name, report=result["report"], urls=urls 
-                    )
-                else:
-                    logger.info(f"✅ 话题检测安全通过: {topic_name}")
+        # 保存结果入库
+        for pr in results:
+            save_ai_result(
+                post_id=pr.post_id,
+                platform=pr.platform,
+                keyword=pr.keyword,
+                title=pr.title,
+                content=pr.content,
+                url=pr.url,
+                risk_level=pr.risk_level,
+                core_issue=pr.core_issue,
+                report=pr.report,
+                publish_time=pr.publish_time,
+            )
+            total_new_count += 1
 
     return total_new_count
+
+
+def run_analysis_pipeline():
+    """同步入口，内部启动 asyncio 事件循环。"""
+    import asyncio
+    return asyncio.run(run_analysis_pipeline_async())
 
 
 def api_start_task(background_tasks):

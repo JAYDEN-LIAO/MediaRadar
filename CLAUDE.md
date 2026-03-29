@@ -19,8 +19,9 @@ backend/
 ├── core/                     # 核心组件（logger, config, database）
 ├── services/
 │   ├── radar_service/        # 舆情分析核心（重点）
-│   │   ├── main.py           # 雷达调度主流程
-│   │   ├── llm_pipeline.py   # 六大 Agent 编排（LangGraph 状态机）
+│   │   ├── main.py           # 雷达调度入口（调用 Pipeline）
+│   │   ├── pipeline.py       # Pipeline 调度器（新增）
+│   │   ├── llm_pipeline.py   # LangGraph 分析子图 + LLM 调用
 │   │   ├── prompt_templates.py
 │   │   ├── api.py            # /api/radar_status, /api/start_task 等
 │   │   ├── db_manager.py     # SQLite 操作
@@ -40,24 +41,30 @@ frontend/MiniApp/
 │   └── utils/api.js          # API 调用封装
 ```
 
-## 核心架构：六大 Agent 管线
+## 核心架构：Pipeline 调度器 + LangGraph 分析子图
 
 ```
-Screener(初筛) -> [有图?] -> Vision Agent(视觉分析)
-    -> Cluster(聚类) -> Analyst(风险分析)
-    -> [高风险?] -> Reviewer(交叉复核) -> Director(报告生成)
+RadarPipeline (Pipeline 调度器)
+  ① ScreenerStage ──► ② VisionStage(条件) ──► ③ ClusterStage(asyncio 并行)
+                                                             │
+                                                             ▼
+                                           LangGraph 分析子图
+                                           analyst → reviewer → director
+                                                             │
+                                                             ▼
+                                                        ④ AlertStage
 ```
 
-### Agent 职责
+### 组件职责
 
-| Agent | 模型 | 职责 |
-|-------|------|------|
-| Screener | DeepSeek | 文本初筛，判定是否相关 |
-| Vision | Qwen-VL-Max | 图片证据解析 |
-| Cluster | BGE-M3 + DBSCAN | 向量聚类 |
-| Analyst | DeepSeek | 风险等级判定 |
-| Reviewer | Kimi | 高风险复核 |
-| Director | Kimi | 生成预警报告 |
+| 组件 | 类型 | 职责 |
+|------|------|------|
+| ScreenerStage | Pipeline Stage | 文本初筛，Early Exit + Vision 条件调用 |
+| VisionStage | Pipeline Stage | Qwen-VL-Max 图片证据解析，含 retry |
+| ClusterStage | Pipeline Stage | HDBSCAN 向量聚类，asyncio 并行 n clusters |
+| Analyst Node | LangGraph Node | DeepSeek 风险等级判定 |
+| Reviewer Node | LangGraph Node | Kimi 交叉复核，确认/驳回 |
+| Director Node | LangGraph Node | Kimi 生成预警简报 |
 
 ## 关键 API
 
@@ -97,5 +104,7 @@ AI 助手通过 Function Calling 拥有三个工具：
 1. **启动后端**: `python backend/gateway/main.py`（端口 8000）
 2. **环境变量**: 详见 `backend/services/radar_service/` 下的 `.env` 配置
 3. **爬虫目录**: `backend/services/crawler_service/` 启动命令 `python main.py`
-4. **LangGraph**: 状态机定义在 `llm_pipeline.py`，入口 `radar_app`
-5. **轮询间隔**: 前端首页 3 秒轮询一次后端状态
+4. **Pipeline**: `pipeline.py` 包含 RadarPipeline 调度器，`run_analysis_pipeline()` 是 asyncio 入口
+5. **LangGraph**: 状态机定义在 `llm_pipeline.py`，`radar_app` 仅封装 analyst→reviewer→director 子图
+6. **轮询间隔**: 前端首页 3 秒轮询一次后端状态
+7. **完整架构升级方案**: 见根目录 `update.md`
