@@ -21,7 +21,8 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from core.logger import logger
 from core.config import settings
-from .prompt_templates import SCREENER_PROMPT, ANALYST_PROMPT, DIRECTOR_PROMPT, REVIEWER_PROMPT, VISION_PROMPT
+from .prompt_templates import SCREENER_PROMPT, ANALYST_PROMPT, ANALYST_PROMPT_WITH_RAG, DIRECTOR_PROMPT, REVIEWER_PROMPT, VISION_PROMPT
+from .vector_store import retrieve_similar_cases
 
 global_http_client = httpx.Client()
 
@@ -265,18 +266,67 @@ class RadarGraphState(TypedDict):
     text_to_analyze: str     # 在 analyst_node 一次性构造，后续节点复用
 
 # 2. 定义节点 (Nodes) - 对应你原有的 Agent 角色
+
+def build_analyst_prompt_with_rag(keyword: str, cases: list[dict]) -> str:
+    """
+    将 RAG 案例填入增强版 Prompt
+
+    构造 3 个案例槽位，不足 3 条时用"暂无相关历史案例"补齐。
+    """
+    # 补齐空位
+    while len(cases) < 3:
+        cases.append({"risk_level": "未知", "core_issue": "无", "report": "暂无相关历史案例"})
+
+    c1, c2, c3 = cases[0], cases[1], cases[2]
+
+    return ANALYST_PROMPT_WITH_RAG.format(
+        keyword=keyword,
+        case1_level=c1.get("risk_level", "未知"),
+        case1_issue=c1.get("core_issue", "无"),
+        case1_report=c1.get("report", "无"),
+        case2_level=c2.get("risk_level", "未知"),
+        case2_issue=c2.get("core_issue", "无"),
+        case2_report=c2.get("report", "无"),
+        case3_level=c3.get("risk_level", "未知"),
+        case3_issue=c3.get("core_issue", "无"),
+        case3_report=c3.get("report", "无"),
+    )
+
 def analyst_node(state: RadarGraphState):
     """DeepSeek 深度分析节点"""
     logger.info(f"🧠 [ANALYST NODE] DeepSeek 正在分析关于 [{state['keyword']}] 的舆情...")
 
-    # 在入口节点一次性构造 text_to_analyze，后续节点复用
-    text_to_analyze = f"标题：{state['mock_post'].get('title', '')}\n内容：{state['mock_post'].get('content', '')}"
-    prompt = ANALYST_PROMPT.format(keyword=state['keyword'])
+    keyword = state["keyword"]
 
-    res = call_llm(prompt, text_to_analyze, response_format="json",
+    # 构造检索 query
+    query_text = f"标题：{state['mock_post'].get('title', '')}\n内容：{state['mock_post'].get('content', '')}"
+
+    # ── RAG 增强（新增）───────────────────────────────
+    similar_cases = []
+    try:
+        similar_cases = retrieve_similar_cases(
+            keyword=keyword,
+            query_text=query_text,
+            top_k=3
+        )
+        if similar_cases:
+            logger.info(f"📚 [RAG] 检索到 {len(similar_cases)} 条相似历史案例")
+        else:
+            logger.info(f"📚 [RAG] 未检索到历史案例，使用无 RAG 分析")
+    except Exception as e:
+        logger.warning(f"⚠️ [RAG] 检索失败，继续使用无 RAG 增强的分析：{e}")
+    # ───────────────────────────────────────────────
+
+    # 选择 Prompt（优先 RAG 版本）
+    if similar_cases:
+        prompt = build_analyst_prompt_with_rag(keyword, similar_cases)
+    else:
+        prompt = ANALYST_PROMPT.format(keyword=keyword)
+
+    res = call_llm(prompt, query_text, response_format="json",
                    engine="deepseek", pydantic_model=AnalystResult)
 
-    return {"analyst_result": res, "text_to_analyze": text_to_analyze}
+    return {"analyst_result": res, "text_to_analyze": query_text}
 
 def reviewer_node(state: RadarGraphState):
     """Kimi 二次复核节点 (交叉验证)"""

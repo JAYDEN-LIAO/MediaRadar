@@ -3,6 +3,7 @@ import sqlite3
 import os
 import json
 import sys
+import threading
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if BASE_DIR not in sys.path:
@@ -51,15 +52,41 @@ def init_radar_db():
         except sqlite3.OperationalError:
             pass
 
+def _async_index_to_qdrant(result: dict):
+    """异步将 ai_results 写入 Qdrant（不阻塞主流程）"""
+    try:
+        from .vector_store import index_ai_result
+        index_ai_result(result)
+        logger.info(f"📚 [RAG Index] post_id={result['post_id']} 已写入 Qdrant")
+    except Exception as e:
+        logger.warning(f"⚠️ [RAG Index] 索引失败（不影响主流程）：{e}")
+
+
 def save_ai_result(post_id, platform, keyword, title, content, url, risk_level, core_issue, report, publish_time="未知时间"):
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute('''
-            INSERT OR REPLACE INTO ai_results 
+            INSERT OR REPLACE INTO ai_results
             (post_id, platform, keyword, title, content, url, risk_level, core_issue, report, publish_time)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (post_id, platform, keyword, title, content, url, risk_level, core_issue, report, publish_time))
         conn.commit()
+
+    # ── 异步触发 RAG 索引（新增）───────────────────
+    result_dict = {
+        "post_id": post_id,
+        "platform": platform,
+        "keyword": keyword,
+        "title": title,
+        "content": content,
+        "url": url,
+        "risk_level": risk_level,
+        "core_issue": core_issue,
+        "report": report,
+        "publish_time": publish_time,
+    }
+    threading.Thread(target=_async_index_to_qdrant, args=(result_dict,), daemon=True).start()
+    # ───────────────────────────────────────────────
 
 def get_latest_results(limit=50):
     with get_db_connection() as conn:

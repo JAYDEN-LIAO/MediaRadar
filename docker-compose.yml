@@ -55,6 +55,24 @@ services:
       retries: 3
       start_period: 10s
 
+  # Qdrant 向量数据库（RAG 知识库）
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: mediaradar-qdrant
+    ports:
+      - "6333:6333"   # REST API
+      - "6334:6334"   # gRPC（高性能场景）
+    volumes:
+      - ./data/qdrant:/qdrant/storage  # 持久化向量数据
+    networks:
+      - mediaradar-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/readyz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 networks:
   mediaradar-net:
     driver: bridge

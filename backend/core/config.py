@@ -34,8 +34,13 @@ class Settings:
     # 默认使用阿里云百炼 (DashScope) 的 OpenAI 兼容接口
     VISION_API_KEY = os.getenv("VISION_API_KEY", "")
     VISION_BASE_URL = os.getenv("VISION_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1").strip()
-    VISION_MODEL = os.getenv("VISION_MODEL", "qwen-vl-max") 
-    
+    VISION_MODEL = os.getenv("VISION_MODEL", "qwen-vl-max")
+
+    # ======== 配置5: Qdrant 向量数据库（RAG 知识库） ========
+    QDRANT_HOST = os.getenv("QDRANT_HOST", "127.0.0.1")
+    QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
+    QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "yq_history")
+
     # ======== 系统路径配置 ========
     STATE_DB_PATH = os.getenv("STATE_DB_PATH", os.path.join(DATA_DIR, "radar_state.db"))
     CRAWLER_DB_PATH = os.getenv("CRAWLER_DB_PATH", os.path.join(BACKEND_DIR, "data", "sqlite_tables.db"))
