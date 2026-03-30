@@ -34,6 +34,7 @@ from .llm_pipeline import (
     analyze_and_report,
 )
 from .prompt_templates import SCREENER_PROMPT
+from .topic_aggregator import TopicAggregator
 
 
 # ============================================================
@@ -408,6 +409,7 @@ class RadarPipeline:
         self.screener = ScreenerStage(config.keywords, config.keyword_levels)
         self.cluster = ClusterStage()
         self.analysis = AnalysisSubGraph()
+        self.aggregator = TopicAggregator()
         # Semaphore 限制并发分析数量，避免触发 Kimi org 并发限制
         self._semaphore = asyncio.Semaphore(config.concurrent_limit)
 
@@ -460,11 +462,15 @@ class RadarPipeline:
 
         # Stage 4: 收集结果 + 预警 + 话题演化追踪
         final_results: List[PipelineResult] = []
+        cluster_results: List[tuple] = []  # (cluster, result) pairs for aggregator
+
         for item in analysis_outputs:
             if isinstance(item, Exception):
                 logger.error(f"[Pipeline] 分析异常: {item}")
                 continue
             cluster, result, evolution_timeline = item
+
+            cluster_results.append((cluster, result))
 
             # 高危预警
             if result["status"] == "alert" and self.config.alert_negative:
@@ -482,6 +488,16 @@ class RadarPipeline:
             final_results.extend(
                 build_results(cluster, result, self.config.platform, evolution_timeline)
             )
+
+        # ── 话题聚合写入 SQLite（Task 2）─────────────────
+        if cluster_results:
+            try:
+                clusters_for_agg = [c for c, _ in cluster_results]
+                results_for_agg = [r for _, r in cluster_results]
+                self.aggregator.aggregate_clusters(clusters_for_agg, results_for_agg)
+            except Exception as e:
+                logger.warning(f"⚠️ [Pipeline] 话题聚合失败: {e}")
+        # ─────────────────────────────────────────────────
 
         logger.info(f"[Pipeline] 完成，共产出 {len(final_results)} 条结果")
         return final_results

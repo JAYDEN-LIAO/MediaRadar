@@ -52,6 +52,33 @@ export const getDashboardStats = () => {
   });
 };
 
+// ----------------- 话题聚合 API（任务6） -----------------
+
+// 获取话题列表
+export const getTopicList = (params) => {
+  return request({
+    url: '/api/topic_list',
+    method: 'GET',
+    data: params
+  });
+};
+
+// 获取话题详情（含关联帖子）
+export const getTopicDetail = (topicId) => {
+  return request({
+    url: `/api/topic/${topicId}`,
+    method: 'GET'
+  });
+};
+
+// 标记话题为已处理
+export const markTopicProcessed = (topicId) => {
+  return request({
+    url: `/api/topic/${topicId}/process`,
+    method: 'POST'
+  });
+};
+
 export const streamRequest = (url, data, onChunk, onDone, onError) => {
   // 注意：小程序支持 enableChunked
   const requestTask = uni.request({
