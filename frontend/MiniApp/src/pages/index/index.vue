@@ -186,7 +186,7 @@ const goToList = () => uni.switchTab({ url: '/pages/list/list' })
 // 读取真实的系统配置
 const loadSystemConfig = () => {
   uni.request({
-    url: 'http://127.0.0.1:8000/api/settings',
+    url: 'http://127.0.0.1:8008/api/settings',
     method: 'GET',
     success: (res) => {
       if (res.data && res.data.code === 200) {
@@ -200,7 +200,7 @@ const loadSystemConfig = () => {
 // 读取数据库舆情列表，并计算首页展示的数据
 const loadDashboardData = () => {
   uni.request({
-    url: 'http://127.0.0.1:8000/api/yq_list',
+    url: 'http://127.0.0.1:8008/api/yq_list',
     method: 'GET',
     success: (res) => {
       if (res.data && res.data.code === 200) {
@@ -241,7 +241,7 @@ const startPollingStatus = () => {
   
   pollTimer = setInterval(() => {
     uni.request({
-      url: 'http://127.0.0.1:8000/api/radar_status',
+      url: 'http://127.0.0.1:8008/api/radar_status',
       method: 'GET',
       success: (res) => {
         if (res.data && res.data.code === 200) {
@@ -286,7 +286,7 @@ const startRadar = () => {
   
   uni.showLoading({ title: '启动扫描中...' })
   uni.request({
-    url: 'http://127.0.0.1:8000/api/start_task',
+    url: 'http://127.0.0.1:8008/api/start_task',
     method: 'POST',
     success: (res) => {
       uni.hideLoading()

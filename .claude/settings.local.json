@@ -56,7 +56,19 @@
       "Bash(D:/JAYDEN/develop/work/MediaRadar/venv/Scripts/python.exe -c \"\nimport uvicorn\nconfig = uvicorn.Config\\('gateway.main:app', host='127.0.0.1', port=8001\\)\nprint\\('log_level:', config.log_level\\)\nprint\\('access_log:', config.access_log\\)\nprint\\('logger_config:', config.logger_config\\)\n\")",
       "Bash(D:/JAYDEN/develop/work/MediaRadar/venv/Scripts/python.exe -c \"\nimport socket\ns = socket.socket\\(socket.AF_INET, socket.SOCK_STREAM\\)\ntry:\n    s.bind\\(\\('0.0.0.0', 8000\\)\\)\n    s.close\\(\\)\n    print\\('Port 8000 is FREE - no other server running'\\)\nexcept:\n    print\\('Port 8000 is IN USE - something else has it'\\)\n\" 2>&1)",
       "Bash(netstat -ano)",
-      "Bash(taskkill //F //PID 25956)"
+      "Bash(taskkill //F //PID 25956)",
+      "Bash(tasklist:*)",
+      "Bash(cmd //C \"taskkill /F /PID 25956\")",
+      "Bash(powershell -Command \"Get-NetTCPConnection -LocalPort 8000 | Format-List\")",
+      "Bash(powershell -Command \"Get-Process -Id 25956 | Format-List *\")",
+      "Bash(wsl -e ps aux)",
+      "Bash(D:/JAYDEN/develop/work/MediaRadar/venv/Scripts/python.exe -c \"\nimport fastapi; import starlette; import sse_starlette; import uvicorn\nprint\\('FastAPI:', fastapi.__version__\\)\nprint\\('Starlette:', starlette.__version__\\)\nprint\\('sse-starlette:', sse_starlette.__version__\\)\nprint\\('uvicorn:', uvicorn.__version__\\)\n\")",
+      "Bash(D:/JAYDEN/develop/work/MediaRadar/venv/Scripts/python.exe -c \"\nfrom starlette.routing import Router\nimport inspect\nsig = inspect.signature\\(Router.__init__\\)\nprint\\('Starlette Router.__init__ params:', list\\(sig.parameters.keys\\(\\)\\)\\)\nprint\\('Has on_startup:', 'on_startup' in sig.parameters\\)\nprint\\('Has lifespan:', 'lifespan' in sig.parameters\\)\n\")",
+      "Bash(D:/JAYDEN/develop/work/MediaRadar/venv/Scripts/python.exe -c \"\nimport sys, os\nsys.path.insert\\(0, 'D:/JAYDEN/develop/work/MediaRadar/backend'\\)\nos.chdir\\('D:/JAYDEN/develop/work/MediaRadar/backend'\\)\nimport uvicorn\nuvicorn.run\\('gateway.main:app', host='127.0.0.1', port=9998, log_level='info', reload=False\\)\n\" 2>&1)",
+      "Bash(D:/JAYDEN/develop/work/MediaRadar/venv/Scripts/python.exe -c \"import qdrant_client; print\\('qdrant_client version:', qdrant_client.__version__\\)\" 2>&1)",
+      "Bash(D:/JAYDEN/develop/work/MediaRadar/venv/Scripts/python.exe -c \"import qdrant_client; print\\(''OK:'', qdrant_client.__version__\\)\")",
+      "Bash(D:/JAYDEN/develop/work/MediaRadar/venv/Scripts/python.exe -c \"\nimport sys; sys.path.insert\\(0, 'D:/JAYDEN/develop/work/MediaRadar/backend'\\)\nfrom services.radar_service.pipeline import RadarPipeline, PipelineConfig\nprint\\('Pipeline import OK'\\)\nprint\\('concurrent_limit field:', hasattr\\(PipelineConfig, 'concurrent_limit'\\)\\)\ncfg = PipelineConfig\\(keywords=['华为'], keyword_levels={}, platform='wb', concurrent_limit=2\\)\np = RadarPipeline\\(cfg\\)\nprint\\('Semaphore:', p._semaphore\\)\nprint\\('All OK'\\)\n\")",
+      "Bash(D:/JAYDEN/develop/work/MediaRadar/venv/Scripts/python.exe -c \"\nimport sys; sys.path.insert\\(0, 'D:/JAYDEN/develop/work/MediaRadar/backend'\\)\nfrom qdrant_client import QdrantClient\nfrom qdrant_client.models import Distance, VectorParams, PointStruct\nprint\\('All qdrant_client imports OK'\\)\n\")"
     ]
   },
   "enableAllProjectMcpServers": true,

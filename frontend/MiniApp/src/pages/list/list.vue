@@ -246,7 +246,7 @@ const goToDetail = (item) => {
 const fetchYqData = () => {
   uni.showLoading({ title: '加载中...' }) 
   uni.request({
-    url: 'http://127.0.0.1:8000/api/yq_list',
+    url: 'http://127.0.0.1:8008/api/yq_list',
     method: 'GET',
     success: (res) => {
       uni.hideLoading() 

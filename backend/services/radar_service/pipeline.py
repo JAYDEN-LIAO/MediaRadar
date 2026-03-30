@@ -296,6 +296,9 @@ class PipelineConfig:
     platform: str
     alert_negative: bool = True
     timeout: int = 300         # Pipeline 单次运行超时（秒）
+    # 并发限制：Kimi 组织级别 max org concurrency=3，
+    # 为保险起见设为 2（留一个余量给其他可能并发的请求）
+    concurrent_limit: int = 2
 
 
 class RadarPipeline:
@@ -319,12 +322,20 @@ class RadarPipeline:
         self.screener = ScreenerStage(config.keywords, config.keyword_levels)
         self.cluster = ClusterStage()
         self.analysis = AnalysisSubGraph()
+        # Semaphore 限制并发分析数量，避免触发 Kimi org 并发限制
+        self._semaphore = asyncio.Semaphore(config.concurrent_limit)
 
     def _get_sensitivity(self, keyword: str) -> str:
         kl = self.config.keyword_levels
         if isinstance(kl, dict) and keyword in kl:
             return kl[keyword]
         return "balanced"
+
+    async def _run_with_semaphore(self, cluster: Cluster):
+        """用 Semaphore 包装的 analysis.run，每次最多 concurrent_limit 个并发"""
+        async with self._semaphore:
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(None, self.analysis.run, cluster)
 
     async def run(self, posts: List[dict]) -> List[PipelineResult]:
         """
@@ -357,12 +368,8 @@ class RadarPipeline:
             logger.info("[Pipeline] Cluster 阶段无有效话题")
             return []
 
-        # Stage 3: 并行分析（asyncio + ThreadPoolExecutor 避免阻塞）
-        loop = asyncio.get_event_loop()
-        tasks = [
-            loop.run_in_executor(None, self.analysis.run, c)
-            for c in clusters
-        ]
+        # Stage 3: 并行分析（asyncio + Semaphore 限流，避免触发 Kimi 并发限制）
+        tasks = [self._run_with_semaphore(c) for c in clusters]
         analysis_outputs = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Stage 4: 收集结果 + 预警

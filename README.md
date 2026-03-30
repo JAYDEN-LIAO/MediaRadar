@@ -99,8 +99,8 @@ VISION_MODEL="qwen-vl-max"
 ```bash
 python backend/gateway/main.py
 ```
-* **API 文档地址**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-* **网关地址**: [http://127.0.0.1:8000](http://127.0.0.1:8000)
+* **API 文档地址**: [http://127.0.0.1:8008/docs](http://127.0.0.1:8008/docs)
+* **网关地址**: [http://127.0.0.1:8008](http://127.0.0.1:8008)
 
 ### 4. 启动前端控制台
 使用 **HBuilderX** 打开 `frontend/MiniApp` 目录，运行至浏览器或小程序模拟器即可。

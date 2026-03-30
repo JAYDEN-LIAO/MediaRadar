@@ -4,7 +4,7 @@
   "host": "127.0.0.1",
   "port": 8001,
   "transport": "stdio",
-  "backend_url": "http://127.0.0.1:8000",
+  "backend_url": "http://127.0.0.1:8008",
   "crawler_dir": "backend/services/crawler_service",
   "enable_streaming": true,
   "log_level": "INFO",

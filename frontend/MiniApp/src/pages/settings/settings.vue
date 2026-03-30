@@ -202,7 +202,7 @@ const executeSaveSilent = () => {
   }
 
   uni.request({
-    url: 'http://127.0.0.1:8000/api/settings',
+    url: 'http://127.0.0.1:8008/api/settings',
     method: 'POST',
     data: payload,
     success: (res) => {
@@ -270,7 +270,7 @@ const onFreqChange = (e) => {
 const loadSettings = () => {
   uni.showLoading({ title: '加载中...' })
   uni.request({
-    url: 'http://127.0.0.1:8000/api/settings',
+    url: 'http://127.0.0.1:8008/api/settings',
     method: 'GET',
     success: (res) => {
       uni.hideLoading()

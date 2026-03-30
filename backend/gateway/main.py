@@ -51,4 +51,4 @@ app.include_router(radar_router, tags=["舆情雷达业务层"])
 app.include_router(agent_router, tags=["AI助手业务层"])
 if __name__ == "__main__":
     # 启动命令说明：请在 backend 目录下执行 python gateway/main.py
-    uvicorn.run("gateway.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("gateway.main:app", host="0.0.0.0", port=8008, reload=True)

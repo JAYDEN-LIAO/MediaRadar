@@ -3,7 +3,7 @@
 // 这里填写你 Python 后端的本地 IP 或域名
 // 注意：如果你是用手机预览，不能写 127.0.0.1，要写你电脑的局域网 IP（比如 192.168.x.x）
 // 目前我们在电脑模拟器里看，用 127.0.0.1 没问题
-const BASE_URL = 'http://127.0.0.1:8000'; 
+const BASE_URL = 'http://127.0.0.1:8008'; 
 
 export const request = (options) => {
   return new Promise((resolve, reject) => {
