@@ -41,6 +41,9 @@ class Settings:
     QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
     QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "yq_history")
 
+    # ======== 配置6: Qdrant 话题演化追踪集合 ========
+    TOPIC_COLLECTION = os.getenv("TOPIC_COLLECTION", "topic_evolution")
+
     # ======== 系统路径配置 ========
     STATE_DB_PATH = os.getenv("STATE_DB_PATH", os.path.join(DATA_DIR, "radar_state.db"))
     CRAWLER_DB_PATH = os.getenv("CRAWLER_DB_PATH", os.path.join(BACKEND_DIR, "data", "sqlite_tables.db"))

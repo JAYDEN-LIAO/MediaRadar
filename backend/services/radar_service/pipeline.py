@@ -56,6 +56,8 @@ class PipelineResult:
     status: str = "safe"
     topic_name: str = ""
     cluster_index: int = -1
+    topic_id: str = ""          # 话题唯一标识（MD5）
+    evolution_timeline: dict = None  # 话题演化时间线
 
 
 @dataclass
@@ -224,9 +226,10 @@ class AnalysisSubGraph:
 
     对每个 Cluster 调用 LangGraph 分析管线
     （analyst → reviewer → director），
+    并在分析前后注入话题演化追踪能力。
     """
 
-    def run(self, cluster: Cluster) -> tuple[Cluster, dict]:
+    def run(self, cluster: Cluster) -> tuple[Cluster, dict, dict]:
         # 聚合多帖内容
         combined_text = ""
         for p in cluster.posts:
@@ -237,17 +240,92 @@ class AnalysisSubGraph:
             "content": combined_text[:2500]
         }
 
+        # ── 话题演化追踪（RAG 增强）──────────────────────
+        from .topic_tracker import (
+            generate_cluster_summary,
+            retrieve_similar_topics,
+            build_evolution_timeline,
+            index_or_update_topic,
+            build_topic_id,
+        )
+        import threading
+
+        evolution_timeline = {}
+        cluster_summary = ""
+
+        # 仅 balanced / aggressive 敏感度启用追踪（节省资源）
+        if cluster.sensitivity in ("aggressive", "balanced"):
+            try:
+                # 1. 生成簇摘要
+                cluster_summary = generate_cluster_summary(cluster.posts, cluster.keyword)
+
+                # 2. RAG 检索相似历史话题
+                similar_topics = retrieve_similar_topics(
+                    keyword=cluster.keyword,
+                    topic_name=cluster.topic_name,
+                    cluster_summary=cluster_summary,
+                    top_k=5,
+                    score_threshold=0.75,
+                )
+
+                # 3. 构造演化时间线（即使无历史也返回结构，供 Analyst 判断）
+                evolution_timeline = build_evolution_timeline(
+                    current_topic={
+                        "topic_name": cluster.topic_name,
+                        "keyword": cluster.keyword,
+                        "cluster_summary": cluster_summary,
+                        "risk_level": None,  # 分析前未知
+                    },
+                    similar_topics=similar_topics,
+                )
+
+                logger.info(
+                    f"📊 [TopicTracker] keyword={cluster.keyword}, "
+                    f"topic={cluster.topic_name[:20]}..., "
+                    f"is_new={evolution_timeline.get('is_new_topic')}, "
+                    f"signal={evolution_timeline.get('evolution_signal')}"
+                )
+
+            except Exception as e:
+                logger.warning(f"⚠️ [TopicTracker] 话题追踪初始化失败: {e}")
+                evolution_timeline = {}
+
+        # 4. 调用 LangGraph 分析（携带演化上下文）
         result = analyze_and_report(
             mock_post,
             keyword=cluster.keyword,
-            sensitivity=cluster.sensitivity
+            sensitivity=cluster.sensitivity,
+            evolution_timeline=evolution_timeline,
         )
 
         logger.info(
             f"[Analysis] 话题【{cluster.topic_name}】→ "
             f"status={result['status']}, risk={result['risk_level']}"
         )
-        return cluster, result
+
+        # 5. 分析完成后，异步写入话题演化记录（仅高危舆情）
+        risk_level = result.get("risk_level", 1)
+        if risk_level >= 3 and evolution_timeline:
+            def _async_index():
+                try:
+                    topic_id = build_topic_id(cluster.keyword, cluster.topic_name)
+                    index_or_update_topic(
+                        topic_id=topic_id,
+                        keyword=cluster.keyword,
+                        topic_name=cluster.topic_name,
+                        cluster_summary=cluster_summary,
+                        risk_level=risk_level,
+                        posts=cluster.posts,
+                        core_issue=result.get("core_issue", ""),
+                        report=result.get("report", ""),
+                    )
+                    logger.info(f"📊 [TopicTracker] topic_id={topic_id} 已写入/更新 Qdrant")
+                except Exception as e:
+                    logger.warning(f"⚠️ [TopicTracker] 异步索引失败: {e}")
+
+            threading.Thread(target=_async_index, daemon=True).start()
+
+        return cluster, result, evolution_timeline
 
 
 # ============================================================
@@ -257,12 +335,18 @@ class AnalysisSubGraph:
 def build_results(
     cluster: Cluster,
     analysis_result: dict,
-    platform: str
+    platform: str,
+    evolution_timeline: dict = None,
 ) -> List[PipelineResult]:
     """
     将 Cluster + AnalysisResult 展开为 List[PipelineResult]，
     每个 post 一条记录，与 save_ai_result() 格式完全兼容。
     """
+    from .topic_tracker import build_topic_id
+
+    topic_id = build_topic_id(cluster.keyword, cluster.topic_name)
+    ev = evolution_timeline or {}
+
     results = []
     for pid in cluster.post_ids:
         post = next((p for p in cluster.posts if p.get("post_id") == pid), None)
@@ -281,6 +365,8 @@ def build_results(
             publish_time=post.get("publish_time", "未知时间"),
             status=analysis_result["status"],
             topic_name=cluster.topic_name,
+            topic_id=topic_id,
+            evolution_timeline=ev,
         ))
     return results
 
@@ -372,13 +458,13 @@ class RadarPipeline:
         tasks = [self._run_with_semaphore(c) for c in clusters]
         analysis_outputs = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # Stage 4: 收集结果 + 预警
+        # Stage 4: 收集结果 + 预警 + 话题演化追踪
         final_results: List[PipelineResult] = []
         for item in analysis_outputs:
             if isinstance(item, Exception):
                 logger.error(f"[Pipeline] 分析异常: {item}")
                 continue
-            cluster, result = item
+            cluster, result, evolution_timeline = item
 
             # 高危预警
             if result["status"] == "alert" and self.config.alert_negative:
@@ -393,7 +479,9 @@ class RadarPipeline:
                     urls=urls
                 )
 
-            final_results.extend(build_results(cluster, result, self.config.platform))
+            final_results.extend(
+                build_results(cluster, result, self.config.platform, evolution_timeline)
+            )
 
         logger.info(f"[Pipeline] 完成，共产出 {len(final_results)} 条结果")
         return final_results

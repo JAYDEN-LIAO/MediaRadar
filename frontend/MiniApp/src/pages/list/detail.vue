@@ -55,6 +55,55 @@
           </view>
         </view>
       </view>
+
+      <!-- 话题追踪卡片（仅话题有历史记录时显示） -->
+      <view class="detail-card evolution-card" v-if="topicEvolution && !topicEvolution.is_new_topic">
+        <view class="evolution-header">
+          <text class="evolution-title">📊 话题追踪</text>
+          <text class="evolution-signal" :class="getSignalClass(topicEvolution.evolution_signal)">
+            {{ getSignalText(topicEvolution.evolution_signal) }}
+          </text>
+        </view>
+
+        <view class="evolution-summary">
+          <text class="summary-text">
+            该话题最早发现于 {{ topicEvolution.duration_days }} 天前，
+            已连续追踪 {{ topicEvolution.total_scan_count }} 次，
+            累计影响 {{ topicEvolution.total_post_count }} 条帖子
+          </text>
+        </view>
+
+        <!-- 风险演变路径 -->
+        <view class="risk-path" v-if="topicEvolution.risk_evolution_path">
+          <text class="path-label">风险演变：</text>
+          <text class="path-value">{{ topicEvolution.risk_evolution_path }}</text>
+        </view>
+
+        <!-- 时间线 -->
+        <view class="timeline" v-if="topicEvolution.timeline && topicEvolution.timeline.length">
+          <view
+            class="timeline-item"
+            v-for="(item, idx) in topicEvolution.timeline"
+            :key="idx"
+            :class="{ 'is-current': item.is_current }"
+          >
+            <view class="timeline-dot"></view>
+            <view class="timeline-content">
+              <view class="timeline-header">
+                <text class="timeline-time">{{ item.scan_time || '未知时间' }}</text>
+                <text class="timeline-risk" :class="getRiskClass(item.risk_level)">
+                  风险{{ item.risk_level }}
+                </text>
+                <text class="timeline-current-tag" v-if="item.is_current">当前</text>
+              </view>
+              <text class="timeline-issue">{{ item.core_issue || '无' }}</text>
+              <text class="timeline-platforms" v-if="item.platforms && item.platforms.length">
+                {{ formatPlatforms(item.platforms) }} · {{ item.post_count || 1 }}条帖子
+              </text>
+            </view>
+          </view>
+        </view>
+      </view>
       
       <view class="detail-actions">
         <view class="detail-btn secondary" @click="openOriginalUrl">复制原文链接</view>
@@ -77,6 +126,8 @@ import { onLoad } from '@dcloudio/uni-app'
 
 // 核心数据源（完全保留原逻辑）
 const itemData = ref({})
+// 话题演化追踪数据
+const topicEvolution = ref(null)
 
 onLoad((options) => {
   if (options.data) {
@@ -85,6 +136,10 @@ onLoad((options) => {
     } catch (e) {
       console.error('解析详情数据失败', e)
     }
+  }
+  // 解析成功后加载话题演化追踪数据
+  if (itemData.value && itemData.value.keyword) {
+    loadTopicEvolution()
   }
 })
 
@@ -128,6 +183,66 @@ const markAsProcessed = () => {
   if (itemData.value.is_processed === 1) return // 如果已处理直接跳过
   uni.showToast({ title: '已标记处理', icon: 'success' })
   setTimeout(() => goBack(), 1000)
+}
+
+// ============================================================
+// 话题演化追踪
+// ============================================================
+const loadTopicEvolution = () => {
+  const keyword = itemData.value.keyword || ''
+  const topicId = itemData.value.topic_id || ''
+
+  uni.request({
+    url: 'http://127.0.0.1:8008/api/topic_evolution',
+    data: { keyword, topic_id: topicId },
+    method: 'GET',
+    success: (res) => {
+      if (res.data && res.data.code === 200 && res.data.data) {
+        const data = res.data.data
+        if (!data.is_new_topic && data.evolution) {
+          topicEvolution.value = data.evolution
+        }
+      }
+    },
+    fail: () => {
+      console.log('话题演化数据加载失败')
+    }
+  })
+}
+
+// 辅助：信号样式
+const getSignalClass = (signal) => {
+  const map = {
+    'escalating': 'signal-red',
+    'stable': 'signal-yellow',
+    'deescalating': 'signal-green'
+  }
+  return map[signal] || 'signal-gray'
+}
+
+// 辅助：信号文本
+const getSignalText = (signal) => {
+  const map = {
+    'escalating': '⚠️ 风险升级',
+    'stable': '→ 趋于稳定',
+    'deescalating': '↓ 风险缓和'
+  }
+  return map[signal] || '未知'
+}
+
+// 辅助：风险等级样式
+const getRiskClass = (level) => {
+  const lvl = parseInt(level) || 0
+  if (lvl >= 4) return 'risk-high'
+  if (lvl >= 3) return 'risk-medium'
+  return 'risk-low'
+}
+
+// 辅助：平台列表文字
+const formatPlatforms = (platforms) => {
+  if (!platforms || !platforms.length) return ''
+  const nameMap = { 'wb': '微博', 'xhs': '小红书', 'dy': '抖音', 'bili': 'B站', 'ks': '快手', 'zhihu': '知乎', 'tieba': '贴吧' }
+  return platforms.map(p => nameMap[p] || p).join('、')
 }
 </script>
 
@@ -190,4 +305,143 @@ const markAsProcessed = () => {
 .detail-btn.primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; box-shadow: 0 8rpx 20rpx rgba(102, 126, 234, 0.3);}
 .detail-btn.primary.disabled { background: #e8e8e8; color: #999; box-shadow: none; pointer-events: none;}
 .detail-btn.secondary { background-color: #fff; color: #667eea; border: 2rpx solid #667eea; }
+
+/* ============================================================
+   话题追踪卡片
+   ============================================================ */
+.evolution-card {
+  border-left: 6rpx solid #667eea;
+}
+
+.evolution-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.evolution-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #333;
+}
+
+.evolution-signal {
+  font-size: 26rpx;
+  font-weight: 600;
+  padding: 6rpx 16rpx;
+  border-radius: 12rpx;
+}
+
+.signal-red { background-color: #fff2f0; color: #ff4d4f; }
+.signal-yellow { background-color: #fffbe6; color: #faad14; }
+.signal-green { background-color: #f6ffed; color: #52c41a; }
+.signal-gray { background-color: #f5f5f5; color: #999; }
+
+.evolution-summary {
+  font-size: 28rpx;
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 20rpx;
+}
+
+.risk-path {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 24rpx;
+  padding: 16rpx;
+  background-color: #f8f8fc;
+  border-radius: 12rpx;
+}
+
+.path-label { font-size: 26rpx; color: #999; }
+.path-value { font-size: 30rpx; font-weight: 700; color: #667eea; letter-spacing: 2rpx; }
+
+/* 时间线 */
+.timeline {
+  position: relative;
+  padding-left: 32rpx;
+}
+
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 8rpx;
+  top: 12rpx;
+  bottom: 12rpx;
+  width: 2rpx;
+  background-color: #e8e8f0;
+}
+
+.timeline-item {
+  position: relative;
+  padding-bottom: 32rpx;
+  padding-left: 24rpx;
+}
+
+.timeline-item:last-child { padding-bottom: 0; }
+
+.timeline-item.is-current .timeline-dot {
+  background-color: #667eea;
+  width: 16rpx;
+  height: 16rpx;
+  margin-left: -2rpx;
+}
+
+.timeline-dot {
+  position: absolute;
+  left: -28rpx;
+  top: 8rpx;
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  background-color: #ccc;
+  border: 2rpx solid #fff;
+}
+
+.timeline-content {
+  background-color: #fafafa;
+  border-radius: 12rpx;
+  padding: 16rpx 20rpx;
+}
+
+.timeline-header {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 8rpx;
+}
+
+.timeline-time { font-size: 24rpx; color: #999; }
+
+.timeline-risk {
+  font-size: 24rpx;
+  font-weight: 600;
+}
+
+.timeline-risk.risk-high { color: #ff4d4f; }
+.timeline-risk.risk-medium { color: #faad14; }
+.timeline-risk.risk-low { color: #52c41a; }
+
+.timeline-current-tag {
+  font-size: 20rpx;
+  background-color: #667eea;
+  color: #fff;
+  padding: 2rpx 8rpx;
+  border-radius: 8rpx;
+}
+
+.timeline-issue {
+  display: block;
+  font-size: 28rpx;
+  color: #333;
+  font-weight: 500;
+  margin-bottom: 6rpx;
+}
+
+.timeline-platforms {
+  font-size: 24rpx;
+  color: #999;
+}
 </style>

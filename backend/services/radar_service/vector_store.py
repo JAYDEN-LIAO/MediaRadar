@@ -118,6 +118,59 @@ def delete_collection():
 
 
 # ===========================
+# 2b. 话题演化集合管理（topic_evolution）
+# ===========================
+
+TOPIC_COLLECTION_NAME = settings.TOPIC_COLLECTION
+
+
+def topic_collection_exists() -> bool:
+    """检查话题演化集合是否存在"""
+    try:
+        client = _get_client()
+        client.get_collection(collection_name=TOPIC_COLLECTION_NAME)
+        return True
+    except Exception:
+        return False
+
+
+def ensure_topic_collection_exists():
+    """
+    幂等创建话题演化集合（集合存在时跳过，不存在则创建）
+    与 ensure_collection_exists() 完全一致的 HNSW 参数配置
+    """
+    if topic_collection_exists():
+        logger.info(f"[Qdrant] 话题集合 '{TOPIC_COLLECTION_NAME}' 已存在，跳过创建")
+        return
+
+    from qdrant_client.models import Distance, VectorParams, HnswConfigDiff, OptimizersConfigDiff
+
+    client = _get_client()
+    client.create_collection(
+        collection_name=TOPIC_COLLECTION_NAME,
+        vectors_config=VectorParams(
+            size=EMBEDDING_DIM,
+            distance=Distance.COSINE,
+        ),
+        hnsw_config=HnswConfigDiff(
+            m=16,
+            ef_construct=100,
+            full_scan_threshold=10000,
+        ),
+        optimizers_config=OptimizersConfigDiff(
+            indexing_threshold=10000,
+        ),
+    )
+    logger.info(f"[Qdrant] 话题集合 '{TOPIC_COLLECTION_NAME}' 创建成功（dim={EMBEDDING_DIM}, HNSW m=16, ef=100）")
+
+
+def get_topic_collection_info():
+    """获取话题演化集合详细信息"""
+    client = _get_client()
+    return client.get_collection(collection_name=TOPIC_COLLECTION_NAME)
+
+
+# ===========================
 # 3. Embedding 生成
 # ===========================
 

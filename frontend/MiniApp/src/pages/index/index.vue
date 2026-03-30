@@ -1,133 +1,137 @@
 <template>
   <view class="page-container">
     <view class="header">
+      <view class="status-dot"></view>
       <view class="title">舆情监控</view>
+      <text class="date">{{ today }}</text>
     </view>
-    
+
     <scroll-view scroll-y class="content-scroll">
       <view class="content-inner">
-        
-        <view class="settings-card">
+
+        <view class="card card-primary">
           <view class="card-header">
             <view class="header-left">
-              <text class="icon">📊</text>
-              <text class="title">今日舆情简报</text>
+              <text class="section-title">今日概览</text>
             </view>
-            <text class="date-tag">{{ today }}</text>
+            <view class="keyword-tag">{{ keyword }}</view>
           </view>
-          
+
           <view class="stats-row">
             <view class="stat-item">
               <view class="number">{{ todayNewCount }}</view>
               <view class="label">今日新增</view>
             </view>
+            <view class="stat-divider"></view>
             <view class="stat-item">
-              <view class="number" :class="{ 'text-danger': highRiskCount > 0 }">{{ highRiskCount }}</view>
+              <view class="number" :class="{ 'num-danger': highRiskCount > 0 }">{{ highRiskCount }}</view>
               <view class="label">高风险</view>
             </view>
+            <view class="stat-divider"></view>
             <view class="stat-item">
-              <view class="number text-success">100%</view>
+              <view class="number num-success">100%</view>
               <view class="label">入库率</view>
             </view>
           </view>
-          
-          <view class="sentiment-section">
-            <view class="section-title">情感分布</view>
-            <view class="sentiment-row">
-              <view class="sentiment-item">
-                <view class="emoji">😊</view>
-                <view class="type">正面</view>
-                <view class="count">{{ posCount }}</view>
-              </view>
-              <view class="sentiment-item">
-                <view class="emoji">😐</view>
-                <view class="type">中性</view>
-                <view class="count">{{ neuCount }}</view>
-              </view>
-              <view class="sentiment-item">
-                <view class="emoji">😠</view>
-                <view class="type">负面</view>
-                <view class="count">{{ negCount }}</view>
-              </view>
-            </view>
-            
+        </view>
+
+        <view class="card">
+          <view class="card-header">
+            <text class="section-title">情感分布</text>
+          </view>
+
+          <view class="sentiment-bar-container">
             <view class="sentiment-bar">
               <view class="bar-segment positive" :style="{ width: posPct + '%' }"></view>
               <view class="bar-segment neutral" :style="{ width: neuPct + '%' }"></view>
               <view class="bar-segment negative" :style="{ width: negPct + '%' }"></view>
             </view>
-            <view class="sentiment-labels">
-              <text>{{ posPct }}%</text>
-              <text>{{ neuPct }}%</text>
-              <text>{{ negPct }}%</text>
+            <view class="sentiment-legend">
+              <view class="legend-item">
+                <view class="legend-dot positive"></view>
+                <text class="legend-label">正面</text>
+                <text class="legend-value">{{ posPct }}%</text>
+              </view>
+              <view class="legend-item">
+                <view class="legend-dot neutral"></view>
+                <text class="legend-label">中性</text>
+                <text class="legend-value">{{ neuPct }}%</text>
+              </view>
+              <view class="legend-item">
+                <view class="legend-dot negative"></view>
+                <text class="legend-label">负面</text>
+                <text class="legend-value">{{ negPct }}%</text>
+              </view>
             </view>
           </view>
         </view>
 
-        <view class="settings-card">
+        <view class="card">
           <view class="card-header">
-            <view class="header-left">
-              <text class="icon">🤖</text>
-              <text class="title">AI 智能研判摘要</text>
-            </view>
+            <text class="section-title">AI 智能研判摘要</text>
           </view>
-          
+
           <view class="summary-text">
-            近期关于“{{ keyword }}”的讨论整体呈现以 <text class="highlight-text">{{ mainSentimentText }}</text> 为主的态势。今日共捕获到相关讨论 {{ todayNewCount }} 条。
+            近期关于"<text class="highlight">{{ keyword }}</text>"的讨论整体呈现以 <text class="highlight">{{ mainSentimentText }}</text> 为主的态势。今日共捕获到相关讨论 <text class="highlight">{{ todayNewCount }}</text> 条。
           </view>
-          
+
           <block v-if="highRiskCount > 0">
-            <view class="warning-box danger">
-              ⚠️ 发现 {{ highRiskCount }} 起高风险事件，建议公关/客服团队立刻排查并跟进。
+            <view class="alert-box alert-danger">
+              <view class="alert-indicator"></view>
+              <view class="alert-content">
+                <text class="alert-title">高风险预警</text>
+                <text class="alert-desc">发现 {{ highRiskCount }} 起高风险事件，建议公关团队立刻跟进处理</text>
+              </view>
             </view>
-            
-            <view class="alert-box" v-if="latestAlert">
-              <view class="alert-item" @click="goToList">
-                <view class="source">
-                  <text class="platform">{{ latestAlert.platform }}</text>
-                  <text class="dot">·</text>
-                  <text class="time">{{ latestAlert.create_time.substring(11, 16) }}</text>
-                </view>
-                <view class="alert-text">{{ latestAlert.report }}</view>
+
+            <view class="latest-alert" v-if="latestAlert">
+              <view class="alert-meta">
+                <view class="platform-dot" :class="latestAlert.platform"></view>
+                <text class="platform-name">{{ getPlatformName(latestAlert.platform) }}</text>
+                <text class="dot-sep">·</text>
+                <text class="alert-time">{{ latestAlert.create_time.substring(11, 16) }}</text>
+              </view>
+              <view class="alert-report">{{ latestAlert.report }}</view>
+              <view class="alert-action" @click="goToList">查看详情 <text class="arrow">→</text></view>
+            </view>
+          </block>
+
+          <block v-else>
+            <view class="alert-box alert-safe">
+              <view class="alert-indicator"></view>
+              <view class="alert-content">
+                <text class="alert-title">暂无高风险</text>
+                <text class="alert-desc">今日暂未发现明显负面舆情，品牌口碑平稳</text>
               </view>
             </view>
           </block>
-          
-          <block v-else>
-            <view class="warning-box safe">
-              ✅ 今日暂未发现明显的高风险负面舆情，品牌口碑平稳。
-            </view>
-          </block>
         </view>
 
-        <view class="settings-card">
-           <view class="card-header">
-            <view class="header-left">
-              <text class="icon">📈</text>
-              <text class="title">近7日声量趋势</text>
-            </view>
+        <view class="card">
+          <view class="card-header">
+            <text class="section-title">近7日声量趋势</text>
           </view>
           <view class="chart-placeholder">
-            [ 数据折线图展示区 ]
+            <text class="placeholder-text">数据可视化区域</text>
           </view>
         </view>
 
         <view class="action-container">
           <button class="primary-btn" @click="startRadar">
-            {{ isWaitingForScan ? '扫描进行中...' : '启动新一轮全网扫描' }}
+            {{ isWaitingForScan ? '扫描进行中...' : '启动全网扫描' }}
           </button>
         </view>
-        
+
         <view class="bottom-spacer"></view>
       </view>
     </scroll-view>
 
     <movable-area class="fab-area">
-      <movable-view 
-        class="agent-fab-view" 
-        direction="all" 
-        :x="fabX" 
-        :y="fabY" 
+      <movable-view
+        class="agent-fab-view"
+        direction="all"
+        :x="fabX"
+        :y="fabY"
         :animation="true"
         @change="onFabChange"
         @touchend="onFabTouchEnd"
@@ -144,33 +148,27 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 
-// 基础变量
-const keyword = ref('加载中...') 
+const keyword = ref('加载中...')
 const today = ref(new Date().toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }))
 
-// 数据统计变量
 const todayNewCount = ref(0)
 const highRiskCount = ref(0)
 const posCount = ref(0)
 const neuCount = ref(0)
 const negCount = ref(0)
 
-// 轮询控制变量
 const isWaitingForScan = ref(false)
 let pollTimer = null
 
-// 组件销毁时清理定时器
 onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer)
 })
 
-// 动态计算百分比
 const total = computed(() => posCount.value + neuCount.value + negCount.value)
 const posPct = computed(() => total.value === 0 ? 0 : Math.round((posCount.value / total.value) * 100))
 const negPct = computed(() => total.value === 0 ? 0 : Math.round((negCount.value / total.value) * 100))
-const neuPct = computed(() => total.value === 0 ? 0 : (100 - posPct.value - negPct.value)) 
+const neuPct = computed(() => total.value === 0 ? 0 : (100 - posPct.value - negPct.value))
 
-// 动态 AI 文案
 const mainSentimentText = computed(() => {
   if (total.value === 0) return '暂无数据'
   const max = Math.max(posCount.value, neuCount.value, negCount.value)
@@ -179,11 +177,15 @@ const mainSentimentText = computed(() => {
   return '中性声量'
 })
 
-const latestAlert = ref(null) 
+const latestAlert = ref(null)
+
+const getPlatformName = (val) => {
+  const names = { wb: '微博', xhs: '小红书', bili: 'B站', zhihu: '知乎', dy: '抖音', ks: '快手', tieba: '贴吧' }
+  return names[val] || val
+}
 
 const goToList = () => uni.switchTab({ url: '/pages/list/list' })
 
-// 读取真实的系统配置
 const loadSystemConfig = () => {
   uni.request({
     url: 'http://127.0.0.1:8008/api/settings',
@@ -197,7 +199,6 @@ const loadSystemConfig = () => {
   })
 }
 
-// 读取数据库舆情列表，并计算首页展示的数据
 const loadDashboardData = () => {
   uni.request({
     url: 'http://127.0.0.1:8008/api/yq_list',
@@ -205,26 +206,26 @@ const loadDashboardData = () => {
     success: (res) => {
       if (res.data && res.data.code === 200) {
         const list = res.data.data
-        
+
         const d = new Date()
         const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-        
+
         const todayData = list.filter(item => item.create_time && item.create_time.startsWith(todayStr))
-        
+
         todayNewCount.value = todayData.length
-        
+
         let pos = 0, neu = 0, neg = 0
         let recentNeg = null
-        
+
         todayData.forEach(item => {
           if (item.sentiment === 'positive') pos++
           else if (item.sentiment === 'negative') {
             neg++
-            if (!recentNeg) recentNeg = item 
+            if (!recentNeg) recentNeg = item
           }
           else neu++
         })
-        
+
         posCount.value = pos
         neuCount.value = neu
         negCount.value = neg
@@ -235,10 +236,9 @@ const loadDashboardData = () => {
   })
 }
 
-// 🌟 轮询后端状态
 const startPollingStatus = () => {
   if (pollTimer) clearInterval(pollTimer)
-  
+
   pollTimer = setInterval(() => {
     uni.request({
       url: 'http://127.0.0.1:8008/api/radar_status',
@@ -246,44 +246,39 @@ const startPollingStatus = () => {
       success: (res) => {
         if (res.data && res.data.code === 200) {
           const statusData = res.data.data
-          
-          // 如果后端停止运行了，且前端正在等待结果
+
           if (!statusData.is_running && isWaitingForScan.value) {
             isWaitingForScan.value = false
             clearInterval(pollTimer)
-            
-            // 弹窗提示结果
+
             if (statusData.last_new_count > 0) {
-              uni.showToast({ 
-                title: `扫描完毕！新增 ${statusData.last_new_count} 条预警`, 
-                icon: 'success', 
-                duration: 3000 
+              uni.showToast({
+                title: `扫描完毕！新增 ${statusData.last_new_count} 条预警`,
+                icon: 'success',
+                duration: 3000
               })
             } else {
-              uni.showToast({ 
-                title: '扫描完毕，暂无相关舆情', 
-                icon: 'none', 
-                duration: 3000 
+              uni.showToast({
+                title: '扫描完毕，暂无相关舆情',
+                icon: 'none',
+                duration: 3000
               })
             }
-            
-            // 重新拉取一次列表数据刷新看板
+
             loadDashboardData()
           }
         }
       },
       fail: () => {
-        console.error('获取状态失败，停止轮询')
         clearInterval(pollTimer)
       }
     })
-  }, 3000) // 3秒问一次后端
+  }, 3000)
 }
 
-// 🚀 触发后端扫描
 const startRadar = () => {
-  if (isWaitingForScan.value) return // 防止连点
-  
+  if (isWaitingForScan.value) return
+
   uni.showLoading({ title: '启动扫描中...' })
   uni.request({
     url: 'http://127.0.0.1:8008/api/start_task',
@@ -292,8 +287,8 @@ const startRadar = () => {
       uni.hideLoading()
       if (res.data && res.data.code === 200) {
         uni.showToast({ title: '开始全面扫描，请稍候', icon: 'none' })
-        isWaitingForScan.value = true // 标记开始等待
-        startPollingStatus() // 启动轮询
+        isWaitingForScan.value = true
+        startPollingStatus()
       } else {
         uni.showToast({ title: res.data.msg || '启动失败', icon: 'none' })
       }
@@ -311,27 +306,20 @@ const goToAgentChat = () => {
   });
 }
 
-// ==========================================
-// 【新增】智能体拖拽与吸附边缘逻辑
-// ==========================================
 const sysInfo = uni.getSystemInfoSync();
 const screenWidth = sysInfo.windowWidth;
 const screenHeight = sysInfo.windowHeight;
 
-// 将设计稿的 120rpx 转换为真实像素，用于精确计算边界
-const fabSizePx = uni.upx2px(120); 
-const marginPx = uni.upx2px(30); // 留出一点边距，避免贴太死
+const fabSizePx = uni.upx2px(120);
+const marginPx = uni.upx2px(30);
 
-// 按钮初始位置：靠右、偏下
 const fabX = ref(screenWidth - fabSizePx - marginPx);
-const fabY = ref(screenHeight - uni.upx2px(260)); 
+const fabY = ref(screenHeight - uni.upx2px(260));
 
-// 记录当前拖动的实时位置
 let currentX = fabX.value;
 let currentY = fabY.value;
 
 const onFabChange = (e) => {
-  // 只响应用户手指拖动 (排除动画过程触发的 change)
   if (e.detail.source === 'touch') {
     currentX = e.detail.x;
     currentY = e.detail.y;
@@ -339,17 +327,15 @@ const onFabChange = (e) => {
 };
 
 const onFabTouchEnd = () => {
-  // 核心吸附逻辑：松手时，判断中心点在屏幕左半边还是右半边
   const isLeftHalf = (currentX + fabSizePx / 2) < (screenWidth / 2);
-  
+
   if (isLeftHalf) {
-    fabX.value = marginPx; // 吸附到左边缘
+    fabX.value = marginPx;
   } else {
-    fabX.value = screenWidth - fabSizePx - marginPx; // 吸附到右边缘
+    fabX.value = screenWidth - fabSizePx - marginPx;
   }
-  
-  // Y轴保持松手时的位置不变
-  fabY.value = currentY; 
+
+  fabY.value = currentY;
 };
 
 onMounted(() => {
@@ -360,103 +346,400 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* 保持全局设置以防止右侧裁切 */
 view, text, scroll-view, button {
   box-sizing: border-box;
 }
 
-/* 统一高级灰底色及布局 */
 .page-container {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: #F4F5F7;
+  background-color: #F8FAFC;
   overflow: hidden;
 }
 
-/* 统一头部样式，带磨砂玻璃效果 */
-.header { 
-  height: 100rpx; background-color: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);
-  display: flex; justify-content: center; align-items: center;
-  padding: 0 32rpx; border-bottom: 1px solid rgba(0,0,0,0.05); z-index: 10; 
+.header {
+  height: 100rpx;
+  background-color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  padding: 0 32rpx;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  z-index: 10;
 }
-.header .title { font-size: 34rpx; font-weight: 600; color: #111827; letter-spacing: 1rpx;}
 
-/* 统一滚动区域，修复卡顿Bug */
-.content-scroll { flex: 1; height: 0; width: 100%; }
-.content-inner { padding: 32rpx; }
-.bottom-spacer { height: 60rpx; }
-
-/* 统一极简卡片风格 */
-.settings-card { 
-  background-color: #ffffff; border-radius: 24rpx; padding: 32rpx; 
-  margin-bottom: 28rpx; box-shadow: 0 4rpx 24rpx rgba(0,0,0,0.02); width: 100%;
+.status-dot {
+  width: 8rpx;
+  height: 8rpx;
+  border-radius: 50%;
+  background-color: #059669;
+  margin-right: 16rpx;
 }
-.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32rpx; }
-.header-left { display: flex; align-items: center; }
-.header-left .icon { font-size: 36rpx; margin-right: 16rpx; }
-.header-left .title { font-size: 32rpx; font-weight: 600; color: #111827; }
 
-/* 日期标签 */
-.date-tag { font-size: 24rpx; color: #4F46E5; background: rgba(79, 70, 229, 0.1); padding: 4rpx 16rpx; border-radius: 20rpx; font-weight: 500;}
-
-/* 数据概览区 */
-.stats-row { display: flex; justify-content: space-around; padding: 16rpx 0 32rpx 0; border-bottom: 1px solid #F3F4F6; margin-bottom: 24rpx;}
-.stat-item { text-align: center; }
-.stat-item .number { font-size: 48rpx; font-weight: 700; color: #111827; margin-bottom: 8rpx; }
-.stat-item .label { font-size: 24rpx; color: #6B7280; }
-.text-danger { color: #EF4444 !important; }
-.text-success { color: #10B981 !important; }
-
-/* 情感分布区 */
-.section-title { font-size: 28rpx; color: #374151; margin-bottom: 24rpx; font-weight: 500;}
-.sentiment-row { display: flex; justify-content: space-around; margin-bottom: 24rpx; }
-.sentiment-item { text-align: center; }
-.sentiment-item .emoji { font-size: 50rpx; margin-bottom: 12rpx; }
-.sentiment-item .type { font-size: 24rpx; color: #6B7280; }
-.sentiment-item .count { font-size: 32rpx; font-weight: 600; color: #111827; margin-top: 8rpx; }
-
-/* 进度条保持动态绑定 */
-.sentiment-bar { height: 16rpx; border-radius: 8rpx; display: flex; overflow: hidden; background: #eee; margin-top: 24rpx; }
-.bar-segment { transition: width 0.5s ease; }
-.bar-segment.positive { background-color: #10B981; }
-.bar-segment.neutral { background-color: #FBBF24; }
-.bar-segment.negative { background-color: #EF4444; }
-.sentiment-labels { display: flex; justify-content: space-between; margin-top: 16rpx; font-size: 22rpx; color: #9CA3AF; }
-
-/* AI 摘要区 */
-.summary-text { font-size: 28rpx; line-height: 1.6; color: #4B5563; }
-.highlight-text { font-weight: 600; color: #4F46E5; }
-
-/* 提示框高级感 */
-.warning-box { padding: 24rpx; border-radius: 12rpx; margin-top: 24rpx; font-size: 26rpx; line-height: 1.5; }
-.warning-box.danger { background-color: #FEF2F2; color: #991B1B; border-left: 6rpx solid #EF4444; }
-.warning-box.safe { background-color: #F0FDF4; color: #065F46; border-left: 6rpx solid #10B981; }
-
-.alert-box { margin-top: 24rpx; }
-.alert-item { padding: 24rpx; background-color: #F9FAFB; border-radius: 16rpx; border: 1px solid #F3F4F6; }
-.alert-item .source { display: flex; align-items: center; margin-bottom: 12rpx; }
-.alert-item .platform { font-size: 24rpx; color: #EF4444; font-weight: 600; }
-.alert-item .dot { margin: 0 12rpx; color: #D1D5DB; }
-.alert-item .time { font-size: 24rpx; color: #9CA3AF; }
-.alert-text { font-size: 28rpx; color: #374151; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-
-.chart-placeholder { height: 240rpx; background-color: #F9FAFB; border-radius: 16rpx; border: 1px dashed #E5E7EB; display: flex; align-items: center; justify-content: center; color: #9CA3AF; font-size: 28rpx; margin-top: 24rpx; }
-
-/* 统一按钮风格 */
-.action-container { padding: 12rpx 0; }
-.primary-btn { 
-  width: 100%; padding: 24rpx 0; background-color: #4F46E5; 
-  border-radius: 16rpx; color: #ffffff; font-size: 30rpx; 
-  display: flex; justify-content: center; align-items: center; font-weight: 500;
-  box-shadow: 0 8rpx 20rpx rgba(79, 70, 229, 0.2);
-  border: none; margin: 0;
+.header .title {
+  font-size: 34rpx;
+  font-weight: 600;
+  color: #0F172A;
+  letter-spacing: 1rpx;
+  flex: 1;
 }
-.primary-btn:active { opacity: 0.9; transform: scale(0.99); }
 
-/* ==========================================
-   新增：全屏拖拽区域与悬浮按钮样式
-========================================== */
+.header .date {
+  font-size: 26rpx;
+  color: #64748B;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.content-scroll {
+  flex: 1;
+  height: 0;
+  width: 100%;
+}
+
+.content-inner {
+  padding: 24rpx;
+}
+
+.bottom-spacer {
+  height: 60rpx;
+}
+
+/* Card Base */
+.card {
+  background-color: #FFFFFF;
+  border-radius: 16rpx;
+  padding: 28rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 1rpx 3rpx rgba(0,0,0,0.04);
+  width: 100%;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24rpx;
+}
+
+.section-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #0F172A;
+}
+
+.keyword-tag {
+  font-size: 22rpx;
+  color: #0891B2;
+  background: rgba(8, 145, 178, 0.08);
+  padding: 6rpx 16rpx;
+  border-radius: 20rpx;
+  font-weight: 500;
+  max-width: 280rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Stats Row */
+.card-primary .stats-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8rpx 0;
+}
+
+.stat-item {
+  flex: 1;
+  text-align: center;
+}
+
+.stat-divider {
+  width: 1rpx;
+  height: 60rpx;
+  background-color: #E2E8F0;
+}
+
+.stat-item .number {
+  font-size: 52rpx;
+  font-weight: 700;
+  color: #0F172A;
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  line-height: 1.2;
+}
+
+.stat-item .label {
+  font-size: 24rpx;
+  color: #64748B;
+  margin-top: 8rpx;
+}
+
+.num-danger {
+  color: #DC2626 !important;
+}
+
+.num-success {
+  color: #059669 !important;
+}
+
+/* Sentiment Bar */
+.sentiment-bar-container {
+  margin-top: 8rpx;
+}
+
+.sentiment-bar {
+  height: 8rpx;
+  border-radius: 4rpx;
+  display: flex;
+  overflow: hidden;
+  background: #E2E8F0;
+}
+
+.bar-segment {
+  transition: width 0.5s ease;
+}
+
+.bar-segment.positive {
+  background-color: #059669;
+}
+
+.bar-segment.neutral {
+  background-color: #D97706;
+}
+
+.bar-segment.negative {
+  background-color: #DC2626;
+}
+
+.sentiment-legend {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20rpx;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+}
+
+.legend-dot {
+  width: 8rpx;
+  height: 8rpx;
+  border-radius: 50%;
+  margin-right: 8rpx;
+}
+
+.legend-dot.positive {
+  background-color: #059669;
+}
+
+.legend-dot.neutral {
+  background-color: #D97706;
+}
+
+.legend-dot.negative {
+  background-color: #DC2626;
+}
+
+.legend-label {
+  font-size: 24rpx;
+  color: #64748B;
+  margin-right: 8rpx;
+}
+
+.legend-value {
+  font-size: 24rpx;
+  color: #0F172A;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Summary */
+.summary-text {
+  font-size: 28rpx;
+  line-height: 1.7;
+  color: #475569;
+}
+
+.highlight {
+  font-weight: 600;
+  color: #0F172A;
+}
+
+/* Alert Box */
+.alert-box {
+  display: flex;
+  align-items: flex-start;
+  padding: 20rpx;
+  border-radius: 12rpx;
+  margin-top: 20rpx;
+}
+
+.alert-danger {
+  background-color: #FEF2F2;
+}
+
+.alert-safe {
+  background-color: #F0FDF4;
+}
+
+.alert-indicator {
+  width: 4rpx;
+  height: 100%;
+  min-height: 60rpx;
+  border-radius: 2rpx;
+  margin-right: 16rpx;
+}
+
+.alert-danger .alert-indicator {
+  background-color: #DC2626;
+}
+
+.alert-safe .alert-indicator {
+  background-color: #059669;
+}
+
+.alert-content {
+  flex: 1;
+}
+
+.alert-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 4rpx;
+}
+
+.alert-danger .alert-title {
+  color: #991B1B;
+}
+
+.alert-safe .alert-title {
+  color: #065F46;
+}
+
+.alert-desc {
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+
+.alert-danger .alert-desc {
+  color: #B91C1C;
+}
+
+.alert-safe .alert-desc {
+  color: #047857;
+}
+
+/* Latest Alert */
+.latest-alert {
+  margin-top: 16rpx;
+  padding: 20rpx;
+  background-color: #F8FAFC;
+  border-radius: 12rpx;
+  border: 1px solid #E2E8F0;
+}
+
+.alert-meta {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12rpx;
+}
+
+.platform-dot {
+  width: 8rpx;
+  height: 8rpx;
+  border-radius: 50%;
+  margin-right: 8rpx;
+}
+
+.platform-dot.wb { background-color: #FF8200; }
+.platform-dot.xhs { background-color: #FF2442; }
+.platform-dot.bili { background-color: #FB7299; }
+.platform-dot.zhihu { background-color: #0066FF; }
+.platform-dot.dy { background-color: #1C1C1E; }
+.platform-dot.ks { background-color: #FF5000; }
+.platform-dot.tieba { background-color: #3388FF; }
+
+.platform-name {
+  font-size: 24rpx;
+  color: #64748B;
+  font-weight: 500;
+}
+
+.dot-sep {
+  margin: 0 10rpx;
+  color: #CBD5E1;
+}
+
+.alert-time {
+  font-size: 24rpx;
+  color: #94A3B8;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.alert-report {
+  font-size: 28rpx;
+  color: #334155;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.alert-action {
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  color: #0891B2;
+  font-weight: 500;
+}
+
+.arrow {
+  margin-left: 4rpx;
+}
+
+/* Chart Placeholder */
+.chart-placeholder {
+  height: 200rpx;
+  background-color: #F8FAFC;
+  border-radius: 12rpx;
+  border: 1px dashed #E2E8F0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.placeholder-text {
+  font-size: 26rpx;
+  color: #94A3B8;
+}
+
+/* Primary Button */
+.action-container {
+  padding: 8rpx 0;
+}
+
+.primary-btn {
+  width: 100%;
+  padding: 26rpx 0;
+  background-color: #0F172A;
+  border-radius: 12rpx;
+  color: #FFFFFF;
+  font-size: 30rpx;
+  font-weight: 500;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: none;
+  margin: 0;
+}
+
+.primary-btn:active {
+  background-color: #1E293B;
+}
+
+/* FAB */
 .fab-area {
   position: fixed;
   top: 0;
@@ -464,36 +747,34 @@ view, text, scroll-view, button {
   width: 100vw;
   height: 100vh;
   z-index: 9999;
-  pointer-events: none; /* 让用户能够穿透拖拽层，点击到下方的列表 */
+  pointer-events: none;
 }
 
 .agent-fab-view {
   width: 120rpx;
   height: 120rpx;
-  pointer-events: auto; /* 让按钮自身恢复点击和触摸响应 */
+  pointer-events: auto;
 }
 
 .agent-fab {
   width: 100%;
   height: 100%;
-  background: linear-gradient(135deg, #4F46E5, #3B82F6);
+  background-color: #0F172A;
   border-radius: 50%;
   display: flex;
   justify-content: center;
   align-items: center;
-  box-shadow: 0 10rpx 30rpx rgba(79, 70, 229, 0.4);
-  transition: transform 0.2s ease; /* 点击缩放效果 */
+  box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.3);
 }
 
 .agent-fab:active {
-  transform: scale(0.9);
+  transform: scale(0.92);
 }
 
 .fab-text {
   color: #FFFFFF;
-  font-size: 44rpx;
-  font-weight: 800;
-  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 40rpx;
+  font-weight: 700;
   letter-spacing: 2rpx;
 }
 </style>

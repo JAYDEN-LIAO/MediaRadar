@@ -105,3 +105,97 @@ def api_save_settings(req: SettingsRequest):
     save_system_settings(req.model_dump())
     reload_config()
     return {"code": 200, "msg": "系统设置已更新并生效"}
+
+
+# ============================================================
+# Phase 6: 话题演化追踪 API
+# ============================================================
+
+@router.get("/api/topic_evolution")
+def get_topic_evolution(keyword: str, topic_id: str = ""):
+    """
+    前端详情页调用此接口，获取指定话题的完整演化时间线。
+
+    参数：
+        keyword: 监控关键词（必填）
+        topic_id: 话题唯一标识（可选，不传则按 keyword 检索最新话题）
+
+    返回：
+        {
+            "is_new_topic": bool,
+            "topic_id": str,
+            "topic_name": str,
+            "keyword": str,
+            "evolution": {
+                "total_scan_count": int,
+                "total_post_count": int,
+                "duration_days": int,
+                "risk_evolution_path": str,   # "2 → 3 → 4"
+                "current_risk_level": int,
+                "evolution_signal": str,       # "escalating" / "stable" / "deescalating" / "unknown"
+                "timeline": [...],
+            }
+        }
+    """
+    from .topic_tracker import get_topic_history
+
+    if not keyword:
+        return {"code": 400, "msg": "keyword 参数必填"}
+
+    result = get_topic_history(topic_id=topic_id, keyword=keyword)
+    return {"code": 200, "data": result}
+
+
+@router.post("/api/topic_evolution/migrate_clusters")
+def migrate_topic_clusters(limit: int = 1000):
+    """
+    将 ai_results 表中的历史数据，按 keyword 聚合后，
+    批量生成 cluster_summary 并写入 topic_evolution 集合。
+
+    用于初始化时一次性执行，或数据修复。
+
+    参数：
+        limit: 最多迁移多少条 ai_results（默认 1000）
+
+    返回：
+        {"migrated_topics": int, "total": int}
+    """
+    from .topic_tracker import migrate_topics_from_ai_results
+
+    migrated, total = migrate_topics_from_ai_results(limit=limit)
+    return {
+        "code": 200,
+        "msg": f"迁移完成，共处理 {total} 个话题簇，写入成功 {migrated} 个",
+        "data": {"migrated_topics": migrated, "total": total},
+    }
+
+
+@router.get("/api/topic_stats")
+def get_topic_stats(keyword: str = ""):
+    """
+    获取话题演化库的统计信息（可选，用于管理后台）。
+
+    参数：
+        keyword: 可选，按关键词过滤
+
+    返回：
+        {
+            "total_topics": int,
+            "escalating_count": int,   # 风险升级中的话题数
+            "new_topics_7d": int,      # 近7天新增话题数
+        }
+    """
+    from .vector_store import get_topic_collection_info
+
+    try:
+        info = get_topic_collection_info()
+        vectors_count = getattr(info, "vectors_count", None) or getattr(info, "points_count", 0)
+        return {
+            "code": 200,
+            "data": {
+                "total_topics": vectors_count,
+                "keyword": keyword or "全部",
+            }
+        }
+    except Exception as e:
+        return {"code": 500, "msg": f"获取统计失败: {str(e)}"}
