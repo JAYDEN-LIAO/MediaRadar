@@ -20,15 +20,10 @@
         </view>
       </view>
 
-      <!-- AI 汇总报告卡片 -->
-      <view class="detail-card ai-card" v-if="topicData.cluster_summary || topicData.report">
+      <!-- AI 话题摘要卡片 -->
+      <view class="detail-card ai-card" v-if="topicData.cluster_summary">
         <view class="card-label">📊 AI 话题摘要</view>
-        <text class="ai-summary-text" user-select="true">{{ topicData.cluster_summary || topicData.report }}</text>
-        <view class="report-section" v-if="topicData.report">
-          <view class="report-divider"></view>
-          <view class="card-label">📋 预警简报</view>
-          <text class="report-text" user-select="true">{{ topicData.report }}</text>
-        </view>
+        <text class="ai-summary-text" user-select="true">{{ topicData.cluster_summary }}</text>
       </view>
 
       <!-- 话题基本信息卡片 -->

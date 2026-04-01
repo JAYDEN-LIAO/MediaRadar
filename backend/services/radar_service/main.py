@@ -4,7 +4,6 @@ import time
 import schedule
 import os
 import sys
-import threading
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 BACKEND_DIR = os.path.dirname(os.path.dirname(CURRENT_DIR))
@@ -18,7 +17,7 @@ CRAWLER_DIR = os.path.join(BACKEND_DIR, "services", "crawler_service")
 from core.logger import logger
 from core.config import settings
 from .db_manager import get_unprocessed_posts, mark_processed_batch, save_ai_result, get_system_settings
-from .llm_pipeline import ScreenerResult
+from .schemas import ScreenerResult
 from .notifier import send_alert
 from .pipeline import RadarPipeline, PipelineConfig
 
@@ -104,17 +103,16 @@ def run_crawler_for_platform(platform):
         logger.error(f"Execution failed for platform {platform}: {e}")
 
 async def run_analysis_pipeline_async():
-    """使用 RadarPipeline 执行完整分析流程（asyncio 并行）。"""
+    """使用 RadarPipeline 执行完整分析流程（多平台 asyncio 并行）。"""
     import asyncio
-    total_new_count = 0
 
-    for platform in MONITOR_PLATFORMS:
+    async def _run_single_platform(platform: str) -> int:
+        """单个平台的完整 Pipeline（抓取 → 分析 → 持久化）。"""
         logger.info(f"[Pipeline Mode] Analyzing {platform.upper()}...")
         posts = get_unprocessed_posts(settings.CRAWLER_DB_PATH, platform)
         if not posts:
-            continue
+            return 0
 
-        # 收集所有待处理的 post_id，用于批量标记已处理
         all_post_ids = [p["post_id"] for p in posts]
 
         config = PipelineConfig(
@@ -132,6 +130,7 @@ async def run_analysis_pipeline_async():
             mark_processed_batch(processed_records)
 
         # 保存结果入库
+        new_count = 0
         for pr in results:
             save_ai_result(
                 post_id=pr.post_id,
@@ -144,8 +143,27 @@ async def run_analysis_pipeline_async():
                 core_issue=pr.core_issue,
                 report=pr.report,
                 publish_time=pr.publish_time,
+                sentiment=getattr(pr, 'sentiment', 'Neutral'),
             )
-            total_new_count += 1
+            new_count += 1
+        return new_count
+
+    # 所有平台并发（各平台独立运行，无依赖）
+    tasks = [
+        _run_single_platform(platform)
+        for platform in MONITOR_PLATFORMS
+    ]
+    all_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    # 汇总结果（过滤异常）
+    total_new_count = 0
+    for i, result in enumerate(all_results):
+        platform = MONITOR_PLATFORMS[i]
+        if isinstance(result, Exception):
+            logger.error(f"⚠️ 平台 {platform} 执行异常: {result}")
+        else:
+            total_new_count += result
+            logger.info(f"[Pipeline Mode] {platform.upper()} 完成，新增 {result} 条")
 
     return total_new_count
 

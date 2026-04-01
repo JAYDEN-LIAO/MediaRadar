@@ -74,25 +74,37 @@ class TopicAggregator:
 
         topic_id = build_topic_id(cluster.keyword, cluster.topic_name)
 
-        # 风险映射
         risk_level = analysis_result.get("risk_level", 2)
-        risk_class = self._calculate_risk_class(risk_level)
+
+        # ── sentiment：优先取 LLM 返回值，避免 reviewer 驳回后被错误映射 ──
+        # analyst_result 中有 sentiment，safe 分支的 sentiment 被标准化为 "Neutral"
+        llm_sentiment = analysis_result.get("sentiment", "").lower() if analysis_result.get("sentiment") else ""
+        if llm_sentiment in ("negative", "positive", "neutral"):
+            sentiment_map = {"negative": "negative", "positive": "positive", "neutral": "neutral"}
+            risk_class = sentiment_map[llm_sentiment]
+        else:
+            risk_class = self._calculate_risk_class(risk_level)
+
+        # ── core_issue：取 LLM 原始值，safe 分支会用误导性兜底值，过滤它 ──
+        raw_core_issue = analysis_result.get("core_issue", "")
+        _bad_phrases = ("无", "无明显风险", "被降级的普通问题", "舆情安全，无需生成报告")
+        if raw_core_issue and raw_core_issue not in _bad_phrases and len(raw_core_issue) > 1:
+            core_issue = raw_core_issue
+        else:
+            core_issue = ""
+
+        report = analysis_result.get("report", "") or ""
+
+        # 话题摘要
+        cluster_summary = analysis_result.get("cluster_summary", "")
 
         # 平台列表
         platforms = list({p.get("platform", cluster.keyword) for p in cluster.posts})
-        # 转为中文
         plat_name_map = {
             "wb": "微博", "xhs": "小红书", "bili": "B站",
             "zhihu": "知乎", "dy": "抖音", "ks": "快手", "tieba": "贴吧"
         }
         platforms_cn = [plat_name_map.get(p, p) for p in platforms]
-
-        # 核心问题取分析结果
-        core_issue = analysis_result.get("core_issue", "")
-        report = analysis_result.get("report", "")
-
-        # 话题摘要（如果 AnalysisSubGraph 已生成则复用，否则传空）
-        cluster_summary = analysis_result.get("cluster_summary", "")
 
         # 写入 / 更新 topic_summary
         is_new = create_or_update_topic_summary(
@@ -119,6 +131,8 @@ class TopicAggregator:
             f"topic={cluster.topic_name[:20]}, "
             f"posts={len(cluster.posts)}, "
             f"risk={risk_level} ({risk_class}), "
+            f"sentiment={llm_sentiment}, "
+            f"core_issue={core_issue[:20] if core_issue else '(空)'}, "
             f"is_new={is_new}"
         )
 

@@ -262,7 +262,7 @@ def get_topic_detail(topic_id: str):
             "topic_id": topic_id,
             "keyword": summary.get("keyword", ""),
             "topic_name": summary.get("topic_name", ""),
-            "cluster_summary": summary.get("cluster_summary", ""),
+            "cluster_summary": summary.get("cluster_summary", "") or summary.get("report", ""),
             "report": summary.get("report", ""),
             "risk_level": risk_level,
             "risk_class": risk_class,

@@ -91,6 +91,11 @@ def init_radar_db():
         except sqlite3.OperationalError:
             pass
 
+        try:
+            cursor.execute("ALTER TABLE ai_results ADD COLUMN sentiment TEXT DEFAULT 'Neutral'")
+        except sqlite3.OperationalError:
+            pass
+
 def _async_index_to_qdrant(result: dict):
     """异步将 ai_results 写入 Qdrant（不阻塞主流程）"""
     try:
@@ -101,14 +106,14 @@ def _async_index_to_qdrant(result: dict):
         logger.warning(f"⚠️ [RAG Index] 索引失败（不影响主流程）：{e}")
 
 
-def save_ai_result(post_id, platform, keyword, title, content, url, risk_level, core_issue, report, publish_time="未知时间"):
+def save_ai_result(post_id, platform, keyword, title, content, url, risk_level, core_issue, report, publish_time="未知时间", sentiment="Neutral"):
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute('''
             INSERT OR REPLACE INTO ai_results
-            (post_id, platform, keyword, title, content, url, risk_level, core_issue, report, publish_time)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (post_id, platform, keyword, title, content, url, risk_level, core_issue, report, publish_time))
+            (post_id, platform, keyword, title, content, url, risk_level, core_issue, report, publish_time, sentiment)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (post_id, platform, keyword, title, content, url, risk_level, core_issue, report, publish_time, sentiment))
         conn.commit()
 
     # ── 异步触发 RAG 索引（新增）───────────────────
@@ -123,6 +128,7 @@ def save_ai_result(post_id, platform, keyword, title, content, url, risk_level, 
         "core_issue": core_issue,
         "report": report,
         "publish_time": publish_time,
+        "sentiment": sentiment,
     }
     threading.Thread(target=_async_index_to_qdrant, args=(result_dict,), daemon=True).start()
     # ───────────────────────────────────────────────

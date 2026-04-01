@@ -15,7 +15,7 @@
       </view>
       
       <view class="detail-card content-card">
-        <text class="full-text" user-select="true">{{ itemData.report || '暂无详细内容' }}</text>
+        <text class="full-text" user-select="true">{{ itemData.content || itemData.report || '暂无详细内容' }}</text>
         
         <view class="image-gallery" v-if="itemData.image_urls && itemData.image_urls.length > 0">
           <image 

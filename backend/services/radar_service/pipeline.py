@@ -2,11 +2,12 @@
 """
 Radar Pipeline 调度器
 
-将爬虫数据处理流程编排为四个可组合阶段：
-  ① ScreenerStage   - 文本初筛（可早退）
-  ② VisionStage      - 视觉证据提取（条件触发）
-  ③ ClusterStage     - 向量聚类（asyncio 并行）
+将爬虫数据处理流程编排为五个可组合阶段：
+  ① ScreenerStage   - 纯文本初筛（asyncio 并发，Semaphore 限流）
+  ② VisionStage      - 视觉证据提取（条件触发，仅处理 needs_vision 分支）
+  ③ ClusterStage     - 向量聚类
   ④ AnalysisSubGraph - LangGraph 分析子图（analyst → reviewer → director）
+  ⑤ 预警 + 聚合写入
 
 对外接口：
   RadarPipeline.run(posts, platform, keyword_levels) -> List[PipelineResult]
@@ -18,7 +19,7 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
-from typing import List, TypedDict, Optional
+from typing import List, NamedTuple
 from dataclasses import dataclass
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -26,13 +27,11 @@ if BASE_DIR not in sys.path:
     sys.path.append(BASE_DIR)
 
 from core.logger import logger
-from .llm_pipeline import (
-    ScreenerResult,
-    call_llm,
-    call_vision_llm,
-    cluster_related_posts,
-    analyze_and_report,
-)
+from .schemas import ScreenerResult
+from .llm_gateway import call_llm
+from .vision_agent import call_vision_llm
+from .embed_cluster import cluster_related_posts
+from .analysis_graph import analyze_and_report
 from .prompt_templates import SCREENER_PROMPT
 from .topic_aggregator import TopicAggregator
 
@@ -59,6 +58,7 @@ class PipelineResult:
     cluster_index: int = -1
     topic_id: str = ""          # 话题唯一标识（MD5）
     evolution_timeline: dict = None  # 话题演化时间线
+    sentiment: str = "Neutral"  # LLM 返回的情感
 
 
 @dataclass
@@ -79,23 +79,40 @@ class ScreenedPost:
     vision_text: str = ""
 
 
+class ScreenerStageResult(NamedTuple):
+    """
+    ScreenerStage 第一遍文本初筛的返回结果。
+
+    passed:       纯文本直接判定相关，直接进入下一阶段
+    needs_vision: 文本存疑但有图片，需要 VisionStage 二次确认
+    rejected:     无关且不需看图，Early Exit 直接丢弃
+    """
+    passed: List[ScreenedPost]
+    needs_vision: List[ScreenedPost]
+    rejected: List[dict]  # 仅记录 post_id 供日志使用
+
+
 # ============================================================
 # Stage 1: Screener
 # ============================================================
 
 class ScreenerStage:
     """
-    文本初筛阶段。
+    文本初筛阶段（asyncio 并发）。
 
-    对每条帖子调用 Screener LLM，判定是否相关。
+    对每条帖子并发调用 Screener LLM，判定是否相关。
     - is_relevant=False 且 needs_vision=False → 直接丢弃（Early Exit）
     - is_relevant=True  → 进入下一阶段
-    - is_relevant=False 且 needs_vision=True → 调用 Vision 后复判
+    - is_relevant=False 且 needs_vision=True → 交给 VisionStage 复判
     """
+
+    # Screener 阶段并发上限（DeepSeek API 限流保护）
+    SCREENER_CONCURRENCY = 10
 
     def __init__(self, keywords: List[str], keyword_levels: dict):
         self.keywords = keywords
         self.keyword_levels = keyword_levels
+        self._screener_semaphore = asyncio.Semaphore(self.SCREENER_CONCURRENCY)
 
     def _build_prompt(self) -> str:
         kw_with_levels = "、".join([
@@ -104,14 +121,21 @@ class ScreenerStage:
         ])
         return SCREENER_PROMPT.format(keyword=kw_with_levels)
 
-    def run(self, posts: List[dict]) -> List[ScreenedPost]:
-        if not posts:
-            return []
+    async def _screener_single(
+        self,
+        post: dict,
+        screener_prompt: str,
+    ) -> tuple[str, dict | ScreenedPost | None]:
+        """
+        单个帖子的 Screener 调用（在线程池中执行）。
 
-        screener_prompt = self._build_prompt()
-        screened: List[ScreenedPost] = []
-
-        for post in posts:
+        Returns:
+            - ("rejected", {"post_id": ...})
+            - ("passed", ScreenedPost(...))
+            - ("needs_vision", ScreenedPost(...))
+            - (None, None) if exception
+        """
+        async with self._screener_semaphore:
             post_id = post.get("post_id", "")
             image_urls = post.get("image_urls", [])
             has_image = bool(image_urls)
@@ -123,51 +147,95 @@ class ScreenerStage:
             )
             text_to_analyze = f"标题: {post['title']}\n正文: {text_content[:800]}{image_hint}"
 
-            # 第一道关卡：纯文本初筛
-            res = call_llm(
-                screener_prompt, text_to_analyze,
-                response_format="json", engine="deepseek", pydantic_model=ScreenerResult
-            )
+            try:
+                res = await asyncio.to_thread(
+                    call_llm,
+                    screener_prompt, text_to_analyze,
+                    response_format="json", engine="deepseek",
+                    pydantic_model=ScreenerResult
+                )
+            except Exception as e:
+                logger.error(f"⚠️ [Screener] LLM 调用失败 (ID:{post_id}): {e}")
+                return (None, None)
 
             # 早退：无关且不需看图
             if not res.get("is_relevant") and not res.get("needs_vision"):
                 logger.info(f"⏭️ [早退] 文本判定无关，跳过 (ID:{post_id})")
-                continue
+                return ("rejected", {"post_id": post_id})
 
-            # 需要看图，调用 Vision Agent
-            vision_text = ""
-            if res.get("needs_vision") and has_image:
-                logger.info(f"📸 [Vision] Screener 申请看图 (ID:{post_id})")
-                vision_text = call_vision_llm(
-                    image_urls[0], text_content,
-                    platform=post.get("platform", "wb"),
-                    post_id=post_id
-                )
-                if vision_text:
-                    # 视觉补充后复判
-                    fused_content = f"{text_content}\n【视觉补充】：{vision_text}"
-                    text_to_analyze2 = f"标题: {post['title']}\n正文: {fused_content[:800]}"
-                    res = call_llm(
-                        screener_prompt, text_to_analyze2,
-                        response_format="json", engine="deepseek", pydantic_model=ScreenerResult
-                    )
-
-            # 二次判断后仍然相关
+            # 纯文本直接判定相关
             if res.get("is_relevant"):
                 matched_kw = res.get("matched_keyword") or ""
                 if matched_kw not in self.keywords:
                     matched_kw = next(
-                        (k for k in self.keywords if k in (post.get("title", "") + text_content)),
+                        (k for k in self.keywords
+                         if k in (post.get("title", "") + text_content)),
                         self.keywords[0] if self.keywords else ""
                     )
-                screened.append(ScreenedPost(
+                logger.info(f"✅ [通过] 捕获舆情: {post.get('title', '')[:15]}...")
+                return ("passed", ScreenedPost(
                     post=post,
                     matched_keyword=matched_kw,
-                    vision_text=vision_text
+                    vision_text=""
                 ))
-                logger.info(f"✅ [通过] 捕获舆情: {post.get('title', '')[:15]}...")
 
-        return screened
+            # needs_vision=True：交给 VisionStage
+            matched_kw = res.get("matched_keyword") or ""
+            if matched_kw not in self.keywords:
+                matched_kw = next(
+                    (k for k in self.keywords
+                     if k in (post.get("title", "") + text_content)),
+                    self.keywords[0] if self.keywords else ""
+                )
+            logger.info(f"👀 [待视觉] 文本存疑需看图 (ID:{post_id})")
+            return ("needs_vision", ScreenedPost(
+                post=post,
+                matched_keyword=matched_kw,
+                vision_text=""
+            ))
+
+    async def run(self, posts: List[dict]) -> ScreenerStageResult:
+        """
+        纯文本初筛（asyncio 并发执行）。
+
+        返回三分支结果：
+        - passed:      文本直接判定相关（可直接进入 Cluster）
+        - needs_vision: 需要 VisionStage 二次确认
+        - rejected:    Early Exit，无关且不需看图
+        """
+        if not posts:
+            return ScreenerStageResult(passed=[], needs_vision=[], rejected=[])
+
+        screener_prompt = self._build_prompt()
+
+        # 并发所有帖子（信号量限制上限）
+        tasks = [
+            self._screener_single(post, screener_prompt)
+            for post in posts
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        passed: List[ScreenedPost] = []
+        needs_vision: List[ScreenedPost] = []
+        rejected: List[dict] = []
+
+        for item in results:
+            if isinstance(item, Exception):
+                logger.error(f"⚠️ [Screener] 并发任务异常: {item}")
+                continue
+            tag, value = item
+            if tag == "passed":
+                passed.append(value)
+            elif tag == "needs_vision":
+                needs_vision.append(value)
+            elif tag == "rejected":
+                rejected.append(value)
+
+        logger.info(
+            f"[Screener] 完成：passed={len(passed)}, "
+            f"needs_vision={len(needs_vision)}, rejected={len(rejected)}"
+        )
+        return ScreenerStageResult(passed=passed, needs_vision=needs_vision, rejected=rejected)
 
 
 # ============================================================
@@ -215,6 +283,85 @@ class ClusterStage:
 
         logger.info(f"[Cluster] 共产生 {len(all_clusters)} 个话题簇")
         return all_clusters
+
+
+# ============================================================
+# Stage 2b: Vision（条件触发）
+# ============================================================
+
+class VisionStage:
+    """
+    视觉证据提取阶段。
+
+    接收 ScreenerStage 标记为 needs_vision 的帖子，
+    调用 Qwen-VL-Max 提取图片证据，
+    融合图文后二次复判，最终决定是否进入 Cluster。
+
+    仅处理 post 中包含 image_urls 的帖子。
+    """
+
+    def run(self, needs_vision_posts: List[ScreenedPost]) -> List[ScreenedPost]:
+        if not needs_vision_posts:
+            return []
+
+        # 复用 ScreenerStage 的 prompt 构建逻辑（提取关键字和等级）
+        # VisionStage 自身没有 keywords，需要由外部注入，
+        # 但由于 needs_vision_posts 已有 matched_keyword，直接复用
+        from .prompt_templates import SCREENER_PROMPT
+        from .schemas import ScreenerResult
+
+        passed: List[ScreenedPost] = []
+
+        for sp in needs_vision_posts:
+            post = sp.post
+            post_id = post.get("post_id", "")
+            image_urls = post.get("image_urls", [])
+            text_content = post.get("content", "")
+            platform = post.get("platform", "wb")
+
+            # 兜底：无图片则跳过（理论上不会发生，needs_vision 本身就暗示有图）
+            if not image_urls:
+                logger.info(f"⚠️ [Vision] needs_vision 但无图片，跳过 (ID:{post_id})")
+                continue
+
+            # 调用视觉模型
+            logger.info(f"📸 [Vision] 提取图片证据 (ID:{post_id})")
+            vision_text = call_vision_llm(
+                image_urls[0],
+                text_content,
+                platform=platform,
+                post_id=post_id
+            )
+
+            if not vision_text:
+                logger.info(f"⚠️ [Vision] 图片解析失败，跳过 (ID:{post_id})")
+                continue
+
+            # 视觉补充后二次复判
+            fused_content = f"{text_content}\n【视觉补充】：{vision_text}"
+            text_to_analyze = f"标题: {post['title']}\n正文: {fused_content[:800]}"
+
+            # 复用 Screener 的 prompt（需要 keyword）
+            kw_with_level = f"{sp.matched_keyword}(监控等级:balanced)"
+            screener_prompt = SCREENER_PROMPT.format(keyword=kw_with_level)
+
+            res = call_llm(
+                screener_prompt, text_to_analyze,
+                response_format="json", engine="deepseek", pydantic_model=ScreenerResult
+            )
+
+            if res.get("is_relevant"):
+                matched_kw = res.get("matched_keyword") or sp.matched_keyword
+                passed.append(ScreenedPost(
+                    post=post,
+                    matched_keyword=matched_kw,
+                    vision_text=vision_text
+                ))
+                logger.info(f"✅ [Vision通过] 融合图文后捕获 (ID:{post_id})")
+            else:
+                logger.info(f"⏭️ [Vision排除] 视觉证据仍无关 (ID:{post_id})")
+
+        return passed
 
 
 # ============================================================
@@ -368,6 +515,7 @@ def build_results(
             topic_name=cluster.topic_name,
             topic_id=topic_id,
             evolution_timeline=ev,
+            sentiment=analysis_result.get("sentiment", "Neutral"),
         ))
     return results
 
@@ -407,6 +555,7 @@ class RadarPipeline:
     def __init__(self, config: PipelineConfig):
         self.config = config
         self.screener = ScreenerStage(config.keywords, config.keyword_levels)
+        self.vision = VisionStage()
         self.cluster = ClusterStage()
         self.analysis = AnalysisSubGraph()
         self.aggregator = TopicAggregator()
@@ -428,7 +577,7 @@ class RadarPipeline:
     async def run(self, posts: List[dict]) -> List[PipelineResult]:
         """
         执行完整管线：
-          Screener → Cluster → [asyncio 并行分析] → 结果收集
+          Screener(asyncio并发) → Vision → Cluster → [asyncio 并行分析] → 结果收集
         超时控制：整个 Pipeline 整体有 timeout 上限（单 cluster LLM 分析最耗时）。
         """
         try:
@@ -439,14 +588,23 @@ class RadarPipeline:
 
     async def _run_inner(self, posts: List[dict]) -> List[PipelineResult]:
         """Pipeline 内部实现，不含超时控制（由 run() 统一包装）。"""
-        # Stage 1: Screener（同步调用，无 asyncio）
-        screened = self.screener.run(posts)
-        if not screened:
+        # Stage 1: Screener（asyncio 并发初筛）
+        screener_result = await self.screener.run(posts)
+        if not screener_result.passed and not screener_result.needs_vision:
             logger.info("[Pipeline] Screener 阶段无相关帖子，全量过滤")
             return []
 
-        # Stage 2: Cluster
-        clusters = self.cluster.run(screened)
+        # Stage 2: Vision（条件触发，同步调用，因为 vision_llm 有自己的并发保护）
+        vision_passed = self.vision.run(screener_result.needs_vision)
+
+        # 合并：纯文本通过 + 视觉二次通过
+        final_screened = screener_result.passed + vision_passed
+        if not final_screened:
+            logger.info("[Pipeline] Vision 阶段后无相关帖子，全量过滤")
+            return []
+
+        # Stage 3: Cluster
+        clusters = self.cluster.run(final_screened)
 
         # 为每个 Cluster 注入 sensitivity（从 keyword_levels 查找）
         for c in clusters:
@@ -456,11 +614,11 @@ class RadarPipeline:
             logger.info("[Pipeline] Cluster 阶段无有效话题")
             return []
 
-        # Stage 3: 并行分析（asyncio + Semaphore 限流，避免触发 Kimi 并发限制）
+        # Stage 4: 并行分析（asyncio + Semaphore 限流，避免触发 Kimi 并发限制）
         tasks = [self._run_with_semaphore(c) for c in clusters]
         analysis_outputs = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # Stage 4: 收集结果 + 预警 + 话题演化追踪
+        # Stage 5: 收集结果 + 预警 + 话题演化追踪
         final_results: List[PipelineResult] = []
         cluster_results: List[tuple] = []  # (cluster, result) pairs for aggregator
 
@@ -489,7 +647,7 @@ class RadarPipeline:
                 build_results(cluster, result, self.config.platform, evolution_timeline)
             )
 
-        # ── 话题聚合写入 SQLite（Task 2）─────────────────
+        # ── 话题聚合写入 SQLite ─────────────────────────
         if cluster_results:
             try:
                 clusters_for_agg = [c for c, _ in cluster_results]
