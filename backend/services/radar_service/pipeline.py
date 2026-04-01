@@ -30,7 +30,7 @@ from core.logger import logger
 from .schemas import ScreenerResult
 from .llm_gateway import call_llm
 from .vision_agent import call_vision_llm
-from .embed_cluster import cluster_related_posts
+from .embed_cluster import cluster_related_posts, merge_similar_clusters
 from .analysis_graph import analyze_and_report
 from .prompt_templates import SCREENER_PROMPT
 from .topic_aggregator import TopicAggregator
@@ -77,6 +77,7 @@ class ScreenedPost:
     post: dict
     matched_keyword: str
     vision_text: str = ""
+    generated_title: str = ""  # LLM生成的标准标题（用于后续聚类）
 
 
 class ScreenerStageResult(NamedTuple):
@@ -163,6 +164,9 @@ class ScreenerStage:
                 logger.info(f"⏭️ [早退] 文本判定无关，跳过 (ID:{post_id})")
                 return ("rejected", {"post_id": post_id})
 
+            # 提取 LLM 生成的标准化标题（用于后续聚类）
+            generated_title = res.get("generated_title", "") or ""
+
             # 纯文本直接判定相关
             if res.get("is_relevant"):
                 matched_kw = res.get("matched_keyword") or ""
@@ -172,11 +176,12 @@ class ScreenerStage:
                          if k in (post.get("title", "") + text_content)),
                         self.keywords[0] if self.keywords else ""
                     )
-                logger.info(f"✅ [通过] 捕获舆情: {post.get('title', '')[:15]}...")
+                logger.info(f"✅ [通过] 捕获舆情: {generated_title or post.get('title', '')[:15]}...")
                 return ("passed", ScreenedPost(
                     post=post,
                     matched_keyword=matched_kw,
-                    vision_text=""
+                    vision_text="",
+                    generated_title=generated_title
                 ))
 
             # needs_vision=True：交给 VisionStage
@@ -191,7 +196,8 @@ class ScreenerStage:
             return ("needs_vision", ScreenedPost(
                 post=post,
                 matched_keyword=matched_kw,
-                vision_text=""
+                vision_text="",
+                generated_title=generated_title
             ))
 
     async def run(self, posts: List[dict]) -> ScreenerStageResult:
@@ -260,28 +266,52 @@ class ClusterStage:
         for sp in screened_posts:
             groups.setdefault(sp.matched_keyword, []).append(sp)
 
-        all_clusters: List[Cluster] = []
+        # 先收集所有聚类结果 dicts（跨 keyword 一起合并）
+        all_cluster_dicts: List[dict] = []
 
         for keyword, sposts in groups.items():
-            posts = [sp.post for sp in sposts]
+            # 将 generated_title 注入到 post 字典中（用于后续 embedding）
+            posts = []
+            for sp in sposts:
+                p = dict(sp.post)  # 浅拷贝，避免修改原始数据
+                p["generated_title"] = sp.generated_title
+                posts.append(p)
 
             # 调用向量聚类
             cluster_dicts = cluster_related_posts(posts, keyword)
 
             for cd in cluster_dicts:
-                pid_list = cd.get("post_ids", [])
-                cluster_posts = [p for p in posts if p.get("post_id") in pid_list]
-                if not cluster_posts:
-                    continue
-                all_clusters.append(Cluster(
-                    topic_name=cd.get("topic_name", posts[0].get("title", "")[:15]),
-                    post_ids=pid_list,
-                    posts=cluster_posts,
-                    keyword=keyword,
-                    sensitivity="balanced"  # 临时默认值，由 RadarPipeline 覆盖
-                ))
+                cd["keyword"] = keyword  # 标记所属 keyword
+                all_cluster_dicts.append(cd)
 
-        logger.info(f"[Cluster] 共产生 {len(all_clusters)} 个话题簇")
+        original_count = len(all_cluster_dicts)
+
+        # ── 后处理：同类话题合并（安全网）───────────────
+        # 仅小规模时启用（帖子数 <= 10），避免大流量时引入不必要的 LLM 开销
+        total_posts = len(screened_posts)
+        if len(all_cluster_dicts) > 1 and total_posts <= 10:
+            all_cluster_dicts = merge_similar_clusters(all_cluster_dicts)
+            logger.info(f"[Cluster] 合并后共 {len(all_cluster_dicts)} 个话题簇")
+        # ─────────────────────────────────────────────────
+
+        # 转换为 Cluster 对象
+        all_clusters: List[Cluster] = []
+        for cd in all_cluster_dicts:
+            pid_list = cd.get("post_ids", [])
+            keyword = cd.get("keyword", "")
+            # cluster_related_posts 返回的 dict 中已包含 posts（带 generated_title）
+            cluster_posts = cd.get("posts", [])
+            if not cluster_posts:
+                continue
+            all_clusters.append(Cluster(
+                topic_name=cd.get("topic_name", cluster_posts[0].get("title", "")[:15]),
+                post_ids=pid_list,
+                posts=cluster_posts,
+                keyword=keyword,
+                sensitivity="balanced"
+            ))
+
+        logger.info(f"[Cluster] 共产生 {len(all_clusters)} 个话题簇（原始 {original_count} → 合并后 {len(all_clusters)}）")
         return all_clusters
 
 
@@ -355,7 +385,8 @@ class VisionStage:
                 passed.append(ScreenedPost(
                     post=post,
                     matched_keyword=matched_kw,
-                    vision_text=vision_text
+                    vision_text=vision_text,
+                    generated_title=sp.generated_title  # 保留 Screener 生成的标准化标题
                 ))
                 logger.info(f"✅ [Vision通过] 融合图文后捕获 (ID:{post_id})")
             else:

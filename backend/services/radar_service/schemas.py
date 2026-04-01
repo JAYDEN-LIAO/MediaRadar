@@ -16,6 +16,7 @@ class ScreenerResult(BaseModel):
     matched_keyword: str = Field(default="", description="匹配到的具体实体名")
     reason: str = Field(default="", description="判断理由")
     needs_vision: bool = Field(default=False, description="是否需要调用视觉模型看图确认")
+    generated_title: str = Field(default="", description="LLM生成的标准化的舆情标题（用于后续聚类）")
 
 
 class AnalystResult(BaseModel):
