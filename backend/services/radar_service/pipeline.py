@@ -117,20 +117,22 @@ class ScreenerStage:
         self.keyword_levels = keyword_levels
         self._screener_semaphore = asyncio.Semaphore(self.SCREENER_CONCURRENCY)
 
-    def _build_prompt(self) -> str:
-        kw_with_levels = "、".join([
-            f"{k}(监控等级:{self.keyword_levels.get(k, 'balanced')})"
-            for k in self.keywords
-        ])
-        return SCREENER_PROMPT.format(keyword=kw_with_levels)
+    def _build_prompt(self, keyword: str) -> str:
+        """为单个关键词构建 prompt（隔离策略，避免多关键词互相干扰）"""
+        kw_with_level = f"{keyword}(监控等级:{self.keyword_levels.get(keyword, 'balanced')})"
+        return SCREENER_PROMPT.format(keyword=kw_with_level)
 
     async def _screener_single(
         self,
         post: dict,
         screener_prompt: str,
+        keyword: str,
     ) -> tuple[str, dict | ScreenedPost | None]:
         """
         单个帖子的 Screener 调用（在线程池中执行）。
+
+        Args:
+            keyword: 当前正在匹配的关键词（隔离策略）
 
         Returns:
             - ("rejected", {"post_id": ...})
@@ -163,7 +165,7 @@ class ScreenerStage:
 
             # 早退：无关且不需看图
             if not res.get("is_relevant") and not res.get("needs_vision"):
-                logger.info(f"⏭️ [早退] 文本判定无关，跳过 (ID:{post_id})")
+                logger.info(f"⏭️ [早退] 关键词【{keyword}】文本判定无关，跳过 (ID:{post_id})")
                 return ("rejected", {"post_id": post_id})
 
             # 提取 LLM 生成的标准化标题（用于后续聚类）
@@ -171,33 +173,19 @@ class ScreenerStage:
 
             # 纯文本直接判定相关
             if res.get("is_relevant"):
-                matched_kw = res.get("matched_keyword") or ""
-                if matched_kw not in self.keywords:
-                    matched_kw = next(
-                        (k for k in self.keywords
-                         if k in (post.get("title", "") + text_content)),
-                        self.keywords[0] if self.keywords else ""
-                    )
-                logger.info(f"✅ [通过] 捕获舆情: {generated_title or post.get('title', '')[:15]}...")
+                logger.info(f"✅ [通过] 关键词【{keyword}】捕获舆情: {generated_title or post.get('title', '')[:15]}...")
                 return ("passed", ScreenedPost(
                     post=post,
-                    matched_keyword=matched_kw,
+                    matched_keyword=keyword,  # 直接使用当前关键词，不再回退
                     vision_text="",
                     generated_title=generated_title
                 ))
 
             # needs_vision=True：交给 VisionStage
-            matched_kw = res.get("matched_keyword") or ""
-            if matched_kw not in self.keywords:
-                matched_kw = next(
-                    (k for k in self.keywords
-                     if k in (post.get("title", "") + text_content)),
-                    self.keywords[0] if self.keywords else ""
-                )
-            logger.info(f"👀 [待视觉] 文本存疑需看图 (ID:{post_id})")
+            logger.info(f"👀 [待视觉] 关键词【{keyword}】文本存疑需看图 (ID:{post_id})")
             return ("needs_vision", ScreenedPost(
                 post=post,
-                matched_keyword=matched_kw,
+                matched_keyword=keyword,  # 直接使用当前关键词，不再回退
                 vision_text="",
                 generated_title=generated_title
             ))
@@ -205,6 +193,9 @@ class ScreenerStage:
     async def run(self, posts: List[dict]) -> ScreenerStageResult:
         """
         纯文本初筛（asyncio 并发执行）。
+
+        关键词隔离策略：每个关键词独立判断，不会互相干扰。
+        只有帖子包含某关键词时，才用该关键词的 prompt 进行判断。
 
         返回三分支结果：
         - passed:      文本直接判定相关（可直接进入 Cluster）
@@ -214,20 +205,33 @@ class ScreenerStage:
         if not posts:
             return ScreenerStageResult(passed=[], needs_vision=[], rejected=[])
 
-        screener_prompt = self._build_prompt()
+        # 关键词隔离：为每个关键词创建独立的任务组
+        # 只有帖子包含某关键词时，才为该关键词创建筛选任务
+        all_tasks: list[tuple[str, asyncio.Task]] = []
 
-        # 并发所有帖子（信号量限制上限）
-        tasks = [
-            self._screener_single(post, screener_prompt)
-            for post in posts
-        ]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for keyword in self.keywords:
+            screener_prompt = self._build_prompt(keyword)
+            # 只对包含该关键词的帖子创建任务（减少不必要的 LLM 调用）
+            for post in posts:
+                post_text = (post.get("title", "") + post.get("content", "")).lower()
+                if keyword.lower() in post_text:
+                    task = self._screener_single(post, screener_prompt, keyword)
+                    all_tasks.append((keyword, task))
+
+        if not all_tasks:
+            logger.info("[Screener] 没有帖子匹配任何关键词，全量过滤")
+            return ScreenerStageResult(passed=[], needs_vision=[], rejected=[])
+
+        # 并发执行所有任务
+        results = await asyncio.gather(*[t for _, t in all_tasks], return_exceptions=True)
 
         passed: List[ScreenedPost] = []
         needs_vision: List[ScreenedPost] = []
         rejected: List[dict] = []
 
-        for item in results:
+        # 建立 keyword → task 的映射（按顺序）
+        for idx, (keyword, _) in enumerate(all_tasks):
+            item = results[idx]
             if isinstance(item, Exception):
                 logger.error(f"⚠️ [Screener] 并发任务异常: {item}")
                 continue
@@ -240,7 +244,7 @@ class ScreenerStage:
                 rejected.append(value)
 
         logger.info(
-            f"[Screener] 完成：passed={len(passed)}, "
+            f"[Screener] 完成（隔离模式）：passed={len(passed)}, "
             f"needs_vision={len(needs_vision)}, rejected={len(rejected)}"
         )
         return ScreenerStageResult(passed=passed, needs_vision=needs_vision, rejected=rejected)
