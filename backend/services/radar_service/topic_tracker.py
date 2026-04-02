@@ -24,7 +24,9 @@ if BASE_DIR not in sys.path:
     sys.path.append(BASE_DIR)
 
 from core.config import settings
-from core.logger import logger
+from core.logger import get_logger
+
+logger = get_logger("radar.tracker")
 
 
 TOPIC_COLLECTION_NAME = settings.TOPIC_COLLECTION

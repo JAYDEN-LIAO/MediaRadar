@@ -13,7 +13,9 @@ import mimetypes
 from openai import OpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from core.logger import logger
+from core.logger import get_logger
+
+logger = get_logger("radar.vision")
 from core.config import settings
 
 

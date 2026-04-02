@@ -12,7 +12,9 @@ from openai import OpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential
 from pydantic import ValidationError
 
-from core.logger import logger
+from core.logger import get_logger
+
+logger = get_logger("radar.llm")
 from core.config import settings
 
 

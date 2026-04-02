@@ -16,11 +16,8 @@ if BASE_DIR not in sys.path:
 from services.radar_service.api import router as radar_router
 from services.agent_service.api import router as agent_router
 
-try:
-    from core.logger import logger
-except ImportError:
-    import logging
-    logger = logging.getLogger("gateway")
+from core.logger import get_logger
+logger = get_logger("gateway")
 
 app = FastAPI(
     title="MediaRadar 统一接口网关",

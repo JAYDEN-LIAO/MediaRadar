@@ -13,7 +13,9 @@ LangGraph 分析子图
 
 from langgraph.graph import StateGraph, END
 
-from core.logger import logger
+from core.logger import get_logger
+
+logger = get_logger("radar.analysis")
 from .schemas import RadarGraphState, AnalystResult, ReviewerResult
 from .llm_gateway import call_llm
 from .vector_store import retrieve_similar_cases

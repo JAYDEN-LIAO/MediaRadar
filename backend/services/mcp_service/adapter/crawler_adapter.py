@@ -23,7 +23,8 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.pa
 if BASE_DIR not in sys.path:
     sys.path.append(BASE_DIR)
 
-from core.logger import logger
+from core.logger import get_logger
+logger = get_logger("mcp.crawler")
 
 # ============================================================
 # 导入 crawler_service 核心模块

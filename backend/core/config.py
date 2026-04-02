@@ -49,4 +49,13 @@ class Settings:
     CRAWLER_DB_PATH = os.getenv("CRAWLER_DB_PATH", os.path.join(BACKEND_DIR, "data", "sqlite_tables.db"))
     LOG_DIR = os.getenv("LOG_DIR", os.path.join(PROJECT_ROOT, "logs"))
 
+    # ======== 日志配置 ========
+    LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+    LOG_FORMAT = os.getenv("LOG_FORMAT", "text").lower()  # text | json
+    LOG_TO_FILE = os.getenv("LOG_TO_FILE", "true").lower() == "true"
+    LOG_TO_CONSOLE = os.getenv("LOG_TO_CONSOLE", "true").lower() == "true"
+    LOG_MAX_BYTES = int(os.getenv("LOG_MAX_BYTES", str(10 * 1024 * 1024)))
+    LOG_BACKUP_COUNT = int(os.getenv("LOG_BACKUP_COUNT", "5"))
+    LOG_USE_UTC = os.getenv("LOG_USE_UTC", "false").lower() == "true"
+
 settings = Settings()

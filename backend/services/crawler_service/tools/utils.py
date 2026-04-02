@@ -25,24 +25,27 @@ from .crawler_util import *
 from .slider_util import *
 from .time_util import *
 
-
-def init_loging_config():
-    level = logging.INFO
-    logging.basicConfig(
-        level=level,
-        format="%(asctime)s %(name)s %(levelname)s (%(filename)s:%(lineno)d) - %(message)s",
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    _logger = logging.getLogger("MediaCrawler")
-    _logger.setLevel(level)
-
-    # Disable httpx INFO level logs
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-
-    return _logger
-
-
-logger = init_loging_config()
+# 导入项目日志系统
+try:
+    import sys
+    import os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    from core.logger import get_logger
+    logger = get_logger("crawler")
+except ImportError:
+    # 如果导入失败，使用标准 logging
+    def init_loging_config():
+        level = logging.INFO
+        logging.basicConfig(
+            level=level,
+            format="%(asctime)s %(name)s %(levelname)s (%(filename)s:%(lineno)d) - %(message)s",
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        _logger = logging.getLogger("MediaCrawler")
+        _logger.setLevel(level)
+        logging.getLogger("httpx").setLevel(logging.WARNING)
+        return _logger
+    logger = init_loging_config()
 
 def str2bool(v):
     if isinstance(v, bool):

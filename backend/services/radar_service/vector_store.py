@@ -22,7 +22,9 @@ if BASE_DIR not in sys.path:
     sys.path.append(BASE_DIR)
 
 from core.config import settings
-from core.logger import logger
+from core.logger import get_logger
+
+logger = get_logger("radar.vector")
 
 
 def _post_id_to_qdrant_id(post_id: str) -> str:

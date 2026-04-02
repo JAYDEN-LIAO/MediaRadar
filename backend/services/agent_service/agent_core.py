@@ -2,7 +2,8 @@
 import json
 from openai import OpenAI
 from core.config import settings
-from core.logger import logger
+from core.logger import get_logger
+logger = get_logger("agent")
 from .tools import TOOLS_SCHEMA, AVAILABLE_TOOLS
 
 # 初始化 DeepSeek 客户端

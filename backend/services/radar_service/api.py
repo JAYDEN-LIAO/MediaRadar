@@ -1,6 +1,9 @@
 # backend/services/radar_service/api.py
 from fastapi import APIRouter, BackgroundTasks
 from pydantic import BaseModel
+from core.logger import get_logger
+
+logger = get_logger("radar.api")
 from .db_manager import (
     get_latest_results, get_system_settings, save_system_settings,
     get_topic_summary_list, get_topic_summary_by_id, get_topic_posts,

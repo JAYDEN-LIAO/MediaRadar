@@ -10,7 +10,9 @@ if BASE_DIR not in sys.path:
     sys.path.append(BASE_DIR)
 
 from core.database import get_db_connection
-from core.logger import logger
+from core.logger import get_logger
+
+logger = get_logger("radar.db")
 from core.config import settings
 
 def init_radar_db():

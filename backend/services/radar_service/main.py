@@ -14,7 +14,10 @@ if BACKEND_DIR not in sys.path:
 
 CRAWLER_DIR = os.path.join(BACKEND_DIR, "services", "crawler_service")
 
-from core.logger import logger
+from core.logger import get_logger
+from core.context import set_task_context
+
+logger = get_logger("radar.main")
 from core.config import settings
 from .db_manager import get_unprocessed_posts, mark_processed_batch, save_ai_result, get_system_settings
 from .schemas import ScreenerResult

@@ -3,7 +3,8 @@ import json
 import threading
 import time
 from core.database import get_db_connection
-from core.logger import logger
+from core.logger import get_logger
+logger = get_logger("agent")
 from services.radar_service.main import RADAR_STATUS, job, MONITOR_KEYWORDS
 import traceback
 import asyncio

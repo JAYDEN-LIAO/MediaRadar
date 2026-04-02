@@ -10,7 +10,9 @@ import numpy as np
 import umap
 from typing import List
 
-from core.logger import logger
+from core.logger import get_logger
+
+logger = get_logger("radar.cluster")
 from core.config import settings
 from .llm_gateway import call_llm, embedding_client
 

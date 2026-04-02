@@ -26,7 +26,9 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 if BASE_DIR not in sys.path:
     sys.path.append(BASE_DIR)
 
-from core.logger import logger
+from core.logger import get_logger
+
+logger = get_logger("radar.pipeline")
 from .schemas import ScreenerResult
 from .llm_gateway import call_llm
 from .vision_agent import call_vision_llm
