@@ -180,3 +180,6 @@ sqlite_tables.db
 test.py
 
 plans/
+
+# Crawler test data
+backend/services/crawler_service/media_platform/*/test_data/*.html
