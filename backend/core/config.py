@@ -44,10 +44,22 @@ class Settings:
     # ======== 配置6: Qdrant 话题演化追踪集合 ========
     TOPIC_COLLECTION = os.getenv("TOPIC_COLLECTION", "topic_evolution")
 
+    # ======== Agent 配置 ========
+    AGENT_MCP_ENABLED = os.getenv("AGENT_MCP_ENABLED", "false").lower() == "true"
+    AGENT_MCP_TRANSPORT = os.getenv("AGENT_MCP_TRANSPORT", "http").strip()
+    AGENT_MAX_ITERATIONS = int(os.getenv("AGENT_MAX_ITERATIONS", "6"))
+    AGENT_MEMORY_TTL_DAYS = int(os.getenv("AGENT_MEMORY_TTL_DAYS", "90"))
+    AGENT_TOKEN_BUDGET = int(os.getenv("AGENT_TOKEN_BUDGET", "1500"))
+    AGENT_REFLECTION_ENABLED = os.getenv("AGENT_REFLECTION_ENABLED", "true").lower() == "true"
+    AGENT_SELF_HEALING_ENABLED = os.getenv("AGENT_SELF_HEALING_ENABLED", "true").lower() == "true"
+
     # ======== 系统路径配置 ========
     STATE_DB_PATH = os.getenv("STATE_DB_PATH", os.path.join(DATA_DIR, "radar_state.db"))
     CRAWLER_DB_PATH = os.getenv("CRAWLER_DB_PATH", os.path.join(BACKEND_DIR, "data", "sqlite_tables.db"))
     LOG_DIR = os.getenv("LOG_DIR", os.path.join(PROJECT_ROOT, "logs"))
+
+    # ======== API 认证配置 ========
+    API_KEYS = os.getenv("API_KEYS", "")
 
     # ======== 日志配置 ========
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -59,3 +71,5 @@ class Settings:
     LOG_USE_UTC = os.getenv("LOG_USE_UTC", "false").lower() == "true"
 
 settings = Settings()
+
+from core.agent_memory_db import init_db as _  # Agent 记忆库初始化

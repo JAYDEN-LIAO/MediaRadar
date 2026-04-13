@@ -5,83 +5,106 @@ import time
 from core.database import get_db_connection
 from core.logger import get_logger
 logger = get_logger("agent")
-from services.radar_service.main import RADAR_STATUS, job, MONITOR_KEYWORDS
+from services.radar_service.main import radar_status, job, MONITOR_KEYWORDS
 import traceback
 import asyncio
 
 def tool_get_system_status() -> str:
     """获取雷达系统当前的运行状态"""
-    return json.dumps({
-        "is_running": RADAR_STATUS["is_running"],
-        "status_text": RADAR_STATUS["status_text"],
-        "last_run_time": RADAR_STATUS["last_run_time"],
-        "last_new_count": RADAR_STATUS.get("last_new_count", 0)
-    }, ensure_ascii=False)
+    try:
+        data = radar_status.get_status_dict()
+        return json.dumps({
+            "success": True,
+            "data": data,
+            "error": "",
+            "error_type": ""
+        }, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({
+            "success": False,
+            "data": None,
+            "error": str(e),
+            "error_type": "unknown"
+        }, ensure_ascii=False)
 
 def tool_trigger_background_crawl(keyword: str = None) -> str:
     """触发一次后台的全局数据抓取与分析任务"""
-    if RADAR_STATUS["is_running"]:
-        return json.dumps({"status": "error", "message": "系统正在运行中，无需重复触发。"}, ensure_ascii=False)
-    
-    # 获取系统设定的关键字，如果 LLM 传了 keyword，我们把它打印进日志
+    if radar_status.is_running:
+        return json.dumps({
+            "success": False,
+            "data": {"is_running": True},
+            "error": "系统正在运行中，无需重复触发",
+            "error_type": "param_error"
+        }, ensure_ascii=False)
+
     current_keyword = "、".join(MONITOR_KEYWORDS) if MONITOR_KEYWORDS else "全局词库"
     target_msg = f"已收到专门针对【{keyword}】的探查请求，" if keyword else ""
-    
+
     def _run():
-        RADAR_STATUS["is_running"] = True
-        RADAR_STATUS["status_text"] = f"Agent 主动触发监控: {current_keyword}"
+        radar_status.set_running_sync(f"Agent 主动触发监控: {current_keyword}")
         try:
             logger.info(">>> 爬虫线程已启动，准备执行 job() <<<")
             new_count = job(keyword)
-                
             if new_count is not None:
-                RADAR_STATUS["last_new_count"] = new_count
-            RADAR_STATUS["last_run_time"] = time.strftime('%Y-%m-%d %H:%M:%S')
+                radar_status.set_result_sync(new_count, time.strftime('%Y-%m-%d %H:%M:%S'))
             logger.info(">>> 爬虫线程 job() 执行完毕 <<<")
-            
         except Exception as e:
             logger.error(f"❌ Agent 触发爬虫任务失败: {e}")
             logger.error(traceback.format_exc())
         finally:
-            RADAR_STATUS["is_running"] = False
-            RADAR_STATUS["status_text"] = "系统闲置中"
+            radar_status.set_idle_sync()
 
     threading.Thread(target=_run, daemon=True).start()
-    
-    # 给 LLM 喂一口定心丸，告诉它已经启动了
+
     return json.dumps({
-        "status": "success", 
-        "message": f"{target_msg}指令已下达，爬虫任务已在后台启动，大概需要1-2分钟。不要再调用任何工具了，直接告知用户等待即可。"
+        "success": True,
+        "data": {"status": "started", "message": f"{target_msg}指令已下达，爬虫任务已在后台启动。"},
+        "error": "",
+        "error_type": ""
     }, ensure_ascii=False)
 
 def tool_get_recent_alerts(limit: int = 5) -> str:
-    """获取最近的高危舆情预警记录"""
+    """获取数据库中最近的高危（风险等级>=3）舆情警报列表"""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            # 注意：数据库中 risk_level 是 TEXT，我们需要转型比较
             cursor.execute('''
-                SELECT title, platform, keyword, risk_level, core_issue, report, publish_time 
-                FROM ai_results 
-                WHERE CAST(risk_level AS INTEGER) >= 3 
-                ORDER BY create_time DESC 
+                SELECT title, platform, keyword, risk_level, core_issue, report, publish_time
+                FROM ai_results
+                WHERE CAST(risk_level AS INTEGER) >= 3
+                ORDER BY create_time DESC
                 LIMIT ?
             ''', (limit,))
             rows = cursor.fetchall()
-            
+
         if not rows:
-            return json.dumps({"message": "近期无高危预警记录，天下太平。"}, ensure_ascii=False)
-            
+            return json.dumps({
+                "success": True,
+                "data": [],
+                "error": "",
+                "error_type": ""
+            }, ensure_ascii=False)
+
         results = []
         for r in rows:
             results.append({
-                "title": r[0], "platform": r[1], "keyword": r[2], 
+                "title": r[0], "platform": r[1], "keyword": r[2],
                 "risk_level": r[3], "core_issue": r[4], "report": r[5], "time": r[6]
             })
-        return json.dumps(results, ensure_ascii=False)
+        return json.dumps({
+            "success": True,
+            "data": results,
+            "error": "",
+            "error_type": ""
+        }, ensure_ascii=False)
     except Exception as e:
         logger.error(f"DB Error in tool_get_recent_alerts: {e}")
-        return json.dumps({"error": f"数据库查询失败: {str(e)}"}, ensure_ascii=False)
+        return json.dumps({
+            "success": False,
+            "data": None,
+            "error": f"数据库查询失败: {str(e)}",
+            "error_type": "data_empty"
+        }, ensure_ascii=False)
 
 # ---------------------------------------------------------
 # OpenAI Function Calling 标准 Schema 定义

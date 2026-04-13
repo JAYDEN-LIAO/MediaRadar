@@ -35,19 +35,19 @@ export const request = (options) => {
 
 // ----------------- 具体的接口定义 -----------------
 
-// 获取舆情列表数据
-export const getRiskList = (params) => {
+// 获取近7日声量统计（用于首页趋势图）
+export const getVolumeStats = (keyword) => {
   return request({
-    url: '/api/risks', // 对应你后端的路由
+    url: '/api/volume_stats',
     method: 'GET',
-    data: params
+    data: { keyword: keyword || '' }
   });
 };
 
-// 获取首页统计数据
-export const getDashboardStats = () => {
+// 获取今日AI摘要
+export const getTodaySummary = () => {
   return request({
-    url: '/api/stats',
+    url: '/api/today_summary',
     method: 'GET'
   });
 };
@@ -125,3 +125,76 @@ export const streamRequest = (url, data, onChunk, onDone, onError) => {
 
   return requestTask; // 返回 task 以便外部可以随时 abort (停止生成)
 };
+
+// ----------------- 记忆库 API（任务14） -----------------
+
+/**
+ * 获取记忆库统计状态
+ */
+export const getMemory = () => {
+  return new Promise((resolve, reject) => {
+    uni.request({
+      url: `${BASE_URL}/api/agent/memory`,
+      method: 'GET',
+      header: {
+        'Content-Type': 'application/json'
+      },
+      success: (res) => {
+        if (res.data.success) {
+          resolve(res.data.data)
+        } else {
+          reject(new Error(res.data.error || '获取记忆状态失败'))
+        }
+      },
+      fail: reject
+    })
+  })
+}
+
+/**
+ * 获取指定 session 的记忆详情
+ * @param {String} sessionId - 会话 ID
+ */
+export const getSessionMemory = (sessionId) => {
+  return new Promise((resolve, reject) => {
+    uni.request({
+      url: `${BASE_URL}/api/agent/memory/${sessionId}`,
+      method: 'GET',
+      header: {
+        'Content-Type': 'application/json'
+      },
+      success: (res) => {
+        if (res.data.success) {
+          resolve(res.data.data)
+        } else {
+          reject(new Error(res.data.error || '获取会话记忆失败'))
+        }
+      },
+      fail: reject
+    })
+  })
+}
+
+/**
+ * 清除指定 session 的记忆
+ * @param {String} sessionId - 会话 ID
+ */
+export const clearMemory = (sessionId) => {
+  return new Promise((resolve, reject) => {
+    uni.request({
+      url: `${BASE_URL}/api/agent/memory/${sessionId}`,
+      method: 'DELETE',
+      header: {
+        'Content-Type': 'application/json'
+      },
+      success: (res) => {
+        if (res.data.success) {
+          resolve(res.data.message)
+        } else {
+          reject(new Error(res.data.error || '清除记忆失败'))
+        }
+      },
+      fail: reject
+    })
+  })
+}

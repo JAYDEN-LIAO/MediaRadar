@@ -4,6 +4,8 @@ import time
 import schedule
 import os
 import sys
+import asyncio
+from dataclasses import dataclass, field
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 BACKEND_DIR = os.path.dirname(os.path.dirname(CURRENT_DIR))
@@ -13,6 +15,11 @@ if BACKEND_DIR not in sys.path:
     sys.path.append(BACKEND_DIR)
 
 CRAWLER_DIR = os.path.join(BACKEND_DIR, "services", "crawler_service")
+
+# venv Python 解释器路径，确保子进程与当前环境一致
+VENV_PYTHON = os.path.join(PROJECT_ROOT, "venv", "Scripts", "python.exe")
+if not os.path.exists(VENV_PYTHON):
+    VENV_PYTHON = sys.executable  # 回退到当前解释器
 
 from core.logger import get_logger
 from core.context import set_task_context
@@ -24,16 +31,62 @@ from .schemas import ScreenerResult
 from .notifier import send_alert
 from .pipeline import RadarPipeline, PipelineConfig
 
-RADAR_STATUS = {
-    "is_running": False, 
-    "status_text": "系统闲置中", 
-    "last_run_time": "暂无",
-    "last_new_count": 0
-}
 MONITOR_KEYWORDS = []
 MONITOR_PLATFORMS = []
 ALERT_NEGATIVE = True
 MONITOR_KEYWORD_LEVELS = {}
+
+
+@dataclass
+class RadarStatus:
+    """线程安全的雷达状态（兼容同步/异步读写）"""
+    is_running: bool = False
+    status_text: str = "系统闲置中"
+    last_run_time: str = "暂无"
+    last_new_count: int = 0
+    _lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+
+    async def set_running(self, text: str):
+        async with self._lock:
+            self.is_running = True
+            self.status_text = text
+            self.last_new_count = 0
+
+    async def set_idle(self, text: str = "系统闲置中"):
+        async with self._lock:
+            self.is_running = False
+            self.status_text = text
+
+    async def is_busy(self) -> bool:
+        async with self._lock:
+            return self.is_running
+
+    # 同步写入方法（供 tools.py 这类同步模块使用）
+    def set_running_sync(self, text: str):
+        self.is_running = True
+        self.status_text = text
+        self.last_new_count = 0
+
+    def set_idle_sync(self, text: str = "系统闲置中"):
+        self.is_running = False
+        self.status_text = text
+
+    def set_result_sync(self, new_count: int, run_time: str):
+        self.last_new_count = new_count
+        self.last_run_time = run_time
+
+    def get_status_dict(self) -> dict:
+        """返回当前状态的 dict 快照（同步读取）"""
+        return {
+            "is_running": self.is_running,
+            "status_text": self.status_text,
+            "last_run_time": self.last_run_time,
+            "last_new_count": self.last_new_count,
+        }
+
+
+# 全局实例
+radar_status = RadarStatus()
 
 def daily_summary_job():
     logger.info("Triggering daily summary notification.")
@@ -87,7 +140,7 @@ def run_crawler_for_platform(platform):
 
         subprocess.run(
             [
-                sys.executable, "main.py", 
+                VENV_PYTHON, "main.py", 
                 "--platform", platform, 
                 "--type", "search", 
                 "--save_data_option", "sqlite", 
@@ -104,6 +157,72 @@ def run_crawler_for_platform(platform):
         logger.error(f"Task timeout for platform {platform}, terminated forcefully.")
     except subprocess.CalledProcessError as e:
         logger.error(f"Execution failed for platform {platform}: {e}")
+
+async def run_crawler_for_platform_async(platform: str):
+    """异步执行爬虫，不阻塞事件循环"""
+    global MONITOR_KEYWORDS
+    if not MONITOR_KEYWORDS:
+        logger.warning("No keywords specified, skipping.")
+        return
+
+    keywords_str = ",".join(MONITOR_KEYWORDS)
+    logger.info(f"[Async Crawler] Starting {platform.upper()}... (python={VENV_PYTHON})")
+    logger.info(f"[Async Crawler] cwd={CRAWLER_DIR}, exists={os.path.exists(CRAWLER_DIR)}")
+
+    if not os.path.exists(VENV_PYTHON):
+        logger.error(f"[Async Crawler] Python interpreter not found: {VENV_PYTHON}")
+        return
+
+    import platform as sys_platform
+    if sys_platform.system() == "Windows":
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
+    else:
+        startupinfo = None
+
+    cmd = f'"{VENV_PYTHON}" main.py --platform {platform} --type search --save_data_option sqlite --headless no --keywords {keywords_str}'
+    process = await asyncio.create_subprocess_shell(
+        cmd,
+        cwd=CRAWLER_DIR,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        startupinfo=startupinfo,
+    )
+    try:
+        stdout_data, stderr_data = await asyncio.wait_for(process.communicate(), timeout=600)
+        output = stdout_data.decode("utf-8", errors="replace") if stdout_data else ""
+        err_output = stderr_data.decode("utf-8", errors="replace") if stderr_data else ""
+        if output:
+            for line in output.splitlines()[:30]:
+                logger.info(f"[Crawler stdout] {line}")
+        if err_output:
+            for line in err_output.splitlines()[:30]:
+                logger.warning(f"[Crawler stderr] {line}")
+        if not output and not err_output:
+            logger.warning(f"[Async Crawler] No output from crawler subprocess, returncode={process.returncode}")
+        logger.info(f"[Async Crawler] {platform.upper()} done, returncode={process.returncode}")
+    except asyncio.TimeoutError:
+        process.kill()
+        logger.error(f"[Async Crawler] {platform.upper()} timeout.")
+
+async def job_async(target_keyword: str = None):
+    """雷达核心任务流（异步版）"""
+    global MONITOR_KEYWORDS, MONITOR_KEYWORD_LEVELS
+    reload_config()
+    if target_keyword:
+        MONITOR_KEYWORDS = [target_keyword]
+        MONITOR_KEYWORD_LEVELS = {target_keyword: "balanced"}
+
+    if MONITOR_PLATFORMS:
+        await asyncio.gather(*[
+            run_crawler_for_platform_async(p) for p in MONITOR_PLATFORMS
+        ], return_exceptions=True)
+    else:
+        logger.warning("MONITOR_PLATFORMS 为空，跳过。")
+
+    new_risk_count = await run_analysis_pipeline_async()
+    return new_risk_count
 
 async def run_analysis_pipeline_async():
     """使用 RadarPipeline 执行完整分析流程（多平台 asyncio 并行）。"""
@@ -178,29 +297,23 @@ def run_analysis_pipeline():
 
 
 def api_start_task(background_tasks):
-    if RADAR_STATUS["is_running"]:
+    if radar_status.is_running:
         return False, "扫描任务正在运行中，请勿重复启动"
-    
+
     reload_config()
     current_keyword = "、".join(MONITOR_KEYWORDS)
-        
-    def _run_in_background():
-        RADAR_STATUS["is_running"] = True
-        RADAR_STATUS["status_text"] = f"正在监控: {current_keyword}"
-        RADAR_STATUS["last_new_count"] = 0
-        
+
+    async def _run_in_background():
         try:
-            new_count = job() 
-            if new_count is not None:
-                RADAR_STATUS["last_new_count"] = new_count
-                
-            RADAR_STATUS["last_run_time"] = time.strftime('%Y-%m-%d %H:%M:%S')
+            await radar_status.set_running(f"正在监控: {current_keyword}")
+            new_count = await job_async()
+            radar_status.last_new_count = new_count if new_count else 0
+            radar_status.last_run_time = time.strftime('%Y-%m-%d %H:%M:%S')
         except Exception as e:
             logger.error(f"Background task exception: {e}")
-            RADAR_STATUS["last_new_count"] = 0
+            radar_status.last_new_count = 0
         finally:
-            RADAR_STATUS["is_running"] = False
-            RADAR_STATUS["status_text"] = "系统闲置中"
+            await radar_status.set_idle()
 
     background_tasks.add_task(_run_in_background)
     return True, "扫描任务已启动"

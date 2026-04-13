@@ -30,7 +30,7 @@ def cluster_related_posts(relevant_posts, keyword):
     """
     if len(relevant_posts) <= 2:
         return [
-            {"topic_name": p.get("generated_title") or p['title'][:15],
+            {"topic_name": p.get("generated_title") or (p.get('title') or "无标题")[:15],
              "post_ids": [p['post_id']],
              "posts": [p]}
             for p in relevant_posts
@@ -138,11 +138,12 @@ def cluster_related_posts(relevant_posts, keyword):
                 sample_parts.append(f"- 内容：{content[:100]}")
         sample_texts = "\n".join(sample_parts)
 
-        topic_name = call_llm(
+        topic_name_result = call_llm(
             prompt=naming_system_prompt,
             text=sample_texts,
             engine="kimi"
-        ).strip('"').strip()
+        )
+        topic_name = (topic_name_result.data if topic_name_result.success and topic_name_result.data else "").strip('"').strip()
 
         if not topic_name or topic_name == "无标题":
             first_content = (posts[0].get("content") or "").strip()
@@ -161,7 +162,7 @@ def cluster_related_posts(relevant_posts, keyword):
 # 后处理：同类话题合并层（Union-Find 安全网）
 # ============================================================
 
-def _get_cluster_keywords(cluster_posts: List[dict], keyword: str) -> dict:
+def _get_cluster_keywords(cluster_posts: List[dict]) -> dict:
     """
     为单个簇生成关键词标签（实体词 + 事件类型）。
     返回格式：{"entities": [...], "event_type": "..."}
@@ -201,8 +202,9 @@ def _get_cluster_keywords(cluster_posts: List[dict], keyword: str) -> dict:
             response_format="json",
             engine="kimi"
         )
-        entities = result.get("entities", [])
-        event_type = result.get("event_type", "")
+        data = result.data if result.success and result.data is not None else {}
+        entities = data.get("entities", [])
+        event_type = data.get("event_type", "")
         return {"entities": entities, "event_type": event_type}
     except Exception as e:
         logger.warning(f"[Cluster Merge] 关键词抽取失败: {e}")
@@ -290,7 +292,8 @@ def _merge_clusters_of_group(clusters_group: List[dict]) -> dict:
         naming_prompt += "内容摘要：" + " | ".join(contents)
 
     try:
-        unified_name = call_llm(prompt=naming_prompt, text="", engine="kimi").strip('"').strip()
+        unified_name_result = call_llm(prompt=naming_prompt, text="", engine="kimi")
+        unified_name = (unified_name_result.data if unified_name_result.success and unified_name_result.data else "").strip('"').strip()
         if not unified_name:
             unified_name = unique_titles[0][:15] if unique_titles else all_posts[0].get("content", "")[:15]
     except Exception:
@@ -327,7 +330,7 @@ def merge_similar_clusters(clusters: List[dict]) -> List[dict]:
     cluster_meta = []
     for c in clusters:
         posts = c.get("posts", [])
-        keyword_info = _get_cluster_keywords(posts, "")
+        keyword_info = _get_cluster_keywords(posts)
         generated_titles = [p.get("generated_title", "") for p in posts if p.get("generated_title")]
         cluster_meta.append({
             "cluster": c,

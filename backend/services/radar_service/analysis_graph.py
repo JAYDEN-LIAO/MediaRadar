@@ -193,7 +193,9 @@ def analyst_node(state: RadarGraphState):
         pydantic_model=AnalystResult
     )
 
-    return {"analyst_result": res, "text_to_analyze": query_text}
+    # call_llm 返回 LLMCallResult，提取 .data 给下游使用
+    analyst_data = res.data if res.success and res.data is not None else {}
+    return {"analyst_result": analyst_data, "text_to_analyze": query_text}
 
 
 def reviewer_node(state: RadarGraphState):
@@ -215,7 +217,9 @@ def reviewer_node(state: RadarGraphState):
         pydantic_model=ReviewerResult
     )
 
-    return {"reviewer_result": res}
+    # call_llm 返回 LLMCallResult，提取 .data 给下游使用
+    reviewer_data = res.data if res.success and res.data is not None else {}
+    return {"reviewer_result": reviewer_data}
 
 
 def director_node(state: RadarGraphState):
@@ -228,7 +232,9 @@ def director_node(state: RadarGraphState):
         response_format="text",
         engine="kimi"
     )
-    return {"final_report": report}
+    # call_llm 返回 LLMCallResult，text 模式下 .data 是报告字符串
+    report_text = report.data if report.success and report.data is not None else ""
+    return {"final_report": report_text}
 
 
 # ============================================================
@@ -240,7 +246,7 @@ def route_after_analyst(state: RadarGraphState):
     risk = state["analyst_result"].get("risk_level", 1)
     sentiment = state["analyst_result"].get("sentiment", "Neutral")
 
-    if risk >= 3 or sentiment == "Negative":
+    if risk >= 3 or sentiment.lower() == "negative":
         return "reviewer"
     logger.info(f"✅ [ROUTER] 分析无明显风险 (Level {risk})，流程结束。")
     return END
@@ -289,7 +295,7 @@ def analyze_and_report(mock_post, keyword, sensitivity="balanced", evolution_tim
         evolution_timeline: 话题演化时间线（来自 TopicTracker）
 
     Returns:
-        dict，包含 status / risk_level / sentiment / core_issue / report
+        dict，包含 status / risk_level / sentiment / core_issue / report / evolution_timeline
     """
     level_instruction = ""
     if sensitivity == "aggressive":
@@ -317,6 +323,8 @@ def analyze_and_report(mock_post, keyword, sensitivity="balanced", evolution_tim
 
     analyst_res = final_state.get("analyst_result", {})
     reviewer_res = final_state.get("reviewer_result", {})
+    # 取出内部构建的 evolution_timeline（含 cluster_summary），透传给下游
+    ev_timeline = final_state.get("evolution_timeline") or {}
 
     # 场景 A: Analyst 觉得没问题，安全结束
     if not reviewer_res:
@@ -326,7 +334,8 @@ def analyze_and_report(mock_post, keyword, sensitivity="balanced", evolution_tim
             "sentiment": analyst_res.get("sentiment", "Neutral"),
             "reason": analyst_res.get("reason", "无明显风险"),
             "core_issue": analyst_res.get("core_issue", "无"),
-            "report": "舆情安全，无需生成报告。"
+            "report": "舆情安全，无需生成报告。",
+            "evolution_timeline": ev_timeline,
         }
 
     # 场景 B: Reviewer 介入了，但驳回了
@@ -337,7 +346,8 @@ def analyze_and_report(mock_post, keyword, sensitivity="balanced", evolution_tim
             "sentiment": analyst_res.get("sentiment", "Neutral"),
             "reason": f"Reviewer复核已降级: {reviewer_res.get('reason', '')}",
             "core_issue": analyst_res.get("core_issue", "无"),
-            "report": "复核被降级，暂无高危报告。"
+            "report": "复核被降级，暂无高危报告。",
+            "evolution_timeline": ev_timeline,
         }
 
     # 场景 C: Director 确认高危并生成报告
@@ -347,9 +357,35 @@ def analyze_and_report(mock_post, keyword, sensitivity="balanced", evolution_tim
             "risk_level": reviewer_res.get("adjusted_risk_level", analyst_res.get("risk_level", 3)),
             "sentiment": analyst_res.get("sentiment", "Neutral"),
             "core_issue": analyst_res.get("core_issue", "未知核心问题"),
-            "report": final_state["final_report"]
+            "report": final_state["final_report"],
+            "evolution_timeline": ev_timeline,
         }
 
     # 兜底
-    return {"status": "safe", "risk_level": 1, "sentiment": "Neutral",
-            "reason": "系统判定安全", "core_issue": "无", "report": ""}
+    return {
+        "status": "safe", "risk_level": 1, "sentiment": "Neutral",
+        "reason": "系统判定安全", "core_issue": "无", "report": "",
+        "evolution_timeline": ev_timeline,
+    }
+
+
+# === 新增：异步版本接口（供 Pipeline 直接 await）===
+import asyncio
+
+async def analyze_and_report_async(
+    mock_post: dict,
+    keyword: str,
+    sensitivity: str = "balanced",
+    evolution_timeline: dict = None,
+) -> dict:
+    """
+    analyze_and_report 的异步封装。
+    内部将同步 call_llm 扔到线程池执行，不阻塞事件循环。
+    返回值与 analyze_and_report 一致，包含 evolution_timeline（含 cluster_summary）。
+    """
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None,
+        analyze_and_report,
+        mock_post, keyword, sensitivity, evolution_timeline
+    )

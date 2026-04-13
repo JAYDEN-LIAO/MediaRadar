@@ -33,7 +33,7 @@ from core.database import get_db_connection
 # 导入 radar_service 核心模块
 # ============================================================
 
-from services.radar_service.main import RADAR_STATUS, job, reload_config
+from services.radar_service.main import radar_status, job, reload_config
 from services.radar_service.db_manager import (
     get_latest_results,
     get_system_settings,
@@ -42,13 +42,11 @@ from services.radar_service.db_manager import (
 )
 from services.radar_service.pipeline import RadarPipeline, PipelineConfig, ScreenedPost, Cluster
 from services.radar_service.notifier import send_alert as notifier_send_alert
-from services.radar_service.llm_pipeline import (
-    ScreenerResult,
-    call_llm,
-    call_vision_llm,
-    cluster_related_posts,
-    analyze_and_report,
-)
+from services.radar_service.schemas import ScreenerResult
+from services.radar_service.llm_gateway import call_llm
+from services.radar_service.vision_agent import call_vision_llm
+from services.radar_service.embed_cluster import cluster_related_posts
+from services.radar_service.analysis_graph import analyze_and_report
 from services.radar_service.prompt_templates import SCREENER_PROMPT
 
 # ============================================================
@@ -117,16 +115,16 @@ class RadarAdapter:
         对应 Tool: get_radar_status
         """
         return {
-            "is_running": RADAR_STATUS["is_running"],
-            "status_text": RADAR_STATUS["status_text"],
-            "last_run_time": RADAR_STATUS.get("last_run_time", "暂无"),
-            "last_new_count": RADAR_STATUS.get("last_new_count", 0)
+            "is_running": radar_status.is_running,
+            "status_text": radar_status.status_text,
+            "last_run_time": radar_status.last_run_time,
+            "last_new_count": radar_status.last_new_count
         }
 
     @staticmethod
     def is_running() -> bool:
         """检查雷达是否正在运行"""
-        return RADAR_STATUS.get("is_running", False)
+        return radar_status.is_running
 
     # ============================================================
     # 配置管理
@@ -194,7 +192,7 @@ class RadarAdapter:
 
         注意：此方法为同步触发，不等待完成，返回即表示任务已启动
         """
-        if RADAR_STATUS.get("is_running"):
+        if radar_status.is_running:
             return {
                 "success": False,
                 "message": "雷达正在运行中，请稍后再试",
@@ -274,13 +272,18 @@ class RadarAdapter:
                 response_format="json", engine="deepseek", pydantic_model=ScreenerResult
             )
 
+            # call_llm 返回 LLMCallResult，提取 .data
+            if not res.success or res.data is None:
+                continue
+            data = res.data
+
             # 早退：无关且不需看图
-            if not res.get("is_relevant") and not res.get("needs_vision"):
+            if not data.get("is_relevant") and not data.get("needs_vision"):
                 continue
 
             # 需要看图
             vision_text = ""
-            if res.get("needs_vision") and has_image:
+            if data.get("needs_vision") and has_image:
                 vision_text = call_vision_llm(
                     image_urls[0], text_content,
                     platform=post.get("platform", "wb"),
@@ -289,14 +292,16 @@ class RadarAdapter:
                 if vision_text:
                     fused_content = f"{text_content}\n【视觉补充】：{vision_text}"
                     text_to_analyze2 = f"标题: {post['title']}\n正文: {fused_content[:800]}"
-                    res = call_llm(
+                    res2 = call_llm(
                         screener_prompt, text_to_analyze2,
                         response_format="json", engine="deepseek", pydantic_model=ScreenerResult
                     )
+                    if res2.success and res2.data is not None:
+                        data = res2.data
 
             # 仍相关
-            if res.get("is_relevant"):
-                matched_kw = res.get("matched_keyword") or ""
+            if data.get("is_relevant"):
+                matched_kw = data.get("matched_keyword") or ""
                 if matched_kw not in keywords:
                     matched_kw = next(
                         (k for k in keywords if k in (post.get("title", "") + text_content)),
@@ -415,7 +420,7 @@ class RadarAdapter:
         }
 
         # 获取 radar_app（延迟导入避免循环）
-        from services.radar_service.llm_pipeline import radar_app
+        from services.radar_service.analysis_graph import radar_app
 
         # 使用 astream 逐节点流式执行
         seen_nodes = set()

@@ -259,7 +259,7 @@ def get_unprocessed_posts(crawler_db_path, platform):
                     if val.startswith('['):
                         try:
                             image_urls = json.loads(val)
-                        except:
+                        except (json.JSONDecodeError, TypeError, ValueError):
                             pass
                     else:
                         image_urls = [u.strip() for u in val.split(',') if u.strip()]

@@ -23,6 +23,7 @@ if BASE_DIR not in sys.path:
 
 from core.config import settings
 from core.logger import get_logger
+from core.qdrant_client import get_qdrant_client
 
 logger = get_logger("radar.vector")
 
@@ -47,20 +48,9 @@ EMBEDDING_DIM = 1024  # BGE-M3 输出维度
 # 1. Qdrant 客户端初始化（懒加载）
 # ===========================
 
-_client = None
-
-
 def _get_client():
-    """获取 Qdrant 客户端单例"""
-    global _client
-    if _client is None:
-        from qdrant_client import QdrantClient
-        _client = QdrantClient(
-            host=QDRANT_HOST,
-            port=QDRANT_PORT,
-            timeout=10,
-        )
-    return _client
+    """获取 Qdrant 客户端单例（复用 core.qdrant_client 单例）"""
+    return get_qdrant_client()
 
 
 # ===========================

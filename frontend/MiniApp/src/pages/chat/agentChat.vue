@@ -56,6 +56,10 @@
       <view class="bottom-spacer" id="scroll-bottom"></view>
     </scroll-view>
 
+    <view v-if="memoryLoaded" class="memory-hint">
+      <text class="memory-hint-text">🧠 记忆已加载</text>
+    </view>
+
     <view class="input-bar">
       <input
         class="input-box"
@@ -78,11 +82,13 @@
 </template>
 
 <script>
-import { streamRequest } from '@/utils/api.js'
+import { streamRequest, getMemory } from '@/utils/api.js'
 
 export default {
   data() {
     return {
+      sessionId: '',
+      memoryLoaded: false,
       inputText: '',
       messages: [],
       isGenerating: false,
@@ -90,7 +96,35 @@ export default {
       currentTask: null
     }
   },
+  onLoad() {
+      // 生成或恢复 session_id
+      const savedSessionId = uni.getStorageSync('agentSessionId')
+      if (savedSessionId) {
+        this.sessionId = savedSessionId
+        this.checkMemoryLoaded()
+      } else {
+        this.sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
+        uni.setStorageSync('agentSessionId', this.sessionId)
+      }
+    },
   methods: {
+    async checkMemoryLoaded() {
+      try {
+        const stats = await getMemory()
+        const entityCount = stats.entity_memory_count || 0
+        if (entityCount > 0) {
+          this.memoryLoaded = true
+          uni.showToast({
+            title: `记忆已加载（${entityCount} 个关注实体）`,
+            icon: 'none',
+            duration: 2000
+          })
+        }
+      } catch (e) {
+        console.warn('记忆查询失败:', e)
+      }
+    },
+
     sendMessage() {
       if (!this.inputText.trim() || this.isGenerating) return;
 
@@ -112,7 +146,7 @@ export default {
 
       this.currentTask = streamRequest(
         '/api/agent/chat',
-        { messages: payloadMessages },
+        { messages: payloadMessages, session_id: this.sessionId },
         (chunkText) => {
           this.parseSSEChunk(chunkText, currentIndex);
         },
@@ -333,6 +367,22 @@ export default {
 
 .bottom-spacer {
   height: 32rpx;
+}
+
+/* Memory Hint */
+.memory-hint {
+  display: flex;
+  justify-content: center;
+  padding: 6rpx 0;
+  background-color: #F8FAFC;
+}
+
+.memory-hint-text {
+  font-size: 24rpx;
+  color: #666;
+  background: #f5f5f5;
+  padding: 4rpx 16rpx;
+  border-radius: 12rpx;
 }
 
 /* Input Bar */

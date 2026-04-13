@@ -25,6 +25,7 @@ if BASE_DIR not in sys.path:
 
 from core.config import settings
 from core.logger import get_logger
+from core.qdrant_client import get_qdrant_client
 
 logger = get_logger("radar.tracker")
 
@@ -68,14 +69,9 @@ def _embed_texts_for_topic(texts: list[str]) -> list[list[float]]:
     """
     调用 BGE-M3 对文本列表生成向量（话题检索用）。
     """
-    from openai import OpenAI
+    from .llm_gateway import embedding_client
 
-    client = OpenAI(
-        api_key=settings.EMBEDDING_API_KEY,
-        base_url=settings.EMBEDDING_BASE_URL,
-    )
-
-    resp = client.embeddings.create(
+    resp = embedding_client.embeddings.create(
         input=texts,
         model=settings.EMBEDDING_MODEL or "BAAI/bge-m3",
     )
@@ -216,11 +212,7 @@ def retrieve_similar_topics(
         query_vector = vectors[0]
 
         # 2. Qdrant 检索
-        client = QdrantClient(
-            host=settings.QDRANT_HOST,
-            port=settings.QDRANT_PORT,
-            timeout=10,
-        )
+        client = get_qdrant_client()
 
         results = client.query_points(
             collection_name=TOPIC_COLLECTION_NAME,
@@ -340,20 +332,6 @@ def build_evolution_timeline(
         first_seen_str = st.get("first_seen", "")
         last_seen_str = st.get("last_seen", "")
 
-        # 计算话题持续天数（从 first_seen 到 last_seen）
-        duration_days = 0
-        if first_seen_str and last_seen_str:
-            try:
-                first_dt = datetime.datetime.fromisoformat(first_seen_str.replace("Z", "+00:00"))
-                last_dt = datetime.datetime.fromisoformat(last_seen_str.replace("Z", "+00:00"))
-                # 转为本地时间（ naive ）
-                now_naive = now.replace(tzinfo=None)
-                first_naive = first_dt.replace(tzinfo=None)
-                last_naive = last_dt.replace(tzinfo=None)
-                duration_days = (last_naive - first_naive).days
-            except Exception:
-                duration_days = 0
-
         timeline.append({
             "scan_time": last_seen_str or first_seen_str or "未知",
             "risk_level": st.get("risk_level", 0),
@@ -367,23 +345,36 @@ def build_evolution_timeline(
     # 按时间升序排序（从早到晚）
     timeline.sort(key=lambda x: x["scan_time"] or "")
 
-    # 风险演变路径
-    risk_levels = [item["risk_level"] for item in timeline]
-    current_risk = current_topic.get("risk_level") or (risk_levels[-1] if risk_levels else 0)
+    # 风险演变路径（只含已知风险等级，current_risk=0/None 不参与路径以避免信号失真）
+    historical_levels = [item["risk_level"] for item in timeline]
+    current_risk = current_topic.get("risk_level") or 0
+
+    # 构造路径：历史路径 + 当前（仅当 current_risk 有意义才加入）
+    risk_levels = historical_levels[:]
+    risk_evolution_path_parts = [str(r) for r in historical_levels]
     if current_risk:
         risk_levels.append(current_risk)
-
-    if len(risk_levels) >= 2:
-        path_parts = [str(r) for r in risk_levels]
-        risk_evolution_path = " → ".join(path_parts)
+        risk_evolution_path_parts.append(str(current_risk))
+        risk_evolution_path = " → ".join(risk_evolution_path_parts)
+    elif risk_levels:
+        risk_evolution_path = " → ".join(risk_evolution_path_parts) + " → ?"
     else:
-        risk_evolution_path = str(current_risk) if current_risk else ""
+        risk_evolution_path = ""
 
-    # 演化信号判断
-    if len(risk_levels) >= 2:
-        earliest = risk_levels[0]
-        latest = risk_levels[-1]
+    # 演化信号判断：只用已知的历史风险等级计算，排除未知值干扰
+    if len(historical_levels) >= 2:
+        earliest = historical_levels[0]
+        latest = historical_levels[-1]
         diff = latest - earliest
+        if diff >= 2:
+            evolution_signal = "escalating"
+        elif diff <= -2:
+            evolution_signal = "deescalating"
+        else:
+            evolution_signal = "stable"
+    elif current_risk and len(historical_levels) == 1:
+        # 只有一个历史数据点且当前有风险 → 用 diff 判断
+        diff = current_risk - historical_levels[0]
         if diff >= 2:
             evolution_signal = "escalating"
         elif diff <= -2:
@@ -437,14 +428,9 @@ def _upsert_topic_point(point: dict) -> bool:
     内部使用 upsert（存在则更新，不存在则插入）。
     """
     try:
-        from qdrant_client import QdrantClient
         from qdrant_client.models import PointStruct
 
-        client = QdrantClient(
-            host=settings.QDRANT_HOST,
-            port=settings.QDRANT_PORT,
-            timeout=10,
-        )
+        client = get_qdrant_client()
 
         pt = PointStruct(
             id=point["topic_id"],
@@ -487,15 +473,9 @@ def index_or_update_topic(
     Returns: True 成功，False 失败
     """
     try:
-        from qdrant_client import QdrantClient
-
         ensure_topic_collection_exists()
 
-        client = QdrantClient(
-            host=settings.QDRANT_HOST,
-            port=settings.QDRANT_PORT,
-            timeout=10,
-        )
+        client = get_qdrant_client()
 
         # 尝试获取已有记录
         try:
@@ -607,13 +587,7 @@ def get_topic_history(topic_id: str, keyword: str) -> dict:
         }
     """
     try:
-        from qdrant_client import QdrantClient
-
-        client = QdrantClient(
-            host=settings.QDRANT_HOST,
-            port=settings.QDRANT_PORT,
-            timeout=10,
-        )
+        client = get_qdrant_client()
 
         # 1. 精确查询（优先用 topic_id）
         if topic_id:

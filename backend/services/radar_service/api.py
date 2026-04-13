@@ -1,7 +1,8 @@
 # backend/services/radar_service/api.py
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Security
 from pydantic import BaseModel
 from core.logger import get_logger
+from core.auth import verify_api_key
 
 logger = get_logger("radar.api")
 from .db_manager import (
@@ -9,7 +10,8 @@ from .db_manager import (
     get_topic_summary_list, get_topic_summary_by_id, get_topic_posts,
     mark_topic_processed,
 )
-from .main import api_start_task, RADAR_STATUS, reload_config
+from core.database import get_db_connection
+from .main import api_start_task, radar_status, reload_config
 from typing import List
 
 router = APIRouter()
@@ -27,11 +29,11 @@ def mcp_health_check():
     return {
         "status": "ok",
         "service": "radar_service",
-        "radar_status": RADAR_STATUS.get("status_text", "idle"),
-        "is_running": RADAR_STATUS.get("is_running", False)
+        "radar_status": radar_status.status_text,
+        "is_running": radar_status.is_running
     }
 
-@router.post("/api/start_task")
+@router.post("/api/start_task", dependencies=[Security(verify_api_key)])
 def start_task(background_tasks: BackgroundTasks):
     success, msg = api_start_task(background_tasks)
     if success:
@@ -39,9 +41,9 @@ def start_task(background_tasks: BackgroundTasks):
     else:
         return {"code": 400, "msg": msg}
 
-@router.get("/api/radar_status")
+@router.get("/api/radar_status", dependencies=[Security(verify_api_key)])
 def get_radar_status():
-    return {"code": 200, "data": RADAR_STATUS}
+    return {"code": 200, "data": radar_status.get_status_dict()}
 
 @router.get("/api/yq_list")
 def get_yq_list():
@@ -77,15 +79,15 @@ def get_yq_list():
             display_report = display_report[:80] + "..."
 
         formatted_data.append({
-            "id": r["post_id"],
-            "platform": plat_name_map.get(r["platform"], str(r["platform"]).upper()),
+            "id": r.get("post_id", ""),
+            "platform": plat_name_map.get(r.get("platform", ""), str(r.get("platform", "")).upper()),
             "sentiment": sentiment,
             "risk": risk_text,
             "keyword": r.get("keyword", "未知"), 
             "core_issue": r.get("core_issue", "无异常"), 
             "report": display_report,          
             "url": r.get("url", ""),           
-            "create_time": r.get("publish_time") or r.get("create_time", "")
+            "create_time": r.get("create_time") or r.get("publish_time", "")
         })
         
     return {
@@ -223,6 +225,11 @@ def get_topic_detail(topic_id: str):
         else:
             sent, risk_t = "neutral", "中风险"
 
+        # 时间处理：publish_time 为空或"未知时间"时用 create_time 兜底
+        raw_publish_time = p.get("publish_time", "")
+        fallback_time = p.get("create_time", "") or raw_publish_time
+        display_time = fallback_time if raw_publish_time and raw_publish_time not in ("未知时间", "") else fallback_time
+
         formatted_posts.append({
             "post_id": p.get("post_id", ""),
             "platform": p.get("platform", ""),
@@ -230,7 +237,7 @@ def get_topic_detail(topic_id: str):
             "title": p.get("title", ""),
             "content": p.get("content", ""),
             "url": p.get("url", ""),
-            "publish_time": p.get("publish_time", ""),
+            "publish_time": display_time,
             "create_time": p.get("create_time", ""),
             "risk_level": p.get("risk_level", ""),
             "core_issue": p.get("core_issue", "无异常"),
@@ -376,7 +383,8 @@ def get_topic_stats(keyword: str = ""):
 
     try:
         info = get_topic_collection_info()
-        vectors_count = getattr(info, "vectors_count", None) or getattr(info, "points_count", 0)
+        # qdrant CollectionInfo 对象属性：vectors_count 才是正确字段名
+        vectors_count = info.vectors_count if hasattr(info, 'vectors_count') and info.vectors_count is not None else 0
         return {
             "code": 200,
             "data": {
@@ -386,3 +394,174 @@ def get_topic_stats(keyword: str = ""):
         }
     except Exception as e:
         return {"code": 500, "msg": f"获取统计失败: {str(e)}"}
+
+
+# ============================================================
+# 首页统计 API
+# ============================================================
+
+@router.get("/api/volume_stats")
+def get_volume_stats(keyword: str = ""):
+    """
+    获取近7日每日声量数据（用于首页趋势图）。
+
+    参数：
+        keyword: 可选，按关键词过滤
+
+    返回：
+        {
+            "days": ["03-27", ...],
+            "volumes": [12, ...],
+            "negative_volumes": [2, ...],
+            "total": int,
+            "negative_total": int,
+        }
+    """
+    import datetime
+    import sqlite3
+
+    today = datetime.date.today()
+    week_ago = today - datetime.timedelta(days=6)
+
+    with get_db_connection() as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT DATE(create_time) as day,
+                   COUNT(*) as total_count,
+                   SUM(CASE WHEN sentiment = 'negative' THEN 1 ELSE 0 END) as neg_count
+            FROM ai_results
+            WHERE DATE(create_time) >= ?
+              AND (? = '' OR keyword = ?)
+            GROUP BY DATE(create_time)
+            ORDER BY day ASC
+        ''', (week_ago.isoformat(), keyword, keyword))
+        rows = cursor.fetchall()
+
+    # 补全7天数据（无数据的日期填0）
+    row_map = {r["day"]: r for r in rows}
+    days, volumes, neg_vols = [], [], []
+    cur = week_ago
+    while cur <= today:
+        day_str = cur.strftime("%m-%d")
+        r = row_map.get(cur.isoformat())
+        days.append(day_str)
+        volumes.append(r["total_count"] if r else 0)
+        neg_vols.append(r["neg_count"] if r else 0)
+        cur += datetime.timedelta(days=1)
+
+    return {
+        "code": 200,
+        "data": {
+            "days": days,
+            "volumes": volumes,
+            "negative_volumes": neg_vols,
+            "total": sum(volumes),
+            "negative_total": sum(neg_vols),
+        }
+    }
+
+
+@router.get("/api/today_summary")
+def get_today_summary():
+    """
+    获取今日舆情 AI 摘要。
+
+    返回：
+        {
+            "keyword": str,
+            "sentiment": str,         # "中性偏负面" 等
+            "summary": str,           # AI 生成的一句话摘要
+            "high_risk_count": int,
+            "hottest_topic": str,
+            "escalating_topics": [str, ...],
+        }
+    """
+    import datetime
+    import sqlite3
+
+    today = datetime.date.today().isoformat()
+
+    with get_db_connection() as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        # 今日数据
+        cursor.execute('''
+            SELECT * FROM ai_results
+            WHERE DATE(create_time) = ?
+            ORDER BY create_time DESC
+        ''', (today,))
+        rows = cursor.fetchall()
+        today_data = [dict(r) for r in rows]
+
+        # 高风险数量（risk_level 包含 high/高 或 sentiment=negative）
+        high_risk = [r for r in today_data if "high" in str(r.get("risk_level", "")).lower() or "高" in str(r.get("risk_level", ""))]
+        high_risk_count = len(high_risk)
+
+        # 统计正负面
+        pos = sum(1 for r in today_data if r.get("sentiment", "").lower() == "positive")
+        neg = sum(1 for r in today_data if r.get("sentiment", "").lower() == "negative")
+        neu = len(today_data) - pos - neg
+
+        # 情感判断
+        if neg > pos and neg > neu:
+            sentiment_text = "中性偏负面"
+        elif pos > neg and pos > neu:
+            sentiment_text = "中性偏正面"
+        else:
+            sentiment_text = "中性态势"
+
+        # 取监控关键词（从系统设置）
+        settings = get_system_settings()
+        keyword = (settings.get("keywords") or [""])[0] if settings else ""
+
+        # 获取今日新增话题（按 last_seen 过滤今天）
+        cursor.execute('''
+            SELECT topic_name, risk_class, post_count, core_issue
+            FROM topic_summary
+            WHERE DATE(last_seen) = ?
+            ORDER BY risk_level DESC
+            LIMIT 5
+        ''', (today,))
+        topic_rows = cursor.fetchall()
+        topics = [dict(r) for r in topic_rows]
+
+        # 最热话题（post_count 最高）
+        hottest = max(topics, key=lambda x: x.get("post_count", 0)) if topics else {}
+        hottest_topic = hottest.get("topic_name", "") if hottest else ""
+
+        # 风险升级话题（risk_class = negative）
+        escalating = [t["topic_name"] for t in topics if t.get("risk_class") == "negative"][:3]
+
+        # AI 生成摘要（从今日数据拼摘要，调用 LLM）
+        summary = ""
+        if today_data:
+            sample = today_data[:5]
+            content_parts = []
+            for r in sample:
+                title = r.get("title", "") or ""
+                content = (r.get("content") or "")[:100]
+                if title:
+                    content_parts.append(f"标题：{title}\\n内容：{content}")
+            posts_text = "\\n---\\n".join(content_parts)
+            try:
+                from .topic_tracker import _call_topic_summary_llm
+                summary = _call_topic_summary_llm(keyword or "舆情", posts_text, len(sample))
+            except Exception as e:
+                logger.warning(f"⚠️ [TodaySummary] LLM 生成摘要失败: {e}")
+
+        if not summary:
+            summary = f"今日共捕获相关讨论 {len(today_data)} 条，其中高风险 {high_risk_count} 条。"
+
+        return {
+            "code": 200,
+            "data": {
+                "keyword": keyword,
+                "sentiment": sentiment_text,
+                "summary": summary,
+                "high_risk_count": high_risk_count,
+                "hottest_topic": hottest_topic,
+                "escalating_topics": escalating,
+            }
+        }

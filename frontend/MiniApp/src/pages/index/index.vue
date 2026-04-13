@@ -66,13 +66,55 @@
           </view>
         </view>
 
+        <!-- 话题热度榜 -->
+        <view class="card" v-if="topTopics.length > 0">
+          <view class="card-header">
+            <text class="section-title">话题热度榜</text>
+            <text class="more-link" @click="goToTopicList">全部 ›</text>
+          </view>
+          <view class="topic-rank-list">
+            <view
+              class="topic-rank-item"
+              v-for="(item, index) in topTopics"
+              :key="index"
+              @click="goToTopicDetail(item)"
+            >
+              <view class="rank-num" :class="{ top: index < 3 }">{{ index + 1 }}</view>
+              <view class="rank-content">
+                <view class="rank-title-row">
+                  <view class="risk-dot" :class="item.risk_class"></view>
+                  <text class="rank-title">{{ item.topic_name || '未知话题' }}</text>
+                </view>
+                <view class="rank-meta">
+                  <text class="rank-platforms">{{ (item.platforms || []).join('、') }}</text>
+                  <text class="rank-count">{{ item.post_count }}条</text>
+                </view>
+              </view>
+              <text class="rank-arrow">›</text>
+            </view>
+          </view>
+        </view>
+
         <view class="card">
           <view class="card-header">
             <text class="section-title">AI 智能研判摘要</text>
           </view>
 
-          <view class="summary-text">
+          <view class="summary-text" v-if="todaySummary">
+            {{ todaySummary.summary }}
+          </view>
+          <view class="summary-text" v-else>
             近期关于"<text class="highlight">{{ keyword }}</text>"的讨论整体呈现以 <text class="highlight">{{ mainSentimentText }}</text> 为主的态势。今日共捕获到相关讨论 <text class="highlight">{{ todayNewCount }}</text> 条。
+          </view>
+
+          <!-- 最热话题 & 风险升级话题 -->
+          <view class="topic-pills" v-if="todaySummary && todaySummary.hottest_topic">
+            <view class="topic-pill-label">最热话题</view>
+            <view class="topic-pill">{{ todaySummary.hottest_topic }}</view>
+          </view>
+          <view class="escalating-list" v-if="todaySummary && todaySummary.escalating_topics && todaySummary.escalating_topics.length > 0">
+            <view class="escalating-label">风险升级中</view>
+            <view class="escalating-item" v-for="(t, i) in todaySummary.escalating_topics" :key="i">{{ t }}</view>
           </view>
 
           <block v-if="highRiskCount > 0">
@@ -111,8 +153,37 @@
           <view class="card-header">
             <text class="section-title">近7日声量趋势</text>
           </view>
-          <view class="chart-placeholder">
-            <text class="placeholder-text">数据可视化区域</text>
+          <!-- 7日声量趋势图（有数据时） -->
+          <view class="trend-chart" v-if="volumeData.days && volumeData.days.length > 0">
+            <view class="trend-legend">
+              <view class="legend-item">
+                <view class="legend-bar total-bar"></view>
+                <text class="legend-label">总声量</text>
+              </view>
+              <view class="legend-item">
+                <view class="legend-bar neg-bar"></view>
+                <text class="legend-label">负面声量</text>
+              </view>
+            </view>
+            <view class="trend-bars">
+              <view class="bar-item" v-for="(day, i) in volumeData.days" :key="i">
+                <view class="bar-col">
+                  <view
+                    class="bar total-bar"
+                    :style="{ height: (volumeData.volumes[i] || 0) > 0 ? Math.max(10, (volumeData.volumes[i] / volumeData.total * 140 || 0)) + 'rpx' : '4rpx' }"
+                  ></view>
+                  <view
+                    class="bar neg-bar"
+                    :style="{ height: (volumeData.negative_volumes[i] || 0) > 0 ? Math.max(4, (volumeData.negative_volumes[i] / volumeData.total * 140 || 0)) + 'rpx' : '4rpx' }"
+                  ></view>
+                </view>
+                <text class="bar-label">{{ day }}</text>
+              </view>
+            </view>
+          </view>
+          <!-- 无数据时显示空状态 -->
+          <view class="chart-placeholder" v-else>
+            <text class="placeholder-text">近7日暂无数据</text>
           </view>
         </view>
 
@@ -147,6 +218,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { getTopicList, getVolumeStats, getTodaySummary } from '../../utils/api.js'
 
 const keyword = ref('加载中...')
 const today = ref(new Date().toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }))
@@ -179,12 +251,74 @@ const mainSentimentText = computed(() => {
 
 const latestAlert = ref(null)
 
+// 话题热度榜
+const topicList = ref([])
+
+// 近7日声量数据
+const volumeData = ref({ days: [], volumes: [], negative_volumes: [], total: 0, negative_total: 0 })
+
+// 今日AI摘要
+const todaySummary = ref(null)
+
 const getPlatformName = (val) => {
   const names = { wb: '微博', xhs: '小红书', bili: 'B站', zhihu: '知乎', dy: '抖音', ks: '快手', tieba: '贴吧' }
   return names[val] || val
 }
 
+// 话题热度榜（取前5，按post_count降序，优先负面）
+const topTopics = computed(() => {
+  return [...topicList.value]
+    .sort((a, b) => {
+      // 负面优先
+      if (a.risk_class === 'negative' && b.risk_class !== 'negative') return -1
+      if (b.risk_class === 'negative' && a.risk_class !== 'negative') return 1
+      return (b.post_count || 0) - (a.post_count || 0)
+    })
+    .slice(0, 5)
+})
+
+// 加载话题列表
+const loadTopics = () => {
+  getTopicList({ limit: 50 })
+    .then(res => {
+      if (res && res.code === 200) {
+        topicList.value = res.data || []
+      }
+    })
+    .catch(() => {})
+}
+
+// 加载7日声量数据
+const loadVolumeStats = () => {
+  getVolumeStats()
+    .then(res => {
+      if (res && res.code === 200) {
+        volumeData.value = res.data || { days: [], volumes: [], negative_volumes: [], total: 0, negative_total: 0 }
+      }
+    })
+    .catch(() => {})
+}
+
+// 加载今日AI摘要
+const loadTodaySummary = () => {
+  getTodaySummary()
+    .then(res => {
+      if (res && res.code === 200) {
+        todaySummary.value = res.data || null
+      }
+    })
+    .catch(() => {})
+}
+
 const goToList = () => uni.switchTab({ url: '/pages/list/list' })
+
+const goToTopicList = () => uni.switchTab({ url: '/pages/list/list' })
+
+const goToTopicDetail = (item) => {
+  uni.navigateTo({
+    url: `/pages/list/topic?topic_id=${item.topic_id}&topic_name=${encodeURIComponent(item.topic_name || '')}`
+  })
+}
 
 const loadSystemConfig = () => {
   uni.request({
@@ -243,6 +377,9 @@ const startPollingStatus = () => {
     uni.request({
       url: 'http://127.0.0.1:8008/api/radar_status',
       method: 'GET',
+      header: {
+        'X-API-Key': 'mr-20260402-6d2d61d53f867e01'
+      },
       success: (res) => {
         if (res.data && res.data.code === 200) {
           const statusData = res.data.data
@@ -283,6 +420,9 @@ const startRadar = () => {
   uni.request({
     url: 'http://127.0.0.1:8008/api/start_task',
     method: 'POST',
+    header: {
+      'X-API-Key': 'mr-20260402-6d2d61d53f867e01'
+    },
     success: (res) => {
       uni.hideLoading()
       if (res.data && res.data.code === 200) {
@@ -341,6 +481,9 @@ const onFabTouchEnd = () => {
 onMounted(() => {
   loadSystemConfig()
   loadDashboardData()
+  loadTopics()
+  loadVolumeStats()
+  loadTodaySummary()
 })
 
 </script>
@@ -697,6 +840,222 @@ view, text, scroll-view, button {
 
 .arrow {
   margin-left: 4rpx;
+}
+
+/* 话题热度榜 */
+.more-link {
+  font-size: 26rpx;
+  color: #0891B2;
+  font-weight: 500;
+}
+
+.topic-rank-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.topic-rank-item {
+  display: flex;
+  align-items: center;
+  padding: 18rpx 0;
+  border-bottom: 1rpx solid #F1F5F9;
+}
+.topic-rank-item:last-child {
+  border-bottom: none;
+}
+
+.rank-num {
+  width: 40rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #CBD5E1;
+  font-family: 'JetBrains Mono', monospace;
+  text-align: center;
+  flex-shrink: 0;
+}
+.rank-num.top {
+  color: #DC2626;
+}
+
+.rank-content {
+  flex: 1;
+  overflow: hidden;
+  margin-left: 12rpx;
+}
+
+.rank-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.risk-dot {
+  width: 8rpx;
+  height: 8rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.risk-dot.negative { background-color: #DC2626; }
+.risk-dot.neutral { background-color: #D97706; }
+.risk-dot.positive { background-color: #059669; }
+
+.rank-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #0F172A;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rank-meta {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: 6rpx;
+}
+
+.rank-platforms {
+  font-size: 22rpx;
+  color: #94A3B8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 280rpx;
+}
+
+.rank-count {
+  font-size: 22rpx;
+  color: #64748B;
+  font-family: 'JetBrains Mono', monospace;
+  flex-shrink: 0;
+}
+
+.rank-arrow {
+  font-size: 36rpx;
+  color: #CBD5E1;
+  flex-shrink: 0;
+  margin-left: 8rpx;
+}
+
+/* 今日摘要 - 话题标签 */
+.topic-pills {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  margin-top: 16rpx;
+  flex-wrap: wrap;
+}
+
+.topic-pill-label {
+  font-size: 22rpx;
+  color: #64748B;
+  font-weight: 500;
+}
+
+.topic-pill {
+  font-size: 24rpx;
+  color: #DC2626;
+  background-color: #FEF2F2;
+  padding: 4rpx 16rpx;
+  border-radius: 20rpx;
+  font-weight: 500;
+}
+
+.escalating-list {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-top: 10rpx;
+  flex-wrap: wrap;
+}
+
+.escalating-label {
+  font-size: 22rpx;
+  color: #64748B;
+}
+
+.escalating-item {
+  font-size: 22rpx;
+  color: #B91C1C;
+  background-color: #FFF7F7;
+  padding: 3rpx 12rpx;
+  border-radius: 6rpx;
+  border: 1rpx solid #FEE2E2;
+}
+
+/* 7日声量趋势图 */
+.trend-chart {
+  padding: 8rpx 0;
+}
+
+.trend-legend {
+  display: flex;
+  gap: 24rpx;
+  margin-bottom: 16rpx;
+}
+
+.trend-legend .legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.legend-bar {
+  width: 20rpx;
+  height: 8rpx;
+  border-radius: 4rpx;
+}
+.total-bar {
+  background-color: #0F172A;
+}
+.neg-bar {
+  background-color: #DC2626;
+}
+
+.trend-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  height: 160rpx;
+  padding: 0 4rpx;
+}
+
+.bar-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6rpx;
+}
+
+.bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2rpx;
+  height: 140rpx;
+}
+
+.bar {
+  width: 24rpx;
+  border-radius: 3rpx 3rpx 0 0;
+  min-height: 4rpx;
+}
+.bar.total-bar {
+  background: linear-gradient(to top, #334155, #0F172A);
+}
+.bar.neg-bar {
+  background: linear-gradient(to top, #F87171, #DC2626);
+}
+
+.bar-label {
+  font-size: 20rpx;
+  color: #94A3B8;
+  font-family: 'JetBrains Mono', monospace;
 }
 
 /* Chart Placeholder */
