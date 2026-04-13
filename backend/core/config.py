@@ -14,27 +14,30 @@ ENV_PATH = os.path.join(PROJECT_ROOT, ".env")
 load_dotenv(dotenv_path=ENV_PATH)
 
 class Settings:
-    # ======== 配置1: Screener & Analyst (DeepSeek) ========
-    ANALYST_API_KEY = os.getenv("ANALYST_API_KEY", "")
-    ANALYST_BASE_URL = os.getenv("ANALYST_BASE_URL", "https://api.deepseek.com/v1").strip()
-    ANALYST_MODEL = os.getenv("ANALYST_MODEL", "deepseek-chat")
-    
-    # ======== 配置2: Reviewer & Director (Kimi) ========
-    REVIEWER_API_KEY = os.getenv("REVIEWER_API_KEY", "")
-    REVIEWER_BASE_URL = os.getenv("REVIEWER_BASE_URL", "https://api.moonshot.cn/v1").strip()
-    REVIEWER_MODEL = os.getenv("REVIEWER_MODEL", "kimi-k2.5")
-    
-    # ======== 配置3: The Cluster (向量聚类引擎) ========
-    # 默认以硅基流动的免费 BGE-m3 API 为例，你可以在 .env 中覆盖它
-    EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY", "")
-    EMBEDDING_BASE_URL = os.getenv("EMBEDDING_BASE_URL", "https://api.siliconflow.cn/v1").strip()
-    EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")
+    # ======== 默认模型配置（所有 Agent 的兜底配置）=======
+    DEFAULT_API_KEY = os.getenv("DEFAULT_API_KEY", "")
+    DEFAULT_BASE_URL = os.getenv("DEFAULT_BASE_URL", "https://api.deepseek.com/v1").strip()
+    DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "deepseek-chat")
 
-    # ======== 配置4: Vision Agent (多模态图片识别 - 通义千问 Qwen) ========
-    # 默认使用阿里云百炼 (DashScope) 的 OpenAI 兼容接口
+    # ======== 配置1: 分析员 Agent ========
+    ANALYST_API_KEY = os.getenv("ANALYST_API_KEY", "")
+    ANALYST_BASE_URL = os.getenv("ANALYST_BASE_URL", "").strip()
+    ANALYST_MODEL = os.getenv("ANALYST_MODEL", "").strip()
+
+    # ======== 配置2: 复核员 Agent ========
+    REVIEWER_API_KEY = os.getenv("REVIEWER_API_KEY", "")
+    REVIEWER_BASE_URL = os.getenv("REVIEWER_BASE_URL", "").strip()
+    REVIEWER_MODEL = os.getenv("REVIEWER_MODEL", "").strip()
+
+    # ======== 配置3: 向量引擎 ========
+    EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY", "")
+    EMBEDDING_BASE_URL = os.getenv("EMBEDDING_BASE_URL", "").strip()
+    EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "").strip()
+
+    # ======== 配置4: 视觉引擎 ========
     VISION_API_KEY = os.getenv("VISION_API_KEY", "")
-    VISION_BASE_URL = os.getenv("VISION_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1").strip()
-    VISION_MODEL = os.getenv("VISION_MODEL", "qwen-vl-max")
+    VISION_BASE_URL = os.getenv("VISION_BASE_URL", "").strip()
+    VISION_MODEL = os.getenv("VISION_MODEL", "").strip()
 
     # ======== 配置5: Qdrant 向量数据库（RAG 知识库） ========
     QDRANT_HOST = os.getenv("QDRANT_HOST", "127.0.0.1")
@@ -73,3 +76,74 @@ class Settings:
 settings = Settings()
 
 from core.agent_memory_db import init_db as _  # Agent 记忆库初始化
+
+
+def update_llm_config(agent: str, config: dict) -> bool:
+    """
+    更新指定 Agent 的 LLM 配置（写入 .env + 内存立即生效）。
+    agent: "default" | "analyst" | "reviewer" | "embedding" | "vision"
+    返回是否成功。
+    """
+    prefix_map = {
+        "default":   "DEFAULT",
+        "analyst":   "ANALYST",
+        "reviewer":  "REVIEWER",
+        "embedding": "EMBEDDING",
+        "vision":    "VISION",
+    }
+    if agent not in prefix_map:
+        return False
+
+    prefix = prefix_map[agent]
+    lines_to_add = []
+    for field, value in config.items():
+        key = f"{prefix}_{field.upper()}"
+        lines_to_add.append(f"{key}={value}")
+        attr = f"{prefix}_{field.upper()}"
+        if hasattr(settings, attr):
+            setattr(settings, attr, value)
+
+    if lines_to_add:
+        # 读取现有 .env，合并更新（避免同一 key 重复追加）
+        existing = {}
+        if os.path.exists(ENV_PATH):
+            with open(ENV_PATH, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if "=" in line and not line.startswith("#"):
+                        k, v = line.split("=", 1)
+                        existing[k.strip()] = v.strip()
+        for line in lines_to_add:
+            k = line.split("=", 1)[0]
+            existing[k] = line.split("=", 1)[1]
+        with open(ENV_PATH, "w", encoding="utf-8") as f:
+            for k, v in existing.items():
+                f.write(f"{k}={v}\n")
+
+    return True
+
+
+def get_effective_llm_config(agent: str) -> dict:
+    """
+    获取指定 Agent 的有效配置，空缺字段自动回退到 DEFAULT。
+    agent: "analyst" | "reviewer" | "embedding" | "vision"
+    """
+    prefix_map = {
+        "analyst":   "ANALYST",
+        "reviewer":  "REVIEWER",
+        "embedding": "EMBEDDING",
+        "vision":    "VISION",
+    }
+    prefix = prefix_map.get(agent)
+    if not prefix:
+        return {}
+
+    def field(name):
+        specific = getattr(settings, f"{prefix}_{name.upper()}", "") or ""
+        return specific if specific else getattr(settings, f"DEFAULT_{name.upper()}", "") or ""
+
+    return {
+        "api_key": field("api_key"),
+        "base_url": field("base_url"),
+        "model": field("model"),
+    }

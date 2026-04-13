@@ -198,3 +198,66 @@ export const clearMemory = (sessionId) => {
     })
   })
 }
+
+// ----------------- 推送配置 API -----------------
+
+/** 获取所有推送通道简洁配置（不含密码） */
+export const getPushConfigs = () => {
+  return request({
+    url: '/api/push/configs',
+    method: 'GET'
+  });
+};
+
+/** 获取单个通道完整配置（含密码） */
+export const getPushConfig = (channel) => {
+  return request({
+    url: `/api/push/config/${channel}`,
+    method: 'GET'
+  });
+};
+
+/** 保存推送通道配置 */
+export const savePushConfig = (channel, data) => {
+  return request({
+    url: `/api/push/config/${channel}`,
+    method: 'POST',
+    data
+  });
+};
+
+/** 测试推送通道 */
+export const testPushChannel = (channel) => {
+  return request({
+    url: '/api/push/test',
+    method: 'POST',
+    data: { channel }
+  });
+};
+
+// ----------------- 大模型 API 配置 -----------------
+
+/** 获取所有 LLM Agent 配置 */
+export const getLlmConfigs = () => {
+  return request({
+    url: '/api/llm/configs',
+    method: 'GET'
+  });
+};
+
+/** 更新单个 LLM Agent 配置 */
+export const updateLlmConfig = (agent, data) => {
+  return request({
+    url: `/api/llm/config/${agent}`,
+    method: 'POST',
+    data
+  });
+};
+
+/** 测试 LLM Agent 连通性 */
+export const testLlmConfig = (agent) => {
+  return request({
+    url: `/api/llm/test/${agent}`,
+    method: 'POST'
+  });
+};

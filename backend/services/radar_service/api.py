@@ -565,3 +565,238 @@ def get_today_summary():
                 "escalating_topics": escalating,
             }
         }
+
+
+# ============================================================
+# 推送配置 API（Phase 4）
+# ============================================================
+
+from pydantic import BaseModel, Field
+from .notifier.models import PushChannel, EmailConfig, WeComConfig, FeishuConfig
+
+
+class PushConfigUpdateRequest(BaseModel):
+    """推送配置更新请求"""
+    enabled: bool = False
+    risk_min_level: int = Field(ge=1, le=5, default=2)
+    # Email 专用
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_use_tls: bool = True
+    from_addr: str = ""
+    to_addrs: list[str] = Field(default_factory=list)
+    # Webhook 专用
+    webhook_url: str = ""
+
+
+class PushTestRequest(BaseModel):
+    channel: str  # email | wecom | feishu
+
+
+@router.get("/api/push/configs")
+def get_all_push_configs():
+    """
+    获取所有推送通道的简洁配置（不含密码）
+    """
+    from .db_manager import get_all_push_configs
+    configs = get_all_push_configs()
+    # 隐藏密码
+    for ch in configs.values():
+        ch.pop("smtp_password", None)
+    return {"code": 200, "data": configs}
+
+
+@router.get("/api/push/config/{channel}")
+def get_push_config(channel: str):
+    """获取单个通道的完整配置（含密码，仅管理员可见）"""
+    valid = [c.value for c in PushChannel]
+    if channel not in valid:
+        return {"code": 400, "msg": f"无效通道，支持: {valid}"}
+    from .db_manager import get_push_config
+    cfg = get_push_config(channel)
+    # 隐藏密码返回
+    safe_cfg = dict(cfg)
+    safe_cfg.pop("smtp_password", None)
+    return {"code": 200, "data": safe_cfg}
+
+
+@router.post("/api/push/config/{channel}")
+def save_push_config(channel: str, req: PushConfigUpdateRequest):
+    """保存推送通道配置"""
+    valid = [c.value for c in PushChannel]
+    if channel not in valid:
+        return {"code": 400, "msg": f"无效通道，支持: {valid}"}
+    from .db_manager import save_push_config
+    from .notifier import reload_registry
+
+    # 根据通道类型构建完整配置
+    cfg = {
+        "enabled": req.enabled,
+        "risk_min_level": req.risk_min_level,
+    }
+    if channel == "email":
+        cfg.update({
+            "smtp_host": req.smtp_host,
+            "smtp_port": req.smtp_port,
+            "smtp_user": req.smtp_user,
+            "smtp_password": req.smtp_password,
+            "smtp_use_tls": req.smtp_use_tls,
+            "from_addr": req.from_addr,
+            "to_addrs": req.to_addrs,
+        })
+    else:
+        cfg["webhook_url"] = req.webhook_url
+
+    save_push_config(channel, cfg)
+    reload_registry()
+    return {"code": 200, "msg": f"{channel} 配置已保存"}
+
+
+@router.post("/api/push/test")
+def test_push_channel(req: PushTestRequest):
+    """发送测试消息到指定通道"""
+    from .notifier import test_channel
+    from .db_manager import get_push_config
+
+    try:
+        ch = PushChannel(req.channel)
+    except ValueError:
+        return {"code": 400, "msg": f"无效通道: {req.channel}"}
+
+    cfg = get_push_config(req.channel)
+    if not cfg.get("enabled"):
+        return {"code": 400, "msg": "请先启用该通道再测试"}
+
+    ok = test_channel(ch, cfg)
+    if ok:
+        return {"code": 200, "msg": f"测试消息发送成功"}
+    else:
+        return {"code": 500, "msg": "发送失败，请检查配置是否正确"}
+
+
+# ============================================================
+# 大模型 API 配置 API
+# ============================================================
+
+from pydantic import BaseModel
+
+
+class LLMConfigUpdateRequest(BaseModel):
+    api_key: str = ""
+    base_url: str = ""
+    model: str = ""
+
+
+LLM_AGENTS = {
+    "default":   {"label": "默认模型",      "role": "所有 Agent 的兜底配置，单独配置后优先级更高",  "default_model": "deepseek-chat"},
+    "analyst":   {"label": "分析员",        "role": "舆情风险分析",   "default_model": "deepseek-chat"},
+    "reviewer":  {"label": "复核员",        "role": "交叉复核判定",   "default_model": "deepseek-chat"},
+    "embedding": {"label": "向量引擎",      "role": "文本向量聚类",   "default_model": "BAAI/bge-m3"},
+    "vision":    {"label": "视觉引擎",      "role": "图片证据解析",   "default_model": "qwen-vl-max"},
+}
+
+
+@router.get("/api/llm/configs")
+def get_llm_configs():
+    """获取所有 LLM Agent 的当前配置（不含 api_key 明文）"""
+    from core.config import settings, get_effective_llm_config
+    result = {}
+    for agent, info in LLM_AGENTS.items():
+        prefix = agent.upper()
+        api_key = getattr(settings, f"{prefix}_API_KEY", "") or ""
+        base_url = getattr(settings, f"{prefix}_BASE_URL", "") or ""
+        model = getattr(settings, f"{prefix}_MODEL", "") or ""
+
+        if agent == "default":
+            effective_base_url = base_url
+            effective_model = model
+            uses_default = False
+        else:
+            eff = get_effective_llm_config(agent)
+            effective_base_url = eff["base_url"]
+            effective_model = eff["model"]
+            uses_default = not base_url or not model
+
+        result[agent] = {
+            "label": info["label"],
+            "role": info["role"],
+            "default_model": info["default_model"],
+            "api_key_masked": api_key[:4] + "****" if api_key else "",
+            "has_key": bool(api_key),
+            "base_url": base_url,
+            "model": model,
+            "effective_base_url": effective_base_url,
+            "effective_model": effective_model,
+            "uses_default": uses_default,
+        }
+    return {"code": 200, "data": result}
+
+
+@router.post("/api/llm/config/{agent}")
+def update_llm_config(agent: str, req: LLMConfigUpdateRequest):
+    """更新指定 Agent 的 LLM 配置"""
+    from core.config import update_llm_config as do_update
+
+    if agent not in LLM_AGENTS:
+        return {"code": 400, "msg": f"无效 Agent：{agent}，支持: {list(LLM_AGENTS.keys())}"}
+
+    config = {}
+    if req.api_key:
+        config["api_key"] = req.api_key
+    if req.base_url:
+        config["base_url"] = req.base_url
+    if req.model:
+        config["model"] = req.model
+
+    if not config:
+        return {"code": 400, "msg": "没有要更新的字段"}
+
+    ok = do_update(agent, config)
+    if ok:
+        return {"code": 200, "msg": f"{LLM_AGENTS[agent]['label']} 配置已保存"}
+    else:
+        return {"code": 500, "msg": "更新失败"}
+
+
+@router.post("/api/llm/test/{agent}")
+def test_llm_config(agent: str):
+    """测试指定 Agent 的 API 连通性（default agent 测试默认配置，其他 Agent 使用有效配置）"""
+    from core.config import settings, get_effective_llm_config
+
+    if agent == "default":
+        api_key = getattr(settings, "DEFAULT_API_KEY", "") or ""
+        base_url = getattr(settings, "DEFAULT_BASE_URL", "") or ""
+        model = getattr(settings, "DEFAULT_MODEL", "") or ""
+    elif agent in LLM_AGENTS:
+        eff = get_effective_llm_config(agent)
+        api_key = getattr(settings, f"{agent.upper()}_API_KEY", "") or ""
+        base_url = eff["base_url"]
+        model = eff["model"]
+    else:
+        return {"code": 400, "msg": f"无效 Agent：{agent}"}
+
+    if not api_key or not base_url:
+        return {"code": 400, "msg": "API Key 或 Base URL 未配置"}
+
+    base_url = base_url.rstrip("/")
+    try:
+        import requests
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+
+        if agent == "embedding":
+            # 向量引擎走 /embeddings 接口
+            payload = {"model": model, "input": "test"}
+            resp = requests.post(f"{base_url}/embeddings", headers=headers, json=payload, timeout=15)
+        else:
+            # 其他 Agent 走 /chat/completions
+            payload = {"model": model, "messages": [{"role": "user", "content": "hi"}], "max_tokens": 5}
+            resp = requests.post(f"{base_url}/chat/completions", headers=headers, json=payload, timeout=15)
+
+        if resp.status_code == 200:
+            return {"code": 200, "msg": "连接成功"}
+        else:
+            return {"code": 500, "msg": f"接口返回错误: {resp.status_code} - {resp.text[:100]}"}
+    except Exception as e:
+        return {"code": 500, "msg": f"连接失败: {str(e)}"}

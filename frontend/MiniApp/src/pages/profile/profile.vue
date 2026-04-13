@@ -26,31 +26,36 @@
       </view>
 
       <view class="menu-list">
-        <view class="menu-item">
-          <text class="label">导出数据报表</text>
+        <view class="menu-item" @click="goToPushSettings">
+          <text class="label">推送设置</text>
           <text class="arrow">›</text>
         </view>
-        <view class="menu-item">
-          <text class="label">大模型 API 设置</text>
+        <view class="menu-item" @click="goToApiSettings">
+          <text class="label">模型设置</text>
           <text class="arrow">›</text>
         </view>
-        <view class="menu-item" @click="goToSettings">
-          <text class="label">系统偏好设置</text>
-          <text class="arrow">›</text>
-        </view>
-        <view class="menu-item">
-          <text class="label">联系技术支持</text>
+        <view class="menu-item" @click="copyEmail">
+          <text class="label">联系我们</text>
           <text class="arrow">›</text>
         </view>
       </view>
 
-      <view class="version-info">舆情雷达 V2.0.0</view>
+      <view class="version-info">舆情雷达 V1.0.1</view>
     </view>
   </view>
 </template>
 
 <script setup>
 const goToSettings = () => uni.navigateTo({ url: '/pages/settings/settings' })
+const goToPushSettings = () => uni.navigateTo({ url: '/pages/settings/pushSettings' })
+const goToApiSettings = () => uni.navigateTo({ url: '/pages/settings/apiSettings' })
+const copyEmail = () => {
+  uni.setClipboardData({
+    data: 'jaydenliao1027@gmail.com',
+    success: () => uni.showToast({ title: '已复制邮箱', icon: 'success' }),
+    fail: () => uni.showToast({ title: '复制失败', icon: 'none' }),
+  })
+}
 </script>
 
 <style scoped>

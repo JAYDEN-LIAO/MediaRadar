@@ -89,7 +89,9 @@
       "Bash(sqlite3:*)",
       "Bash(./venv/Scripts/python.exe -c \"import typer; print\\('typer OK'\\)\")",
       "Bash(../..//venv/Scripts/python.exe main.py --platform xhs --type search --save_data_option sqlite --headless no --keywords 理想)",
-      "Bash(D:/JAYDEN/develop/work/MediaRadar/venv/Scripts/python.exe main.py --platform xhs --type search --save_data_option sqlite --headless no --keywords 理想)"
+      "Bash(D:/JAYDEN/develop/work/MediaRadar/venv/Scripts/python.exe main.py --platform xhs --type search --save_data_option sqlite --headless no --keywords 理想)",
+      "Bash(rm:*)",
+      "Bash(node --check frontend/MiniApp/src/utils/api.js)"
     ]
   },
   "enableAllProjectMcpServers": true,

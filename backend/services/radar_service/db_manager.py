@@ -548,4 +548,72 @@ def mark_topic_processed(topic_id: str) -> bool:
         return cursor.rowcount > 0
 
 
+# ============================================================
+# 推送配置 CRUD
+# ============================================================
+
+def _ensure_push_settings_table():
+    """确保 push_settings 表存在"""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS push_settings (
+                channel TEXT PRIMARY KEY,
+                config_json TEXT NOT NULL
+            )
+        ''')
+        conn.commit()
+
+
+def get_push_config(channel: str) -> dict:
+    """读取指定通道的配置"""
+    _ensure_push_settings_table()
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT config_json FROM push_settings WHERE channel = ?",
+            (channel,)
+        )
+        row = cursor.fetchone()
+    if row:
+        return json.loads(row[0])
+    # 返回默认空配置
+    defaults = {
+        "email": {"enabled": False, "risk_min_level": 3},
+        "wecom": {"enabled": False, "risk_min_level": 2},
+        "feishu": {"enabled": False, "risk_min_level": 2},
+    }
+    return defaults.get(channel, {"enabled": False, "risk_min_level": 1})
+
+
+def save_push_config(channel: str, config: dict) -> None:
+    """保存指定通道的配置"""
+    _ensure_push_settings_table()
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT OR REPLACE INTO push_settings (channel, config_json) VALUES (?, ?)",
+            (channel, json.dumps(config))
+        )
+        conn.commit()
+
+
+def get_all_push_configs() -> dict[str, dict]:
+    """返回所有推送通道配置（供 registry 初始化用）"""
+    _ensure_push_settings_table()
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT channel, config_json FROM push_settings")
+        rows = cursor.fetchall()
+    result = {}
+    for row in rows:
+        result[row[0]] = json.loads(row[1])
+    # 补全未配置的通道默认值
+    for ch in ("email", "wecom", "feishu"):
+        if ch not in result:
+            result[ch] = {"enabled": False, "risk_min_level": 2}
+    return result
+
+
+
 init_radar_db()

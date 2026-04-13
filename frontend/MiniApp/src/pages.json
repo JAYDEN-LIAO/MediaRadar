@@ -30,6 +30,14 @@
         "navigationBarTitleText": "智能助理",
         "navigationBarBackgroundColor": "#F3F4F6"
       }
+    },
+    {
+      "path": "pages/settings/pushSettings",
+      "style": { "navigationBarTitleText": "推送设置" }
+    },
+    {
+      "path": "pages/settings/apiSettings",
+      "style": { "navigationBarTitleText": "模型设置" }
     }
   ],
   "globalStyle": {

@@ -1,4 +1,4 @@
-# MediaRadar 舆情雷达系统
+# MediaRadar Public Opinion Monitoring System
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11+-blue.svg" alt="Python">
@@ -7,165 +7,206 @@
   <img src="https://img.shields.io/badge/Qdrant-1.7+-46A0B6.svg" alt="Qdrant">
 </p>
 
-> 「 不仅仅是爬虫，更是一个具备**多模态视觉**、**多智能体协同**、**话题演化追踪**、**RAG 知识库**的工业级 AI 舆情大脑 」
+> 「 Not just a crawler — it's an industrial-grade **AI brain** for public opinion monitoring, featuring **multimodal vision**, **multi-agent collaboration**, **topic evolution tracking**, and **RAG knowledge base**. 」
 
-基于 FastAPI + uni-app 构建的企业级舆情监控系统。通过深度整合多源大模型与自研的高可用爬虫架构，实现全网平台的数据抓取、跨模态证据解析、多重 AI 交叉审核、话题聚合、演化追踪及实时预警推送。
-
----
-
-## 核心特性
-
-### 🔄 多智能体协同管线
-
-```
-爬虫抓取原始帖子
-     │
-     ▼
-┌─────────────────────────────────────────────┐
-│ ① Screener（DeepSeek 初筛）                 │
-│    无关帖子 Early Exit + 生成标准化标题       │
-└─────────────────────────────────────────────┘
-     │
-     ▼
-┌─────────────────────────────────────────────┐
-│ ② Vision Agent（Qwen-VL 图片证据提取）       │
-│    图文联合判断（条件触发）                   │
-└─────────────────────────────────────────────┘
-     │
-     ▼
-┌─────────────────────────────────────────────┐
-│ ③ Cluster（HDBSCAN + BGE-M3 语义聚类）       │
-│    话题聚合 + 并查集合并安全网                │
-└─────────────────────────────────────────────┘
-     │
-     ▼
-┌─────────────────────────────────────────────┐
-│ ④ Analyst（DeepSeek 风险判定）               │
-│    结合话题演化 RAG 上下文                    │
-└─────────────────────────────────────────────┘
-     │
-     ▼
-┌─────────────────────────────────────────────┐
-│ ⑤ Reviewer（Kimi 交叉复核）                 │
-│    防止单一模型幻觉                           │
-└─────────────────────────────────────────────┘
-     │
-     ▼
-┌─────────────────────────────────────────────┐
-│ ⑥ Director（Kimi 预警简报）                 │
-│    高危预警生成                               │
-└─────────────────────────────────────────────┘
-     │
-     ▼
-预警推送 + 话题聚合写入 + 异步 Qdrant 索引
-```
-
-### 📊 话题聚合与演化追踪
-
-从**单帖级别**升级到**话题级别**，实现更精准的风险管控：
-
-| 能力 | 说明 |
-|------|------|
-| 语义聚类 | HDBSCAN 将语义相似的帖子聚合成话题簇 |
-| 智能合并 | 并查集安全网自动合并高度相似话题 |
-| 演化追踪 | 展示「风险演变路径」如 `2 → 3 → 4` |
-| 演化信号 | 识别话题为升级 / 稳定 / 缓和 |
-| RAG 增强 | 为 Analyst 自动关联历史案例参照 |
-
-### 👁️ 多模态视觉侦探
-
-自动读取本地高清大图，精准捕捉并解析图片中的「异物、脏乱差、报错截图」等核心视觉证据，攻克图文分离难题。
-
-### ⚖️ 异源大模型交叉验证
-
-```
-DeepSeek（逻辑推理定性） ──┐
-                          ├──► 双轨审核防线
-Kimi（深度复核 + 长文报告）─┘
-```
+An enterprise-grade public opinion monitoring system built with FastAPI + uni-app. Through deep integration of multiple large language models and a proprietary high-availability crawler architecture, it achieves full-network data collection, cross-modal evidence parsing, multi-AI cross-validation, topic aggregation, evolution tracking, and real-time alert pushing.
 
 ---
 
-## 支持的平台
+## Key Features
+
+### 🔄 Multi-Agent Collaboration Pipeline
+
+```
+Crawler collects raw posts
+     │
+     ▼
+┌─────────────────────────────────────────────┐
+│ ① Screener (Initial Filtering)              │
+│    Early Exit for irrelevant posts          │
+└─────────────────────────────────────────────┘
+     │
+     ▼
+┌─────────────────────────────────────────────┐
+│ ② Vision Agent (Image Evidence Extraction) │
+│    Joint image-text judgment (conditional)  │
+└─────────────────────────────────────────────┘
+     │
+     ▼
+┌─────────────────────────────────────────────┐
+│ ③ Cluster (HDBSCAN + Semantic Clustering)   │
+│    Topic aggregation + union-find safety net │
+└─────────────────────────────────────────────┘
+     │
+     ▼
+┌─────────────────────────────────────────────┐
+│ ④ Analyst (Risk Assessment)                 │
+│    RAG context from topic evolution          │
+└─────────────────────────────────────────────┘
+     │
+     ▼
+┌─────────────────────────────────────────────┐
+│ ⑤ Reviewer (Cross-Validation)               │
+│    Prevent single-model hallucinations      │
+└─────────────────────────────────────────────┘
+     │
+     ▼
+┌─────────────────────────────────────────────┐
+│ ⑥ Director (Alert Briefing)                 │
+│    High-risk alert generation               │
+└─────────────────────────────────────────────┘
+     │
+     ▼
+Alert Push + Topic Aggregation Write + Async Qdrant Index
+```
+
+### 📊 Topic Aggregation & Evolution Tracking
+
+Elevated from **post-level** to **topic-level** for more precise risk management:
+
+| Capability | Description |
+|------------|-------------|
+| Semantic Clustering | HDBSCAN groups semantically similar posts into topic clusters |
+| Smart Merging | Union-find safety net automatically merges highly similar topics |
+| Evolution Tracking | Shows "risk evolution path" e.g. `2 → 3 → 4` |
+| Evolution Signals | Identifies topics as escalating / stable / de-escalating |
+| RAG Enhancement | Auto-links historical cases for Analyst |
+
+### 👁️ Multimodal Vision Detective
+
+Automatically reads local HD images, precisely capturing and parsing visual evidence such as "foreign objects, messiness, error screenshots" in images — solving the image-text separation problem.
+
+### ⚖️ Cross-Source LLM Cross-Validation
+
+```
+Analyst (logical reasoning) ──┐
+                               ├──► Dual-track review defense
+Reviewer (deep review + report) ┘
+```
+
+### 📢 Multi-Channel Alert Push
+
+Supports three push channels, independently configurable:
+
+| Channel | Description |
+|---------|-------------|
+| WeCom (企业微信) | Webhook bot, Markdown format, color-coded risk levels |
+| Feishu (飞书) | Interactive card messages, color distinguishes risk levels |
+| Email | SMTP TLS, HTML + plain text dual format, auto-bundled summary |
+
+Each channel is independently configured and can filter by risk level (1–5).
+
+---
+
+## Supported Platforms
 
 <p float="left">
-  <img src="https://img.shields.io/badge/-小红书-EA5A89?style=flat-square" alt="小红书">
-  <img src="https://img.shields.io/badge/-微博-F0999D?style=flat-square" alt="微博">
-  <img src="https://img.shields.io/badge/-抖音-25F4EE?style=flat-square" alt="抖音">
-  <img src="https://img.shields.io/badge/-知乎-0084FF?style=flat-square" alt="知乎">
-  <img src="https://img.shields.io/badge/-B站-FF9C02?style=flat-square" alt="B站">
-  <img src="https://img.shields.io/badge/-贴吧-BA1C26?style=flat-square" alt="贴吧">
+  <img src="https://img.shields.io/badge/-%E5%B0%8F%E7%BA%A2%E4%B9%A6-EA5A89?style=flat-square" alt="小红书">
+  <img src="https://img.shields.io/badge/-%E5%BE%AE%E5%8D%9A-F0999D?style=flat-square" alt="微博">
+  <img src="https://img.shields.io/badge/-%E6%8A%96%E9%9F%B3-25F4EE?style=flat-square" alt="抖音">
+  <img src="https://img.shields.io/badge/-%E7%9F%A5%E4%B9%8E-0084FF?style=flat-square" alt="知乎">
+  <img src="https://img.shields.io/badge/-B%E7%AB%99-FF9C02?style=flat-square" alt="B站">
+  <img src="https://img.shields.io/badge/-%E8%B4%B0%E9%82%BA-BA1C26?style=flat-square" alt="贴吧">
 </p>
 
 ---
 
-## 技术架构
+## Architecture
 
-### 双层 RAG 知识库
+### Dual-Layer RAG Knowledge Base
 
-| 集合 | 存储单元 | 用途 |
-|------|---------|------|
-| `yq_history` | 单帖分析结果 | Analyst 单帖历史案例参照 |
-| `topic_evolution` | 话题簇聚合摘要 + 演化轨迹 | Analyst 话题时间线上下文 |
+| Collection | Storage Unit | Purpose |
+|------------|--------------|---------|
+| `yq_history` | Single-post analysis results | Analyst historical case reference |
+| `topic_evolution` | Topic cluster summary + evolution track | Analyst topic timeline context |
 
-### 技术栈
+### Tech Stack
 
-| 层级 | 技术选型 |
-|------|----------|
-| 后端框架 | FastAPI · SQLite · asyncio |
-| AI 分析 | DeepSeek · Kimi/Moonshot · Qwen-VL-Max |
-| 向量引擎 | BGE-M3 · Qdrant（双集合） |
-| 聚类算法 | HDBSCAN（自适应密度）+ 并查集 |
-| 对话引擎 | DeepSeek + Function Calling + SSE |
-| 前端 | uni-app (Vue 3) |
-| 爬虫 | Playwright / Selenium |
+| Layer | Technology |
+|-------|------------|
+| Backend Framework | FastAPI · SQLite · asyncio |
+| AI Analysis | DeepSeek · Kimi/Moonshot · Qwen-VL-Max |
+| Vector Engine | BGE-M3 · Qdrant (dual collections) |
+| Clustering | HDBSCAN (adaptive density) + Union-Find |
+| Dialogue Engine | DeepSeek + Function Calling + SSE |
+| Frontend | uni-app (Vue 3) |
+| Crawler | Playwright / Selenium |
+
+### Model Configuration Mechanism
+
+The system supports independent model configuration for each Agent role, with automatic fallback to the **default model** when not configured:
+
+| Role | Purpose |
+|------|---------|
+| Default Model | Fallback for all agents |
+| Analyst | Public opinion risk analysis |
+| Reviewer | Cross-validation and judgment |
+| Embedding Engine | Text vector clustering (BGE-M3) |
+| Vision Engine | Image evidence parsing (Qwen-VL) |
 
 ---
 
-## 快速启动
+## Quick Start
 
-### 环境准备
+### Environment Setup
 
 ```bash
-# 确保 Python 3.11+
+# Ensure Python 3.11+
 python --version
 
-# 初始化浏览器环境
+# Initialize browser environment
 playwright install
 ```
 
-### 配置环境变量
+### Configure Environment Variables
 
 ```bash
-# 在项目根目录创建 .env
+# Create .env in project root
 cat > .env << 'EOF'
-# ======== Screener & Analyst (DeepSeek) ========
-ANALYST_BASE_URL="https://api.deepseek.com/v1"
-ANALYST_API_KEY="sk-xxx"
-ANALYST_MODEL="deepseek-chat"
+# ======== Default Model (fallback for all agents) ========
+DEFAULT_BASE_URL="https://api.deepseek.com/v1"
+DEFAULT_API_KEY="sk-xxx"
+DEFAULT_MODEL="deepseek-chat"
 
-# ======== Reviewer & Director (Kimi) ========
-REVIEWER_BASE_URL="https://api.moonshot.cn/v1"
-REVIEWER_API_KEY="sk-xxx"
-REVIEWER_MODEL="moonshot-v1-8k"
+# ======== Analyst (optional, overrides default) ========
+ANALYST_API_KEY=""
+ANALYST_BASE_URL=""
+ANALYST_MODEL=""
 
-# ======== Embedding & 聚类 (BGE-M3) ========
-EMBEDDING_BASE_URL="https://api.siliconflow.cn/v1"
-EMBEDDING_API_KEY="sk-xxx"
-EMBEDDING_MODEL="BAAI/bge-m3"
+# ======== Reviewer (optional, overrides default) ========
+REVIEWER_API_KEY=""
+REVIEWER_BASE_URL=""
+REVIEWER_MODEL=""
 
-# ======== Vision Agent (Qwen-VL) ========
-VISION_BASE_URL="https://dashscope.aliyuncs.com/compatible-mode/v1"
-VISION_API_KEY="sk-xxx"
-VISION_MODEL="qwen-vl-max"
+# ======== Embedding Engine (optional, overrides default) ========
+EMBEDDING_API_KEY=""
+EMBEDDING_BASE_URL=""
+EMBEDDING_MODEL=""
 
-# ======== Qdrant 向量数据库 ========
+# ======== Vision Engine (optional, overrides default) ========
+VISION_API_KEY=""
+VISION_BASE_URL=""
+VISION_MODEL=""
+
+# ======== Qdrant Vector Database ========
 QDRANT_HOST="127.0.0.1"
 QDRANT_PORT="6333"
 QDRANT_COLLECTION="yq_history"
 TOPIC_COLLECTION="topic_evolution"
 
-# ======== 日志配置（可选） ========
+# ======== Push Channels (optional) ========
+# WeCom Webhook
+WECOM_WEBHOOK_URL=""
+# Feishu Webhook
+FEISHU_WEBHOOK_URL=""
+# Email SMTP
+SMTP_HOST=""
+SMTP_PORT="587"
+SMTP_USER=""
+SMTP_PASSWORD=""
+SMTP_FROM=""
+
+# ======== Logging (optional) ========
 LOG_LEVEL="INFO"
 LOG_FORMAT="text"
 LOG_TO_FILE="true"
@@ -173,71 +214,88 @@ LOG_TO_CONSOLE="true"
 EOF
 ```
 
-### 启动服务
+### Start Services
 
 ```bash
-# 1. 启动 Qdrant
+# 1. Start Qdrant
 docker run -d --name mediaradar-qdrant \
   -p 6333:6333 -p 6334:6334 \
   -v $(pwd)/data/qdrant:/qdrant/storage \
   qdrant/qdrant:latest
 
-# 2. 启动后端
+# 2. Start backend
 python backend/gateway/main.py
-# 访问 http://127.0.0.1:8000/docs 查看 API 文档
+# Visit http://127.0.0.1:8000/docs for API docs
 
-# 3. 初始化话题演化知识库（一次性）
+# 3. Initialize topic evolution knowledge base (one-time)
 python scripts/rag/migrate_topic_evolution.py
 
-# 4. 启动前端
-# 使用 HBuilderX 打开 frontend/MiniApp 目录运行
+# 4. Start frontend
+# Use HBuilderX to open frontend/MiniApp directory and run
 ```
 
 ---
 
-## API 端点
+## API Endpoints
 
-### 雷达业务
+### Radar Operations
 
-| 端点 | 方法 | 描述 |
-|------|:----:|------|
-| `/api/start_task` | POST | 触发全网扫描（后台运行） |
-| `/api/radar_status` | GET | 获取雷达运行状态 |
-| `/api/settings` | GET / POST | 获取/保存系统配置 |
-| `/api/mcp/health` | GET | MCP Server 健康检查 |
+| Endpoint | Method | Description |
+|----------|:------:|-------------|
+| `/api/start_task` | POST | Trigger full-network scan (background) |
+| `/api/radar_status` | GET | Get radar running status |
+| `/api/settings` | GET / POST | Get/save system configuration |
+| `/api/mcp/health` | GET | MCP Server health check |
 
-### 话题聚合
+### Push Channels
 
-| 端点 | 方法 | 描述 |
-|------|:----:|------|
-| `/api/topic_list` | GET | 话题聚合列表（支持 keyword/platform/sentiment 筛选） |
-| `/api/topic/{topic_id}` | GET | 话题详情（含关联帖子 + 演化时间线） |
-| `/api/topic/{topic_id}/process` | POST | 标记话题已处理 |
-| `/api/topic_evolution` | GET | 获取话题完整演化时间线 |
-| `/api/topic_evolution/migrate_clusters` | POST | 批量迁移历史数据 |
-| `/api/topic_stats` | GET | 话题演化库统计 |
+| Endpoint | Method | Description |
+|----------|:------:|-------------|
+| `/api/push/configs` | GET | Get all push configurations |
+| `/api/push/config/{channel}` | GET | Get specific channel config |
+| `/api/push/config/{channel}` | POST | Save push channel config |
+| `/api/push/test` | POST | Test push channel connectivity |
 
-### 舆情 & AI 助手
+### Model Configuration
 
-| 端点 | 方法 | 描述 |
-|------|:----:|------|
-| `/api/yq_list` | GET | 舆情列表（最近 50 条） |
-| `/api/agent/chat` | POST | AI 助手流式对话（SSE + Function Calling） |
+| Endpoint | Method | Description |
+|----------|:------:|-------------|
+| `/api/llm/configs` | GET | Get all Agent model configurations |
+| `/api/llm/config/{agent}` | POST | Update specific Agent model config |
+| `/api/llm/test/{agent}` | POST | Test specific Agent model connectivity |
+
+### Topic Aggregation
+
+| Endpoint | Method | Description |
+|----------|:------:|-------------|
+| `/api/topic_list` | GET | Topic aggregation list |
+| `/api/topic/{topic_id}` | GET | Topic detail (posts + evolution timeline) |
+| `/api/topic/{topic_id}/process` | POST | Mark topic as processed |
+| `/api/topic_evolution` | GET | Get full topic evolution timeline |
+| `/api/topic_evolution/migrate_clusters` | POST | Batch migrate historical data |
+| `/api/topic_stats` | GET | Topic evolution library statistics |
+
+### Public Opinion & AI Assistant
+
+| Endpoint | Method | Description |
+|----------|:------:|-------------|
+| `/api/yq_list` | GET | Public opinion list (latest 50) |
+| `/api/agent/chat` | POST | AI assistant streaming chat (SSE + Function Calling) |
 
 ---
 
-## 日志系统
+## Logging System
 
-日志按模块分目录存储，支持 `text` / `json` 双格式：
+Logs are stored by module subdirectory, supporting `text` / `json` dual format:
 
 ```
 logs/
-├── radar/          # 雷达服务（pipeline / cluster / analysis / tracker...）
-├── crawler/        # 爬虫服务
-├── agent/          # AI 助手服务
-├── gateway/        # API 网关
-├── audit/          # 审计日志（预警、配置变更）
-└── error/          # 错误汇总
+├── radar/          # Radar service (pipeline / cluster / analysis / tracker...)
+├── crawler/        # Crawler service
+├── agent/          # AI assistant service
+├── gateway/        # API gateway
+├── audit/          # Audit logs (alerts, config changes)
+└── error/          # Error summary
 ```
 
 ```python
@@ -246,62 +304,79 @@ from core.context import set_task_context
 
 logger = get_logger("radar.pipeline")
 
-# 请求级别上下文追踪
-set_task_context(task_id="xxx", keyword="李荣浩", platform="WB")
+# Request-level context tracking
+set_task_context(task_id="xxx", keyword="Li Ronghao", platform="WB")
 ```
 
 ---
 
-## 项目结构
+## Project Structure
 
 ```
 MediaRadar/
 ├── backend/
-│   ├── core/                    # 全局核心
-│   │   ├── config.py           # 配置管理
-│   │   ├── database.py         # SQLite 连接
-│   │   ├── logger.py           # 日志工厂（text/json 双格式）
-│   │   ├── context.py          # 请求上下文（task_id 追踪）
-│   │   └── audit.py            # 审计日志
+│   ├── core/                    # Global core
+│   │   ├── config.py           # Configuration (Qdrant / LLM configs)
+│   │   ├── database.py         # SQLite connection
+│   │   ├── logger.py           # Log factory (text/json dual format)
+│   │   ├── context.py          # Request context (task_id tracking)
+│   │   └── audit.py            # Audit log
 │   ├── gateway/
-│   │   └── main.py             # FastAPI 统一网关（端口 8000）
+│   │   └── main.py             # FastAPI unified gateway (port 8000)
 │   └── services/
-│       ├── agent_service/       # AI 舆情助手
-│       │   ├── agent_core.py   # DeepSeek Function Calling
-│       │   ├── tools.py        # 工具集
+│       ├── agent_service/       # AI opinion assistant
+│       │   ├── agent_core.py   # Streaming dialogue engine + Function Calling
+│       │   ├── tools.py        # Toolset
 │       │   └── api.py
-│       ├── radar_service/       # 舆情分析核心
-│       │   ├── main.py         # 调度主程序
-│       │   ├── pipeline.py     # 5阶段 Pipeline
-│       │   ├── embed_cluster.py # HDBSCAN 聚类
-│       │   ├── analysis_graph.py # LangGraph 子图
-│       │   ├── topic_tracker.py # 话题演化追踪
-│       │   ├── topic_aggregator.py # 话题聚合
-│       │   ├── vector_store.py  # Qdrant 封装
-│       │   ├── vision_agent.py # 视觉证据提取
-│       │   ├── llm_gateway.py  # LLM 网关
+│       ├── radar_service/       # Core opinion analysis
+│       │   ├── main.py         # Dispatcher main program
+│       │   ├── pipeline.py     # Pipeline dispatcher
+│       │   ├── llm_pipeline.py # LangGraph analysis subgraph
+│       │   ├── embed_cluster.py # HDBSCAN clustering
+│       │   ├── analysis_graph.py # LangGraph graph
+│       │   ├── topic_tracker.py # Topic evolution tracking
+│       │   ├── topic_aggregator.py # Topic aggregation
+│       │   ├── vector_store.py  # Qdrant wrapper
+│       │   ├── vision_agent.py # Visual evidence extraction
+│       │   ├── llm_gateway.py  # LLM gateway
 │       │   ├── db_manager.py   # SQLite CRUD
-│       │   ├── schemas.py      # 数据契约
+│       │   ├── schemas.py      # Data contracts
 │       │   ├── prompt_templates.py
-│       │   ├── notifier.py     # 预警推送
+│       │   ├── notifier/       # Alert push (package)
+│       │   │   ├── __init__.py
+│       │   │   ├── base.py     # NotifierBase abstract class
+│       │   │   ├── registry.py # Push dispatcher
+│       │   │   ├── models.py  # Data models
+│       │   │   ├── channel_email.py
+│       │   │   ├── channel_wecom.py
+│       │   │   └── channel_feishu.py
 │       │   └── api.py
-│       └── crawler_service/     # 爬虫引擎
+│       └── crawler_service/     # Crawler engine
 ├── frontend/
 │   └── MiniApp/                 # uni-app (Vue 3)
+│       └── src/
+│           └── pages/
+│               ├── index/        # Dashboard
+│               ├── list/         # Opinion list / topic detail
+│               ├── chat/         # AI assistant
+│               ├── profile/      # Profile center
+│               └── settings/      # Monitor settings / push settings / model settings
 ├── scripts/
-│   └── rag/                     # 数据迁移脚本
-├── plans/                       # 方案文档
+│   └── rag/                     # Data migration scripts
+├── plans/                       # Planning documents
 └── .env
 ```
 
 ---
 
-## 更新日志
+## Changelog
 
-| 版本 | 内容 |
-|------|------|
-| v2.0 | 日志系统重构，按模块分目录存储，支持 text/json 双格式 |
-| v2.0 | 话题聚合，从单帖升级到话题簇级别，HDBSCAN + 并查集合并 |
-| v2.0 | 话题演化追踪，RAG 增强 + 风险演变路径展示 |
-| v1.0 | Pipeline 5阶段调度器，LangGraph Multi-Agent 架构 |
-| v1.0 | Vision Agent，多模态视觉证据提取 |
+| Version | Content |
+|---------|---------|
+| v2.1 | Multi-channel alert push: WeCom / Feishu / Email, independent risk level config |
+| v2.1 | Model settings page: default model fallback + per-agent independent config |
+| v2.0 | Logging system refactored, stored by module, text/json dual format |
+| v2.0 | Topic aggregation, upgraded from post-level to topic cluster level |
+| v2.0 | Topic evolution tracking, RAG enhancement + risk evolution path display |
+| v1.0 | Pipeline 5-stage dispatcher, LangGraph Multi-Agent architecture |
+| v1.0 | Vision Agent, multimodal visual evidence extraction |

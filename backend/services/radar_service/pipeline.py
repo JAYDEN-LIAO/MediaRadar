@@ -724,13 +724,18 @@ class RadarPipeline:
             if result["status"] == "alert" and self.config.alert_negative:
                 from .notifier import send_alert
                 urls = [p.get("url", "") for p in cluster.posts if p.get("url")]
+                rl = result["risk_level"]
+                risk_class_map = {1: "low", 2: "low", 3: "medium", 4: "high", 5: "critical"}
+                risk_class = risk_class_map.get(rl, "neutral")
                 send_alert(
                     keyword=cluster.keyword,
                     platform=self.config.platform,
-                    risk_level=result["risk_level"],
+                    risk_level=rl,
+                    risk_class=risk_class,
                     core_issue=cluster.topic_name,
                     report=result["report"],
-                    urls=urls
+                    urls=urls,
+                    post_count=len(cluster.posts),
                 )
 
             # 收集后台索引任务（asyncio.Task 替代 daemon thread）

@@ -174,20 +174,21 @@ async def run_crawler_for_platform_async(platform: str):
         return
 
     import platform as sys_platform
+    creation_flags = 0
     if sys_platform.system() == "Windows":
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        startupinfo.wShowWindow = subprocess.SW_HIDE
-    else:
-        startupinfo = None
+        creation_flags = subprocess.CREATE_NO_WINDOW
 
-    cmd = f'"{VENV_PYTHON}" main.py --platform {platform} --type search --save_data_option sqlite --headless no --keywords {keywords_str}'
-    process = await asyncio.create_subprocess_shell(
-        cmd,
+    process = await asyncio.create_subprocess_exec(
+        VENV_PYTHON, "main.py",
+        "--platform", platform,
+        "--type", "search",
+        "--save_data_option", "sqlite",
+        "--headless", "no",
+        "--keywords", keywords_str,
         cwd=CRAWLER_DIR,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
-        startupinfo=startupinfo,
+        creationflags=creation_flags,
     )
     try:
         stdout_data, stderr_data = await asyncio.wait_for(process.communicate(), timeout=600)
@@ -200,7 +201,7 @@ async def run_crawler_for_platform_async(platform: str):
             for line in err_output.splitlines()[:30]:
                 logger.warning(f"[Crawler stderr] {line}")
         if not output and not err_output:
-            logger.warning(f"[Async Crawler] No output from crawler subprocess, returncode={process.returncode}")
+            logger.warning(f"[Async Crawler] No output, returncode={process.returncode}")
         logger.info(f"[Async Crawler] {platform.upper()} done, returncode={process.returncode}")
     except asyncio.TimeoutError:
         process.kill()
@@ -303,17 +304,17 @@ def api_start_task(background_tasks):
     reload_config()
     current_keyword = "、".join(MONITOR_KEYWORDS)
 
-    async def _run_in_background():
+    def _run_in_background():
+        radar_status.set_running_sync(f"正在监控: {current_keyword}")
         try:
-            await radar_status.set_running(f"正在监控: {current_keyword}")
-            new_count = await job_async()
+            new_count = job()
             radar_status.last_new_count = new_count if new_count else 0
             radar_status.last_run_time = time.strftime('%Y-%m-%d %H:%M:%S')
         except Exception as e:
             logger.error(f"Background task exception: {e}")
             radar_status.last_new_count = 0
         finally:
-            await radar_status.set_idle()
+            radar_status.set_idle_sync()
 
     background_tasks.add_task(_run_in_background)
     return True, "扫描任务已启动"
