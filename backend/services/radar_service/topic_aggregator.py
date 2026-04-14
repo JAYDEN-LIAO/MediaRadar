@@ -78,6 +78,25 @@ class TopicAggregator:
 
         risk_level = analysis_result.get("risk_level", 2)
 
+        # ── alert_recommendation：AI 最终决策结论，由 analysis_result["status"] 决定 ──
+        # 规则：
+        #   status == "alert"  → high（需预警）
+        #   status == "safe"    → 根据 risk_level 降级
+        #       risk_level >= 4  → medium
+        #       risk_level == 3  → low
+        #       risk_level <= 2  → none
+        status = analysis_result.get("status", "safe")
+        if status == "alert":
+            alert_recommendation = "high"
+        else:
+            # safe 状态：初筛可能 high，但 AI 判定无需上报，降级处理
+            if risk_level >= 4:
+                alert_recommendation = "medium"
+            elif risk_level == 3:
+                alert_recommendation = "low"
+            else:
+                alert_recommendation = "none"
+
         # ── sentiment：优先取 LLM 返回值，避免 reviewer 驳回后被错误映射 ──
         # analyst_result 中有 sentiment，safe 分支的 sentiment 被标准化为 "Neutral"
         llm_sentiment = analysis_result.get("sentiment", "").lower() if analysis_result.get("sentiment") else ""
@@ -116,6 +135,7 @@ class TopicAggregator:
             cluster_summary=cluster_summary,
             risk_level=risk_level,
             risk_class=risk_class,
+            alert_recommendation=alert_recommendation,
             core_issue=core_issue,
             report=report,
             platforms=platforms_cn,
@@ -133,6 +153,7 @@ class TopicAggregator:
             f"topic={cluster.topic_name[:20]}, "
             f"posts={len(cluster.posts)}, "
             f"risk={risk_level} ({risk_class}), "
+            f"alert_recommendation={alert_recommendation}, "
             f"sentiment={llm_sentiment}, "
             f"core_issue={core_issue[:20] if core_issue else '(空)'}, "
             f"is_new={is_new}"

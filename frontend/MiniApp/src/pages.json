@@ -55,26 +55,26 @@
       {
         "pagePath": "pages/index/index",
         "text": "首页",
-        "iconPath": "static/logo.png",
-        "selectedIconPath": "static/logo.png"
+        "iconPath": "static/home.png",
+        "selectedIconPath": "static/home_selected.png"
       },
       {
         "pagePath": "pages/list/list",
         "text": "列表",
-        "iconPath": "static/logo.png",
-        "selectedIconPath": "static/logo.png"
+        "iconPath": "static/list.png",
+        "selectedIconPath": "static/list_selected.png"
       },
       {
         "pagePath": "pages/settings/settings",
         "text": "设置",
-        "iconPath": "static/logo.png",
-        "selectedIconPath": "static/logo.png"
+        "iconPath": "static/settings.png",
+        "selectedIconPath": "static/settings_selected.png"
       },
       {
         "pagePath": "pages/profile/profile",
         "text": "我的",
-        "iconPath": "static/logo.png",
-        "selectedIconPath": "static/logo.png"
+        "iconPath": "static/profile.png",
+        "selectedIconPath": "static/profile_selected.png"
       }
     ]
   }

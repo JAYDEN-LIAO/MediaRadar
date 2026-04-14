@@ -302,7 +302,7 @@ const getSignalClass = (signal) => {
 }
 
 const getSignalText = (signal) => {
-  const map = { 'escalating': '⚠️ 风险升级', 'stable': '→ 趋于稳定', 'deescalating': '↓ 风险缓和' }
+  const map = { 'escalating': '风险升级', 'stable': '趋于稳定', 'deescalating': '风险缓和' }
   return map[signal] || '未知'
 }
 
@@ -384,7 +384,7 @@ onMounted(() => {
   margin-bottom: 16rpx;
   box-shadow: 0 1rpx 3rpx rgba(0,0,0,0.04);
   position: relative;
-  border-left: 6rpx solid #667eea;
+  border-left: 4rpx solid #E2E8F0;
 }
 
 .topic-card-header {
@@ -420,10 +420,10 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
-.signal-red { background-color: #fff2f0; color: #ff4d4f; }
-.signal-yellow { background-color: #fffbe6; color: #faad14; }
-.signal-green { background-color: #f6ffed; color: #52c41a; }
-.signal-gray { background-color: #f5f5f5; color: #999; }
+.signal-red { background-color: #FEF2F2; color: #DC2626; }
+.signal-yellow { background-color: #FFFBEB; color: #D97706; }
+.signal-green { background-color: #F0FDF4; color: #059669; }
+.signal-gray { background-color: #F1F5F9; color: #94A3B8; }
 
 .topic-summary {
   font-size: 26rpx;
@@ -480,7 +480,7 @@ onMounted(() => {
 .list-item-meta { display: flex; align-items: center; font-size: 24rpx; color: #94A3B8; }
 .tag { background-color: #F1F5F9; padding: 4rpx 10rpx; border-radius: 4rpx; font-size: 22rpx; }
 .dot-sep { margin: 0 10rpx; }
-.core-issue { font-weight: 600; color: #667eea; font-size: 24rpx; }
+.core-issue { font-weight: 600; color: #0F172A; font-size: 24rpx; }
 
 .status-action { font-size: 26rpx; font-weight: 500; color: #0891B2; }
 .status-action.processed { color: #94A3B8; }

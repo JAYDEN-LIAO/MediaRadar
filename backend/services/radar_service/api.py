@@ -158,14 +158,17 @@ def get_topic_list(
     for r in rows:
         risk_level = r.get("risk_level", 2)
         risk_class = r.get("risk_class", "neutral")
+        alert_rec = r.get("alert_recommendation", "none")
 
-        # 风险显示文本
-        if risk_class == "negative":
+        # 风险显示文本：以 AI 最终决策 alert_recommendation 为准
+        if alert_rec == "high":
             risk_text = "高风险"
-        elif risk_class == "positive":
+        elif alert_rec == "medium":
+            risk_text = "中风险"
+        elif alert_rec == "low":
             risk_text = "低风险"
         else:
-            risk_text = "中风险"
+            risk_text = "待观察"
 
         # 摘要截断
         summary = r.get("cluster_summary", "") or r.get("report", "") or ""
@@ -179,6 +182,7 @@ def get_topic_list(
             "cluster_summary": summary,
             "risk_level": risk_level,
             "risk_class": risk_class,
+            "alert_recommendation": alert_rec,
             "risk_text": risk_text,
             "core_issue": r.get("core_issue", "无异常"),
             "sentiment": risk_class_map.get(risk_class, "中性"),
@@ -256,15 +260,19 @@ def get_topic_detail(topic_id: str):
     except Exception as e:
         logger.warning(f"⚠️ [TopicDetail] 获取演化时间线失败: {e}")
 
-    # 话题整体风险
+    # 话题整体风险（以 AI 最终决策 alert_recommendation 为准）
     risk_level = summary.get("risk_level", 2)
     risk_class = summary.get("risk_class", "neutral")
-    if risk_class == "negative":
+    alert_rec = summary.get("alert_recommendation", "none")
+
+    if alert_rec == "high":
         risk_text = "高风险"
-    elif risk_class == "positive":
+    elif alert_rec == "medium":
+        risk_text = "中风险"
+    elif alert_rec == "low":
         risk_text = "低风险"
     else:
-        risk_text = "中风险"
+        risk_text = "待观察"
 
     return {
         "code": 200,
@@ -276,6 +284,7 @@ def get_topic_detail(topic_id: str):
             "report": summary.get("report", ""),
             "risk_level": risk_level,
             "risk_class": risk_class,
+            "alert_recommendation": alert_rec,
             "risk_text": risk_text,
             "core_issue": summary.get("core_issue", "无异常"),
             "sentiment": risk_class_map.get(risk_class, "中性"),

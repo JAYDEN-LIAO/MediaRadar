@@ -58,6 +58,7 @@ def init_radar_db():
                 cluster_summary TEXT,
                 risk_level INTEGER DEFAULT 2,
                 risk_class TEXT DEFAULT 'neutral',
+                alert_recommendation TEXT DEFAULT 'none',
                 core_issue TEXT,
                 report TEXT,
                 first_seen TEXT,
@@ -95,6 +96,12 @@ def init_radar_db():
 
         try:
             cursor.execute("ALTER TABLE ai_results ADD COLUMN sentiment TEXT DEFAULT 'Neutral'")
+        except sqlite3.OperationalError:
+            pass
+
+        # 话题表新增字段（存量数据库迁移）
+        try:
+            cursor.execute("ALTER TABLE topic_summary ADD COLUMN alert_recommendation TEXT DEFAULT 'none'")
         except sqlite3.OperationalError:
             pass
 
@@ -338,6 +345,7 @@ def create_or_update_topic_summary(
     cluster_summary: str = "",
     risk_level: int = 2,
     risk_class: str = "neutral",
+    alert_recommendation: str = "none",
     core_issue: str = "",
     report: str = "",
     platforms: list = None,
@@ -347,6 +355,12 @@ def create_or_update_topic_summary(
     创建或更新话题聚合记录。
     如果话题已存在（topic_id 相同），则合并（更新 post_count、scan_count、last_seen 等）。
     返回 True 表示新建，False 表示更新。
+
+    alert_recommendation: AI 最终决策结论，取值范围:
+        - "high":     高风险预警（需处理）
+        - "medium":   中风险（待观察）
+        - "low":      低风险（忽略）
+        - "none":     无风险（无需处理）
     """
     if platforms is None:
         platforms = []
@@ -372,6 +386,7 @@ def create_or_update_topic_summary(
                         WHEN ? > risk_level THEN ?
                         ELSE risk_class
                     END,
+                    alert_recommendation = ?,
                     core_issue = COALESCE(NULLIF(?, ''), core_issue),
                     report = COALESCE(NULLIF(?, ''), report),
                     platforms = ?,
@@ -387,6 +402,7 @@ def create_or_update_topic_summary(
                 WHERE topic_id = ?
             ''', (
                 cluster_summary, risk_level, risk_level, risk_class,
+                alert_recommendation,
                 core_issue, report,
                 platforms_json,
                 risk_level, sentiment,
@@ -399,11 +415,11 @@ def create_or_update_topic_summary(
             cursor.execute('''
                 INSERT INTO topic_summary
                 (topic_id, keyword, topic_name, cluster_summary, risk_level, risk_class,
-                 core_issue, report, platforms, sentiment, first_seen, last_seen, post_count)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 alert_recommendation, core_issue, report, platforms, sentiment, first_seen, last_seen, post_count)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 topic_id, keyword, topic_name, cluster_summary, risk_level, risk_class,
-                core_issue, report, platforms_json, sentiment, now, now, 0
+                alert_recommendation, core_issue, report, platforms_json, sentiment, now, now, 0
             ))
             conn.commit()
             return True
@@ -492,6 +508,9 @@ def get_topic_summary_list(
         # 演化信号（暂无，从 topic_tracker 获取）
         d["evolution_signal"] = "unknown"
 
+        # alert_recommendation 字段（默认 none，兼容旧数据）
+        d["alert_recommendation"] = d.get("alert_recommendation", "none")
+
         results.append(d)
 
     return results
@@ -517,6 +536,9 @@ def get_topic_summary_by_id(topic_id: str) -> dict:
     risk_class = d.get("risk_class", "neutral")
     sentiment_map = {"negative": "负面", "positive": "正面", "neutral": "中性"}
     d["sentiment"] = sentiment_map.get(risk_class, "中性")
+
+    # alert_recommendation 字段（默认 none，兼容旧数据）
+    d["alert_recommendation"] = d.get("alert_recommendation", "none")
 
     return d
 

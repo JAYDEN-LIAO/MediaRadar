@@ -22,7 +22,7 @@
 
       <!-- AI 话题摘要卡片 -->
       <view class="detail-card ai-card" v-if="topicData.cluster_summary">
-        <view class="card-label">📊 AI 话题摘要</view>
+        <view class="card-label">AI 话题摘要</view>
         <text class="ai-summary-text" user-select="true">{{ topicData.cluster_summary }}</text>
       </view>
 
@@ -51,8 +51,8 @@
         </view>
         <view class="info-row">
           <view class="info-label">预警级别</view>
-          <view class="info-value" :class="topicData.risk_class === 'negative' ? 'negative' : 'unprocessed'">
-            {{ topicData.risk_class === 'negative' ? '🚨 高风险预警' : '✅ 常规提示' }}
+          <view class="info-value" :class="topicData.alert_recommendation === 'high' ? 'negative' : 'unprocessed'">
+            {{ topicData.alert_recommendation === 'high' ? '高风险预警' : '常规提示' }}
           </view>
         </view>
         <view class="info-row">
@@ -73,7 +73,7 @@
       <view class="detail-card evolution-card"
         v-if="topicData.evolution_timeline && topicData.evolution_timeline.length">
         <view class="evolution-header">
-          <text class="card-label">📈 话题演化追踪</text>
+          <text class="card-label">话题演化追踪</text>
           <view class="risk-path" v-if="riskPath">
             <text class="path-label">风险演变：</text>
             <text class="path-value">{{ riskPath }}</text>
@@ -242,7 +242,7 @@ const getSignalClass = (signal) => {
 }
 
 const getSignalText = (signal) => {
-  const map = { 'escalating': '⚠️ 风险升级', 'stable': '→ 趋于稳定', 'deescalating': '↓ 风险缓和' }
+  const map = { 'escalating': '风险升级', 'stable': '趋于稳定', 'deescalating': '风险缓和' }
   return map[signal] || '未知'
 }
 
@@ -291,11 +291,11 @@ const riskPath = computed(() => {
 /* 话题头部卡片 */
 .topic-header-card {
   background-color: #fff;
-  border-radius: 24rpx;
-  padding: 32rpx;
-  margin-bottom: 24rpx;
-  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.03);
-  border-left: 6rpx solid #667eea;
+  border-radius: 16rpx;
+  padding: 28rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 1rpx 3rpx rgba(0,0,0,0.04);
+  border-left: 4rpx solid #E2E8F0;
 }
 
 .topic-title-row {
@@ -323,18 +323,18 @@ const riskPath = computed(() => {
   flex-shrink: 0;
 }
 
-.signal-red { background-color: #fff2f0; color: #ff4d4f; }
-.signal-yellow { background-color: #fffbe6; color: #faad14; }
-.signal-green { background-color: #f6ffed; color: #52c41a; }
-.signal-gray { background-color: #f5f5f5; color: #999; }
+.signal-red { background-color: #FEF2F2; color: #DC2626; }
+.signal-yellow { background-color: #FFFBEB; color: #D97706; }
+.signal-green { background-color: #F0FDF4; color: #059669; }
+.signal-gray { background-color: #F1F5F9; color: #94A3B8; }
 
 /* 统一卡片 */
 .detail-card {
   background-color: #fff;
-  border-radius: 24rpx;
-  padding: 32rpx;
-  margin-bottom: 24rpx;
-  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.03);
+  border-radius: 16rpx;
+  padding: 28rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 1rpx 3rpx rgba(0,0,0,0.04);
 }
 
 .card-label {
@@ -345,7 +345,7 @@ const riskPath = computed(() => {
 }
 
 /* AI 汇总卡片 */
-.ai-card { border-left: 6rpx solid #667eea; }
+.ai-card { border-left: 4rpx solid #E2E8F0; }
 .ai-summary-text {
   font-size: 28rpx; line-height: 1.8; color: #334155;
   display: block; white-space: pre-wrap; word-break: break-all;
@@ -363,7 +363,7 @@ const riskPath = computed(() => {
 .info-card .info-row:first-child { padding-top: 0; }
 .info-label { font-size: 28rpx; color: #999; }
 .info-value { font-size: 28rpx; color: #333; font-weight: 500; }
-.keyword-hl { color: #667eea; font-weight: bold; }
+.keyword-hl { color: #0F172A; font-weight: 600; }
 .negative { color: #ff4d4f; }
 .unprocessed { color: #faad14; }
 
@@ -384,7 +384,7 @@ const riskPath = computed(() => {
 .plat-badge.tieba { background-color: #eef4ff; color: #3388FF; }
 
 /* 演化卡片 */
-.evolution-card { border-left: 6rpx solid #667eea; }
+.evolution-card { border-left: 4rpx solid #E2E8F0; }
 
 .evolution-header {
   margin-bottom: 20rpx;
@@ -400,7 +400,7 @@ const riskPath = computed(() => {
   border-radius: 12rpx;
 }
 .path-label { font-size: 24rpx; color: #999; }
-.path-value { font-size: 28rpx; font-weight: 700; color: #667eea; letter-spacing: 2rpx; }
+.path-value { font-size: 28rpx; font-weight: 700; color: #0F172A; letter-spacing: 2rpx; }
 
 /* 时间线 */
 .timeline { position: relative; padding-left: 32rpx; }
@@ -411,7 +411,7 @@ const riskPath = computed(() => {
 
 .timeline-item { position: relative; padding-bottom: 32rpx; padding-left: 24rpx; }
 .timeline-item:last-child { padding-bottom: 0; }
-.timeline-item.is-current .timeline-dot { background-color: #667eea; width: 16rpx; height: 16rpx; margin-left: -2rpx; }
+.timeline-item.is-current .timeline-dot { background-color: #0F172A; width: 16rpx; height: 16rpx; margin-left: -2rpx; }
 
 .timeline-dot {
   position: absolute; left: -28rpx; top: 8rpx;
@@ -426,7 +426,7 @@ const riskPath = computed(() => {
 .risk-high { color: #ff4d4f; }
 .risk-medium { color: #faad14; }
 .risk-low { color: #52c41a; }
-.timeline-current-tag { font-size: 20rpx; background-color: #667eea; color: #fff; padding: 2rpx 8rpx; border-radius: 8rpx; }
+.timeline-current-tag { font-size: 20rpx; background-color: #0F172A; color: #fff; padding: 2rpx 8rpx; border-radius: 8rpx; }
 .timeline-issue { display: block; font-size: 28rpx; color: #333; font-weight: 500; margin-bottom: 6rpx; }
 .timeline-platforms { font-size: 24rpx; color: #999; }
 
@@ -516,9 +516,9 @@ const riskPath = computed(() => {
 }
 .detail-btn:active { opacity: 0.8; }
 .detail-btn.primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #fff; box-shadow: 0 8rpx 20rpx rgba(102, 126, 234, 0.3);
+  background-color: #0F172A;
+  color: #fff;
 }
-.detail-btn.primary.disabled { background: #e8e8e8; color: #999; box-shadow: none; pointer-events: none; }
-.detail-btn.secondary { background-color: #fff; color: #667eea; border: 2rpx solid #667eea; }
+.detail-btn.primary.disabled { background-color: #E2E8F0; color: #94A3B8; pointer-events: none; }
+.detail-btn.secondary { background-color: #fff; color: #0F172A; border: 1rpx solid #E2E8F0; }
 </style>

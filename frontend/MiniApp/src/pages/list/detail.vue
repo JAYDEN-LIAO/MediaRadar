@@ -8,7 +8,7 @@
     <scroll-view scroll-y class="content">
       <view class="detail-card source-card">
         <view class="platform-info">
-          <text class="platform-icon" :class="itemData.platform">{{ getPlatformEmoji(itemData.platform) }}</text>
+          <view class="platform-dot" :class="itemData.platform"></view>
           <text class="name">{{ getPlatformName(itemData.platform) }}</text>
         </view>
         <view class="sentiment-tag" :class="itemData.riskClass">{{ itemData.riskText }}</view>
@@ -51,7 +51,7 @@
         <view class="info-row">
           <view class="info-label">预警级别</view>
           <view class="info-value" :class="itemData.riskClass === 'negative' ? 'negative' : 'unprocessed'">
-            {{ itemData.riskClass === 'negative' ? '🚨 高风险预警' : '✅ 常规提示' }}
+            {{ itemData.riskClass === 'negative' ? '高风险预警' : '常规提示' }}
           </view>
         </view>
       </view>
@@ -89,12 +89,6 @@ onLoad((options) => {
 })
 
 const goBack = () => uni.navigateBack()
-
-// 完善的平台图标字典（对接你 list.vue 的设定）
-const getPlatformEmoji = (p) => {
-  const map = { 'wb': '📘', 'xhs': '📕', 'dy': '🎵', 'bili': '📺', 'ks': '📷', 'toutiao': '📰', 'zhihu': '🎓', 'tieba': '💬' }
-  return map[p] || '🌐'
-}
 
 const getPlatformName = (p) => {
   const map = { 'wb': '微博', 'xhs': '小红书', 'dy': '抖音', 'bili': 'B站', 'ks': '快手', 'toutiao': '今日头条', 'zhihu': '知乎', 'tieba': '贴吧' }
@@ -147,7 +141,7 @@ const markAsProcessed = () => {
 .bottom-spacer { height: 60rpx; }
 
 /* 统一卡片基础样式：大圆角，柔和阴影 */
-.detail-card { background-color: #fff; border-radius: 24rpx; padding: 32rpx; margin-bottom: 24rpx; box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.03); }
+.detail-card { background-color: #fff; border-radius: 16rpx; padding: 28rpx; margin-bottom: 20rpx; box-shadow: 0 1rpx 3rpx rgba(0,0,0,0.04); }
 
 /* 第一部分：来源与情感 */
 .source-card { display: flex; align-items: center; justify-content: space-between; }
@@ -172,24 +166,24 @@ const markAsProcessed = () => {
 
 .content-card .tags { margin-top: 32rpx; padding-top: 24rpx; border-top: 2rpx dashed #eee; }
 .content-card .tag { display: inline-flex; align-items: center; padding: 10rpx 24rpx; background-color: #f5f5f5; border-radius: 30rpx; font-size: 26rpx; color: #666; font-weight: 500;}
-.content-card .tag .hash { color: #667eea; margin-right: 6rpx; font-weight: bold;}
+.content-card .tag .hash { color: #64748B; margin-right: 6rpx; font-weight: bold;}
 
 /* 第三部分：AI 分析信息 */
 .info-card .info-row { display: flex; justify-content: space-between; align-items: center; padding: 24rpx 0; border-bottom: 2rpx solid #fafafa; }
 .info-card .info-row:last-child { border-bottom: none; padding-bottom: 0;}
 .info-card .info-row:first-child { padding-top: 0;}
-.info-card .info-label { font-size: 28rpx; color: #999; }
-.info-card .info-value { font-size: 28rpx; color: #333; font-weight: 500;}
-.info-card .keyword-hl { color: #667eea; font-weight: bold;}
-.info-card .info-value.negative { color: #ff4d4f; }
-.info-card .info-value.unprocessed { color: #faad14; }
+.info-card .info-label { font-size: 28rpx; color: #94A3B8; }
+.info-card .info-value { font-size: 28rpx; color: #0F172A; font-weight: 500;}
+.info-card .keyword-hl { color: #0F172A; font-weight: 600;}
+.info-card .info-value.negative { color: #DC2626; }
+.info-card .info-value.unprocessed { color: #D97706; }
 
 /* 底部操作区 */
 .detail-actions { display: flex; gap: 24rpx; margin-top: 16rpx; padding-bottom: 20rpx;}
 .detail-btn { flex: 1; padding: 26rpx; border-radius: 20rpx; font-size: 30rpx; font-weight: 600; text-align: center; transition: opacity 0.2s;}
 .detail-btn:active { opacity: 0.8; }
-.detail-btn.primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; box-shadow: 0 8rpx 20rpx rgba(102, 126, 234, 0.3);}
-.detail-btn.primary.disabled { background: #e8e8e8; color: #999; box-shadow: none; pointer-events: none;}
-.detail-btn.secondary { background-color: #fff; color: #667eea; border: 2rpx solid #667eea; }
+.detail-btn.primary { background-color: #0F172A; color: #fff; }
+.detail-btn.primary.disabled { background-color: #E2E8F0; color: #94A3B8; pointer-events: none; }
+.detail-btn.secondary { background-color: #fff; color: #0F172A; border: 1rpx solid #E2E8F0; }
 
 </style>

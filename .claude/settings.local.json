@@ -91,7 +91,12 @@
       "Bash(../..//venv/Scripts/python.exe main.py --platform xhs --type search --save_data_option sqlite --headless no --keywords 理想)",
       "Bash(D:/JAYDEN/develop/work/MediaRadar/venv/Scripts/python.exe main.py --platform xhs --type search --save_data_option sqlite --headless no --keywords 理想)",
       "Bash(rm:*)",
-      "Bash(node --check frontend/MiniApp/src/utils/api.js)"
+      "Bash(node --check frontend/MiniApp/src/utils/api.js)",
+      "Bash(mkdir -p \"D:\\\\JAYDEN\\\\develop\\\\work\\\\MediaRadar\\\\frontend\\\\MiniApp\\\\static\")",
+      "Bash(ls -la *.png)",
+      "Bash(xxd)",
+      "WebFetch(domain:api.iconify.design)",
+      "Bash(ls -la *.svg)"
     ]
   },
   "enableAllProjectMcpServers": true,
