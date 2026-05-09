@@ -86,7 +86,33 @@
               <text class="title">预警与调度</text>
             </view>
           </view>
-          
+
+          <view class="setting-row">
+            <view class="row-left">
+              <text class="row-title">自动监控频率</text>
+            </view>
+            <picker
+              mode="selector"
+              :range="freqOptions"
+              range-key="label"
+              @change="onFreqChange"
+            >
+              <view class="picker-value">
+                {{ freqOptions.find(opt => opt.val === settings.monitor_frequency)?.label || '请选择' }} ▾
+              </view>
+            </picker>
+          </view>
+
+          <view class="setting-row">
+            <view class="row-left">
+              <text class="row-title" :class="{ 'title-disabled': settings.monitor_frequency < 0 }">每日首次扫描时间</text>
+              <text class="row-desc" :class="{ 'desc-disabled': settings.monitor_frequency < 0 }">从此时刻开始按频率重复执行监控</text>
+            </view>
+            <picker mode="time" :value="settings.start_time" :disabled="settings.monitor_frequency < 0" @change="e => settings.start_time = e.detail.value">
+              <view class="picker-value" :class="{ 'picker-value-disabled': settings.monitor_frequency < 0 }">{{ settings.start_time }} ▾</view>
+            </picker>
+          </view>
+
           <view class="setting-row">
             <view class="row-left">
               <text class="row-title">负面舆情立即预警</text>
@@ -94,7 +120,7 @@
             </view>
             <switch :checked="settings.alert_negative" @change="e => settings.alert_negative = e.detail.value" color="#EF4444" style="transform:scale(0.8)"/>
           </view>
-          
+
           <view class="setting-row">
             <view class="row-left">
               <text class="row-title">每日简报推送</text>
@@ -102,29 +128,13 @@
             </view>
             <switch :checked="settings.push_summary" @change="e => settings.push_summary = e.detail.value" color="#10B981" style="transform:scale(0.8)"/>
           </view>
-          
-          <view class="setting-row" v-if="settings.push_summary">
-            <view class="row-left">
-              <text class="row-title">简报推送时间</text>
-            </view>
-            <picker mode="time" :value="settings.push_time" @change="e => settings.push_time = e.detail.value">
-              <view class="picker-value">{{ settings.push_time }} ▾</view>
-            </picker>
-          </view>
-          
+
           <view class="setting-row" style="border-bottom: none;">
             <view class="row-left">
-              <text class="row-title">自动监控频率</text>
+              <text class="row-title" :class="{ 'title-disabled': !settings.push_summary }">简报推送时间</text>
             </view>
-            <picker 
-              mode="selector" 
-              :range="freqOptions" 
-              range-key="label" 
-              @change="onFreqChange"
-            >
-              <view class="picker-value">
-                {{ freqOptions.find(opt => opt.val === settings.monitor_frequency)?.label || '请选择' }} ▾
-              </view>
+            <picker mode="time" :value="settings.push_time" :disabled="!settings.push_summary" @change="e => settings.push_time = e.detail.value">
+              <view class="picker-value" :class="{ 'picker-value-disabled': !settings.push_summary }">{{ settings.push_time }} ▾</view>
             </picker>
           </view>
         </view>
@@ -146,7 +156,8 @@ const settings = ref({
   push_summary: true,
   push_time: '18:00',
   alert_negative: true,
-  monitor_frequency: 1.0
+  monitor_frequency: 1.0,
+  start_time: '08:00'
 })
 
 const activeKeywords = ref([])
@@ -161,6 +172,8 @@ const platformOptions = [
 ]
 
 const freqOptions = [
+  { label: '已关闭', val: -1 },
+  { label: '每 10 分钟', val: 0.167 },
   { label: '每 0.5 小时', val: 0.5 },
   { label: '每 1 小时', val: 1.0 },
   { label: '每 1.5 小时', val: 1.5 },
@@ -175,7 +188,7 @@ let isLoaded = false
 let saveTimer = null
 
 const triggerAutoSave = () => {
-  if (!isLoaded) return
+  if (!isLoaded) retur
   if (saveTimer) clearTimeout(saveTimer)
   
   saveTimer = setTimeout(() => {
@@ -186,8 +199,7 @@ const triggerAutoSave = () => {
 const executeSaveSilent = () => {
   const activeCount = activeKeywords.value.filter(k => k.active).length
   if (activeCount === 0) {
-    uni.showToast({ title: '警告：请至少保留一个开启的监控词', icon: 'none' })
-    return
+    uni.showToast({ title: '警告：当前无监控中的关键词', icon: 'none', duration: 2500 })
   }
   if (settings.value.platforms.length === 0) {
     uni.showToast({ title: '警告：至少选择一个抓取平台', icon: 'none' })
@@ -382,9 +394,12 @@ page { background-color: #F8FAFC; }
 
 .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 28rpx 0; border-bottom: 1px solid #F1F5F9; }
 .row-left { display: flex; flex-direction: column; gap: 6rpx; }
-.row-title { font-size: 28rpx; font-weight: 500; color: #0F172A; }
+.row-title { font-size: 28rpx; font-weight: 500; color: #0F172A; transition: color 0.2s; }
+.title-disabled { color: #CBD5E1; }
+.desc-disabled { color: #CBD5E1; }
+.picker-value { font-size: 28rpx; color: #0891B2; font-weight: 500; background-color: rgba(8, 145, 178, 0.08); padding: 12rpx 24rpx; border-radius: 12rpx; transition: all 0.2s; }
 .row-desc { font-size: 24rpx; color: #94A3B8; }
-.picker-value { font-size: 28rpx; color: #0891B2; font-weight: 500; background-color: rgba(8, 145, 178, 0.08); padding: 12rpx 24rpx; border-radius: 12rpx; }
+.picker-value-disabled { color: #94A3B8; background-color: #F1F5F9; }
 
 .page-spacer { height: 40rpx; }
 </style>

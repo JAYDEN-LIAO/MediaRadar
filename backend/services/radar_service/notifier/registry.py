@@ -72,6 +72,7 @@ class NotifierRegistry:
             report="若您收到此消息，说明推送通道配置正确，无需任何操作。",
             urls=["https://www.example.com"],
             post_count=1,
+            email_html="<p>这是一封<strong>测试邮件</strong>，用于验证推送通道是否正常配置。</p>",
         )
         # 临时创建一个 notifier 实例用于测试
         cls_map = {

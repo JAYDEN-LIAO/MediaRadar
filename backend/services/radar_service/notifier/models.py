@@ -21,6 +21,7 @@ class AlertPayload(BaseModel):
     urls: list[str] = Field(default_factory=list)
     topic_id: str = ""
     post_count: int = 1
+    email_html: str = ""  # LLM 生成的 HTML 邮件内容，为空则用 channel_email 内部生成
 
 
 # ---- 各通道配置模型 ----

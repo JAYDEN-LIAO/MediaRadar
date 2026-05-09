@@ -284,6 +284,66 @@ python scripts/rag/migrate_topic_evolution.py
 
 ---
 
+## 调度系统
+
+系统使用 **APScheduler**（BackgroundScheduler）实现定时任务调度，包含两类任务：
+
+### 雷达扫描任务
+
+- 每天从 `start_time`（默认 08:00）开始，按 `monitor_frequency` 小时间隔重复执行
+- 所有频率（< 1h / ≥ 1h / 24h）均使用 `IntervalTrigger`
+- 全局 `asyncio.Lock`（`_scan_lock`）防止并发扫描
+- `misfire_grace_time=60` 秒 — 漏触发的工作在 60 秒内仍会补执行
+- 配置变更时调用 `reschedule_if_running()` 热重载调度
+- 设置 `monitor_frequency = -1` 可**暂停扫描**而不停止调度器（每日简报不受影响）
+
+### 每日简报任务
+
+- 由 `push_time`（默认 18:00）触发，受 `push_summary` 开关控制
+- 使用 `CronTrigger`（固定时间，非间隔）
+- 通过 `generate_daily_summary_html()` 生成 HTML 简报，发送至所有已启用推送通道
+- `push_summary` 或 `push_time` 变更时调用 `reschedule_daily_summary_if_running()` 热重载
+
+### 调度器控制 API
+
+| 端点 | 方法 | 描述 |
+|------|:----:|------|
+| `/api/scheduler/start` | POST | 启动调度器 |
+| `/api/scheduler/stop` | POST | 停止调度器 |
+| `/api/scheduler/status` | GET | 查询调度器状态（是否运行、下次执行时间、间隔、扫描中） |
+
+---
+
+## 邮件模板
+
+系统生成两种 HTML 邮件模板（均在 `push_generator.py` 中）：
+
+### 预警邮件模板 (`PUSH_HTML_TEMPLATE`)
+
+随高风险预警触发。特性：
+- 深色 Banner 表头，风险等级颜色编码
+- 统计行：平台 · 风险等级 · 帖子数量
+- 可折叠区块：核心问题 · 预警简报 · 溯源链接
+- LLM 结构化数据提取增强（`generate_push_data()`）
+- LLM 失败时通过 `render_push_html()` 回退到固定模板
+
+### 每日简报模板 (`DAILY_SUMMARY_TEMPLATE`)
+
+由每日简报任务触发。特性：
+- 统计行：总条数 · 高危条数 · 涉及平台数
+- 按关键词分块，最高风险等级作为块标签
+- 通过 `_generate_daily_summary_text()` 调用 LLM 生成 AI 总结
+- 数据从 `topic_summary` 表按关键词分组
+- 链接通过 `topic_posts` + `ai_results` 表关联查询
+
+两种模板共同特性：
+- Table 布局（邮件客户端兼容性）
+- 内联 CSS（无外部依赖）
+- 最大宽度 620px 响应式
+- 支持 `<details>` 可折叠区块（▼/▶ 指示器）
+
+---
+
 ## 日志系统
 
 日志按模块分目录存储，支持 `text` / `json` 双格式：

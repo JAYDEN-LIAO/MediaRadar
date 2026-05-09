@@ -196,6 +196,7 @@ import { getTopicList } from '../../utils/api.js'
 
 const dataList = ref([])
 const activeModal = ref(null)
+const allKeywords = ref([])
 
 const currentKeyword = ref('all')
 const currentPlatform = ref('all')
@@ -233,11 +234,7 @@ const selectFilter = (type, value) => {
 }
 
 const uniqueKeywords = computed(() => {
-  const keys = new Set()
-  dataList.value.forEach(item => {
-    if (item.keyword) keys.add(item.keyword)
-  })
-  return Array.from(keys)
+  return allKeywords.value
 })
 
 const filteredList = computed(() => {
@@ -312,8 +309,24 @@ const getPlatClass = (platName) => {
   return map[platName] || ''
 }
 
+const loadSettingsKeywords = () => {
+  uni.request({
+    url: 'http://127.0.0.1:8008/api/settings',
+    method: 'GET',
+    success: (res) => {
+      if (res.data && res.data.code === 200) {
+        const data = res.data.data
+        const active = (data.keywords || []).map(k => typeof k === 'string' ? k : k.text)
+        const inactive = (data.inactive_keywords || []).map(k => typeof k === 'string' ? k : k.text)
+        allKeywords.value = [...active, ...inactive]
+      }
+    }
+  })
+}
+
 onMounted(() => {
   fetchTopicList()
+  loadSettingsKeywords()
 })
 </script>
 

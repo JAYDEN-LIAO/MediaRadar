@@ -41,6 +41,34 @@ def start_task(background_tasks: BackgroundTasks):
     else:
         return {"code": 400, "msg": msg}
 
+
+# ============================================================
+# 定时调度器 API
+# ============================================================
+
+@router.post("/api/scheduler/start")
+def start_scheduler():
+    """启动定时调度器"""
+    from .scheduler import scheduler_start
+    success, msg = scheduler_start()
+    return {"code": 200, "msg": msg} if success else {"code": 400, "msg": msg}
+
+
+@router.post("/api/scheduler/stop")
+def stop_scheduler():
+    """停止定时调度器"""
+    from .scheduler import scheduler_stop
+    success, msg = scheduler_stop()
+    return {"code": 200, "msg": msg}
+
+
+@router.get("/api/scheduler/status")
+def get_scheduler_status():
+    """查询调度器状态"""
+    from .scheduler import scheduler_status
+    status = scheduler_status()
+    return {"code": 200, "data": status}
+
 @router.get("/api/radar_status", dependencies=[Security(verify_api_key)])
 def get_radar_status():
     return {"code": 200, "data": radar_status.get_status_dict()}
@@ -104,6 +132,7 @@ class SettingsRequest(BaseModel):
     push_time: str
     alert_negative: bool
     monitor_frequency: float
+    start_time: str = "08:00"
 
 @router.get("/api/settings")
 def api_get_settings():
@@ -113,6 +142,14 @@ def api_get_settings():
 def api_save_settings(req: SettingsRequest):
     save_system_settings(req.model_dump())
     reload_config()
+
+    try:
+        from .scheduler import reschedule_if_running, reschedule_daily_summary_if_running
+        reschedule_if_running(req.start_time, req.monitor_frequency)
+        reschedule_daily_summary_if_running()
+    except Exception:
+        pass
+
     return {"code": 200, "msg": "系统设置已更新并生效"}
 
 

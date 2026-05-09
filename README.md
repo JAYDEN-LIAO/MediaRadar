@@ -284,6 +284,66 @@ python scripts/rag/migrate_topic_evolution.py
 
 ---
 
+## Scheduling System
+
+The system uses **APScheduler** (BackgroundScheduler) for time-based task scheduling, with two types of scheduled jobs:
+
+### Radar Scanning Job
+
+- Runs at `start_time` (default 08:00) and repeats every `monitor_frequency` hours
+- Uses `IntervalTrigger` for all frequency ranges (< 1h / ≥ 1h / 24h)
+- Global `asyncio.Lock` (`_scan_lock`) prevents concurrent scans
+- `misfire_grace_time=60` seconds — missed jobs within 60s will still run
+- `reschedule_if_running()` hot-reloads the schedule when `start_time` or `monitor_frequency` changes
+- Set `monitor_frequency = -1` to **pause scanning** without stopping the scheduler (daily summary continues)
+
+### Daily Summary Job
+
+- Triggered by `push_time` (default 18:00), controlled by `push_summary` switch
+- Uses `CronTrigger` (fixed clock time, not interval)
+- Generates HTML digest via `generate_daily_summary_html()` and sends via all active push channels
+- `reschedule_daily_summary_if_running()` hot-reloads when `push_summary` or `push_time` changes
+
+### Scheduler Control API
+
+| Endpoint | Method | Description |
+|----------|:------:|-------------|
+| `/api/scheduler/start` | POST | Start the scheduler |
+| `/api/scheduler/stop` | POST | Stop the scheduler |
+| `/api/scheduler/status` | GET | Get scheduler status (active, next_run, interval, scan_in_progress) |
+
+---
+
+## Email Templates
+
+The system generates two types of HTML email templates (both in `push_generator.py`):
+
+### Alert Template (`PUSH_HTML_TEMPLATE`)
+
+Triggered per high-risk alert. Features:
+- Dark banner header with risk-level color coding
+- Stats row: platform · risk level · post count
+- Collapsible sections: Core Issue · Alert Report · Source Links
+- LLM-enhanced structured data extraction via `generate_push_data()`
+- Renders via `render_push_html()` with fallback if LLM fails
+
+### Daily Summary Template (`DAILY_SUMMARY_TEMPLATE`)
+
+Triggered by daily summary job. Features:
+- Statistics row: total count · high-risk count · platform count
+- Per-keyword blocks with highest risk badge
+- AI-generated summary via `_generate_daily_summary_text()` (calls LLM)
+- Grouped by keyword from `topic_summary` table
+- Links pulled from `topic_posts` + `ai_results` join
+
+Both templates:
+- Table-based layout (email client compatibility)
+- Inline CSS (no external dependencies)
+- Responsive max-width 620px
+- Support collapsible `<details>` elements with ▼/▶ indicators
+
+---
+
 ## Logging System
 
 Logs are stored by module subdirectory, supporting `text` / `json` dual format:

@@ -99,6 +99,11 @@ def init_radar_db():
         except sqlite3.OperationalError:
             pass
 
+        try:
+            cursor.execute("ALTER TABLE ai_results ADD COLUMN email_html TEXT")
+        except sqlite3.OperationalError:
+            pass
+
         # 话题表新增字段（存量数据库迁移）
         try:
             cursor.execute("ALTER TABLE topic_summary ADD COLUMN alert_recommendation TEXT DEFAULT 'none'")
@@ -320,7 +325,8 @@ def get_system_settings():
             "push_summary": True,
             "push_time": "18:00",
             "alert_negative": True,
-            "monitor_frequency": 1.0
+            "monitor_frequency": 1.0,
+            "start_time": "08:00",
         }
         save_system_settings(default_config)
         return default_config
@@ -332,6 +338,17 @@ def save_system_settings(config_dict):
             INSERT OR REPLACE INTO system_settings (id, config_json)
             VALUES (1, ?)
         ''', (json.dumps(config_dict),))
+
+
+def update_ai_result_email_html(post_id: str, html: str):
+    """更新 ai_results 的 email_html 字段（LLM 生成后回填）"""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE ai_results SET email_html = ? WHERE post_id = ?",
+            (html, post_id)
+        )
+        conn.commit()
 
 
 # ============================================================

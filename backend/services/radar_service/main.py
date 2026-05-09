@@ -298,6 +298,14 @@ def run_analysis_pipeline():
 
 
 def api_start_task(background_tasks):
+    # 检查调度器全局锁
+    try:
+        from .scheduler import _scan_lock
+        if _scan_lock.locked():
+            return False, "定时扫描任务正在运行中，请稍后再试"
+    except Exception:
+        pass
+
     if radar_status.is_running:
         return False, "扫描任务正在运行中，请勿重复启动"
 

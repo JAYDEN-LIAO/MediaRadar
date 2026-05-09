@@ -25,6 +25,8 @@ backend/
 │   │   ├── prompt_templates.py
 │   │   ├── api.py            # /api/radar_status, /api/start_task 等
 │   │   ├── db_manager.py     # SQLite 操作
+│   │   ├── scheduler.py      # APScheduler 定时调度器（扫描 + 每日简报）
+│   │   ├── push_generator.py # LLM 邮件内容生成（预警模板 + 每日简报模板）
 │   │   └── notifier/          # 预警推送（包）
 │   │       ├── __init__.py   # send_alert(), reload_registry(), test_channel()
 │   │       ├── base.py       # NotifierBase 抽象类
@@ -92,6 +94,9 @@ RadarPipeline (Pipeline 调度器)
 | `/api/llm/configs` | GET | 获取所有模型配置（含 DEFAULT 回退信息） |
 | `/api/llm/config/{agent}` | POST | 更新指定 Agent 模型配置 |
 | `/api/llm/test/{agent}` | POST | 测试指定 Agent 连通性 |
+| `/api/scheduler/start` | POST | 启动 APScheduler 调度器 |
+| `/api/scheduler/stop` | POST | 停止调度器 |
+| `/api/scheduler/status` | GET | 查询调度器状态（active/next_run/interval/scan_in_progress） |
 
 ## AI 助手（Agent Service）
 
@@ -142,3 +147,5 @@ AI 助手通过 Function Calling 拥有三个工具：
 7. **完整架构升级方案**: 见根目录 `update.md`
 8. **推送通道**: 企业微信/飞书/邮箱，`notifier/` 包使用相对导入，通过 `send_alert()` 触发
 9. **模型配置**: `update_llm_config()` 写入 `.env` 并立即更新内存 `settings`，避免重复 key
+10. **调度器**: `scheduler.py` 使用 APScheduler，扫描任务（IntervalTrigger）+ 每日简报任务（CronTrigger），配置变更时热重载
+11. **邮件模板**: `push_generator.py` 中两个 HTML 模板，PUSH_HTML_TEMPLATE（预警）/ DAILY_SUMMARY_TEMPLATE（每日简报），均支持 `<details>` 可折叠

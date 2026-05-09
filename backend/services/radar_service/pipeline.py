@@ -727,6 +727,28 @@ class RadarPipeline:
                 rl = result["risk_level"]
                 risk_class_map = {1: "low", 2: "low", 3: "medium", 4: "high", 5: "critical"}
                 risk_class = risk_class_map.get(rl, "neutral")
+                posts_summary = "\n".join(
+                    p.get("content", "")[:80] for p in cluster.posts[:3]
+                )
+                # 同步生成精美 HTML（固定模板），然后立即发送
+                email_html = ""
+                try:
+                    from .push_generator import generate_push_html
+                    email_html = await generate_push_html(
+                        keyword=cluster.keyword,
+                        platforms=self.config.platform,
+                        risk_level=rl,
+                        risk_class=risk_class,
+                        core_issue=cluster.topic_name,
+                        report=result["report"],
+                        post_count=len(cluster.posts),
+                        posts_summary=posts_summary,
+                        urls=urls,
+                        topic_id=result.get("topic_id", ""),
+                    )
+                except Exception as e:
+                    logger.warning(f"[Pipeline] 生成精美邮件HTML失败: {e}")
+
                 send_alert(
                     keyword=cluster.keyword,
                     platform=self.config.platform,
@@ -736,6 +758,7 @@ class RadarPipeline:
                     report=result["report"],
                     urls=urls,
                     post_count=len(cluster.posts),
+                    email_html=email_html,
                 )
 
             # 收集后台索引任务（asyncio.Task 替代 daemon thread）

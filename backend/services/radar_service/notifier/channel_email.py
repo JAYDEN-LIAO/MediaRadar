@@ -19,7 +19,8 @@ class EmailNotifier(NotifierBase):
         try:
             # 构建邮件内容
             title = self.build_title(payload)
-            body_html = self._build_html(payload)
+            # 优先使用 LLM 生成的 HTML，否则 fallback 到内部生成
+            body_html = payload.email_html if payload.email_html else self._build_html(payload)
             body_text = self._build_text(payload)
 
             msg = MIMEMultipart("alternative")

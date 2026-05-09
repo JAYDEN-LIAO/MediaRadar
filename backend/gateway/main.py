@@ -46,6 +46,28 @@ async def global_exception_handler(request: Request, exc: Exception):
 # 注：为严格保持原有前端接口调用路径 (/api/...) 不变，此处暂不添加统一前缀
 app.include_router(radar_router, tags=["舆情雷达业务层"])
 app.include_router(agent_router, tags=["AI助手业务层"])
+
+
+@app.on_event("startup")
+async def on_startup():
+    """FastAPI 启动时自动启动定时调度器"""
+    try:
+        from services.radar_service.scheduler import scheduler_start
+        success, msg = scheduler_start()
+        logger.info(f"[Gateway] {msg}")
+    except Exception as e:
+        logger.warning(f"[Gateway] 调度器启动失败（不影响主服务）: {e}")
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    """FastAPI 关闭时停止调度器"""
+    try:
+        from services.radar_service.scheduler import scheduler_stop
+        success, msg = scheduler_stop()
+        logger.info(f"[Gateway] {msg}")
+    except Exception as e:
+        logger.warning(f"[Gateway] 调度器关闭失败: {e}")
 if __name__ == "__main__":
     # 启动命令说明：请在 backend 目录下执行 python gateway/main.py
     uvicorn.run("gateway.main:app", host="0.0.0.0", port=8008, reload=True)

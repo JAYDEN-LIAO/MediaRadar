@@ -47,6 +47,7 @@ def send_alert(
     urls: list[str],
     topic_id: str = "",
     post_count: int = 1,
+    email_html: str = "",
 ) -> dict[PushChannel, bool]:
     """
     统一预警发送接口
@@ -68,6 +69,7 @@ def send_alert(
         urls=urls,
         topic_id=topic_id,
         post_count=post_count,
+        email_html=email_html,
     )
     return _get_registry().send_alert(payload)
 
