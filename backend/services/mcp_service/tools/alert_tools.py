@@ -66,10 +66,10 @@ def register_alert_tools(mcp):
                 "message": f"近期无风险等级 >= {min_level} 的预警记录"
             }
 
-        risk_emoji = {1: "🟢", 2: "🟡", 3: "🟠", 4: "🟠", 5: "🔴"}
+        risk_labels = {1: "低", 2: "偏低", 3: "中", 4: "高", 5: "极高"}
         for item in result:
             lvl = item.get("risk_level", 3)
-            item["emoji"] = risk_emoji.get(lvl, "⚪")
+            item["emoji"] = risk_labels.get(lvl, "未知")
             item["risk_text"] = f"风险{lvl}级"
 
         return {

@@ -105,7 +105,7 @@ def _coerce_enum(
         return enum_cls(value)
     except ValueError:
         typer.secho(
-            f"⚠️ Config value '{value}' is not within the supported range of {enum_cls.__name__}, falling back to default value '{default.value}'.",
+            f"[Config] Config value '{value}' is not within the supported range of {enum_cls.__name__}, falling back to default value '{default.value}'.",
             fg=typer.colors.YELLOW,
         )
         return default

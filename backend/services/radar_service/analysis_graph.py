@@ -46,7 +46,7 @@ def _build_evolution_context(evolution_timeline: dict) -> str:
     signal = evolution_timeline.get("evolution_signal", "unknown")
 
     signal_map = {
-        "escalating": "⚠️ 风险逐步升级",
+        "escalating": "风险逐步升级",
         "stable": "→ 趋于稳定",
         "deescalating": "↓ 风险逐步缓和",
         "unknown": "未知",
@@ -146,7 +146,7 @@ def _build_analyst_prompt_with_evolution(
 
 def analyst_node(state: RadarGraphState):
     """DeepSeek 深度分析节点"""
-    logger.info(f"🧠 [ANALYST NODE] DeepSeek 正在分析关于 [{state['keyword']}] 的舆情...")
+    logger.info(f"[ANALYST NODE] DeepSeek 正在分析关于 [{state['keyword']}] 的舆情...")
 
     keyword = state["keyword"]
     evolution_timeline = state.get("evolution_timeline") or {}
@@ -162,18 +162,18 @@ def analyst_node(state: RadarGraphState):
             top_k=3
         )
         if similar_cases:
-            logger.info(f"📚 [RAG] 检索到 {len(similar_cases)} 条相似历史案例")
+            logger.info(f"[RAG] 检索到 {len(similar_cases)} 条相似历史案例")
         else:
-            logger.info(f"📚 [RAG] 未检索到历史案例，使用无 RAG 分析")
+            logger.info(f"[RAG] 未检索到历史案例，使用无 RAG 分析")
     except Exception as e:
-        logger.warning(f"⚠️ [RAG] 检索失败，继续使用无 RAG 增强的分析：{e}")
+        logger.warning(f"[RAG] 检索失败，继续使用无 RAG 增强的分析：{e}")
     # ───────────────────────────────────────────────
 
     # ── 话题演化上下文注入 ───────────────────────────
     evolution_context = _build_evolution_context(evolution_timeline)
     if evolution_context:
         logger.info(
-            f"📊 [TopicTracker] 演化上下文已注入: "
+            f"[TopicTracker] 演化上下文已注入: "
             f"is_new={evolution_timeline.get('is_new_topic')}, "
             f"signal={evolution_timeline.get('evolution_signal')}"
         )
@@ -201,7 +201,7 @@ def analyst_node(state: RadarGraphState):
 def reviewer_node(state: RadarGraphState):
     """Kimi 二次复核节点（交叉验证）"""
     risk_level = state["analyst_result"].get("risk_level", 1)
-    logger.info(f"🧐 [REVIEWER NODE] 触发高危预警 (Level {risk_level})，移交 Kimi 进行复核...")
+    logger.info(f"[REVIEWER NODE] 触发高危预警 (Level {risk_level})，移交 Kimi 进行复核...")
 
     reviewer_prompt = REVIEWER_PROMPT.format(
         keyword=state["keyword"],
@@ -224,7 +224,7 @@ def reviewer_node(state: RadarGraphState):
 
 def director_node(state: RadarGraphState):
     """Kimi 决策与报告生成节点"""
-    logger.info("🚨 [DIRECTOR NODE] 高风险确认！Director 正在生成最终简报...")
+    logger.info("[DIRECTOR NODE] 高风险确认！Director 正在生成最终简报...")
     prompt = DIRECTOR_PROMPT.format(keyword=state['keyword'])
 
     report = call_llm(
@@ -258,7 +258,7 @@ def route_after_reviewer(state: RadarGraphState):
 
     if is_confirmed:
         return "director"
-    logger.info(f"⚠️ [ROUTER] Reviewer 驳回了高危判定，流程结束。")
+    logger.info(f"[ROUTER] Reviewer 驳回了高危判定，流程结束。")
     return END
 
 

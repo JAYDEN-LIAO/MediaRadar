@@ -11,10 +11,7 @@
 
         <view class="card card-primary">
           <view class="card-header">
-            <view class="header-left">
-              <text class="section-title">今日概览</text>
-            </view>
-            <view class="keyword-tag">{{ keyword }}</view>
+            <text class="section-title">今日概览</text>
           </view>
 
           <view class="stats-row">
@@ -151,39 +148,46 @@
 
         <view class="card">
           <view class="card-header">
-            <text class="section-title">近7日声量趋势</text>
-          </view>
-          <!-- 7日声量趋势图（有数据时） -->
-          <view class="trend-chart" v-if="volumeData.days && volumeData.days.length > 0">
-            <view class="trend-legend">
-              <view class="legend-item">
-                <view class="legend-bar total-bar"></view>
-                <text class="legend-label">总声量</text>
-              </view>
-              <view class="legend-item">
-                <view class="legend-bar neg-bar"></view>
-                <text class="legend-label">负面声量</text>
-              </view>
-            </view>
-            <view class="trend-bars">
-              <view class="bar-item" v-for="(day, i) in volumeData.days" :key="i">
-                <view class="bar-col">
-                  <view
-                    class="bar total-bar"
-                    :style="{ height: (volumeData.volumes[i] || 0) > 0 ? Math.max(10, (volumeData.volumes[i] / volumeData.total * 140 || 0)) + 'rpx' : '4rpx' }"
-                  ></view>
-                  <view
-                    class="bar neg-bar"
-                    :style="{ height: (volumeData.negative_volumes[i] || 0) > 0 ? Math.max(4, (volumeData.negative_volumes[i] / volumeData.total * 140 || 0)) + 'rpx' : '4rpx' }"
-                  ></view>
-                </view>
-                <text class="bar-label">{{ day }}</text>
-              </view>
+            <text class="section-title">监控状态</text>
+            <view class="status-badge" :class="schedulerBadgeClass">
+              {{ schedulerBadgeText }}
             </view>
           </view>
-          <!-- 无数据时显示空状态 -->
-          <view class="chart-placeholder" v-else>
-            <text class="placeholder-text">近7日暂无数据</text>
+          <view class="status-grid">
+            <view class="status-item">
+              <text class="status-label">调度器</text>
+              <text class="status-value" :class="schedulerStatus.active ? 'txt-on' : 'txt-off'">
+                {{ schedulerStatus.active ? '运行中' : '已停止' }}
+              </text>
+            </view>
+            <view class="status-item">
+              <text class="status-label">扫描频率</text>
+              <text class="status-value">{{ freqDisplay }}</text>
+            </view>
+            <view class="status-item">
+              <text class="status-label">每日启动</text>
+              <text class="status-value">{{ schedulerStatus.start_time || '--' }}</text>
+            </view>
+            <view class="status-item">
+              <text class="status-label">下次执行</text>
+              <text class="status-value">{{ nextRunDisplay }}</text>
+            </view>
+            <view class="status-item">
+              <text class="status-label">扫描任务</text>
+              <text class="status-value" :class="isPaused ? 'txt-warn' : (schedulerStatus.scan_in_progress ? 'txt-warn' : 'txt-off')">
+                {{ isPaused ? '已暂停' : (schedulerStatus.scan_in_progress ? '进行中' : '空闲') }}
+              </text>
+            </view>
+            <view class="status-item">
+              <text class="status-label">上次扫描</text>
+              <text class="status-value">{{ lastRunDisplay }}</text>
+            </view>
+            <view class="status-item">
+              <text class="status-label">本次新增</text>
+              <text class="status-value" :class="radarStatus.last_new_count > 0 ? 'txt-on' : 'txt-off'">
+                {{ radarStatus.last_new_count > 0 ? radarStatus.last_new_count + ' 条' : '--' }}
+              </text>
+            </view>
           </view>
         </view>
 
@@ -257,19 +261,74 @@ const topicList = ref([])
 // 近7日声量数据
 const volumeData = ref({ days: [], volumes: [], negative_volumes: [], total: 0, negative_total: 0 })
 
+// 图表基准高度（避免模板里 Math.max spread 问题）
+const chartMaxTotal = computed(() => Math.max(...volumeData.value.volumes.filter(v => v > 0), 1))
+const chartMaxNeg = computed(() => Math.max(...volumeData.value.negative_volumes.filter(v => v > 0), 1))
+
 // 今日AI摘要
 const todaySummary = ref(null)
+
+// 调度器状态
+const schedulerStatus = ref({ active: false, next_run: null, interval_hours: null, start_time: null, scan_in_progress: false })
+const radarStatus = ref({ is_running: false, last_run_time: null, last_new_count: 0 })
+
+const isPaused = computed(() => schedulerStatus.value.interval_hours < 0)
+
+const schedulerBadgeClass = computed(() => {
+  if (!schedulerStatus.value.active) return 'badge-inactive'
+  if (isPaused.value) return 'badge-paused'
+  return 'badge-active'
+})
+
+const schedulerBadgeText = computed(() => {
+  if (!schedulerStatus.value.active) return '已停止'
+  if (isPaused.value) return '已暂停'
+  return '运行中'
+})
+
+const freqDisplay = computed(() => {
+  const h = schedulerStatus.value.interval_hours
+  if (h == null) return '--'
+  if (h < 0) return '已暂停'
+  return `${h}h`
+})
+
+const nextRunDisplay = computed(() => {
+  if (!schedulerStatus.value.next_run) return '--'
+  try {
+    const d = new Date(schedulerStatus.value.next_run.replace(' ', 'T'))
+    if (isNaN(d.getTime())) return '--'
+    return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
+  } catch {
+    return '--'
+  }
+})
+
+const lastRunDisplay = computed(() => {
+  if (!radarStatus.value.last_run_time) return '从未'
+  try {
+    const d = new Date(radarStatus.value.last_run_time.replace(' ', 'T'))
+    if (isNaN(d.getTime())) return '--'
+    return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
+  } catch {
+    return '--'
+  }
+})
 
 const getPlatformName = (val) => {
   const names = { wb: '微博', xhs: '小红书', bili: 'B站', zhihu: '知乎', dy: '抖音', ks: '快手', tieba: '贴吧' }
   return names[val] || val
 }
 
-// 话题热度榜（取前5，按post_count降序，优先负面）
+// 话题热度榜（取近7天内活跃话题，按post_count降序，优先负面）
 const topTopics = computed(() => {
+  const sevenDaysAgo = new Date()
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+  const cutoff = sevenDaysAgo.toISOString()
+
   return [...topicList.value]
+    .filter(item => item.last_seen && item.last_seen >= cutoff)
     .sort((a, b) => {
-      // 负面优先
       if (a.risk_class === 'negative' && b.risk_class !== 'negative') return -1
       if (b.risk_class === 'negative' && a.risk_class !== 'negative') return 1
       return (b.post_count || 0) - (a.post_count || 0)
@@ -310,6 +369,35 @@ const loadTodaySummary = () => {
     .catch(() => {})
 }
 
+// 加载调度器状态
+const loadSchedulerStatus = () => {
+  uni.request({
+    url: 'http://127.0.0.1:8008/api/scheduler/status',
+    method: 'GET',
+    success: (res) => {
+      if (res.data && res.data.code === 200) {
+        schedulerStatus.value = res.data.data || {}
+      }
+    },
+    fail: () => {}
+  })
+}
+
+// 加载雷达实时状态
+const loadRadarStatus = () => {
+  uni.request({
+    url: 'http://127.0.0.1:8008/api/radar_status',
+    method: 'GET',
+    header: { 'X-API-Key': 'mr-20260402-6d2d61d53f867e01' },
+    success: (res) => {
+      if (res.data && res.data.code === 200) {
+        radarStatus.value = res.data.data || {}
+      }
+    },
+    fail: () => {}
+  })
+}
+
 const goToList = () => uni.switchTab({ url: '/pages/list/list' })
 
 const goToTopicList = () => uni.switchTab({ url: '/pages/list/list' })
@@ -327,7 +415,7 @@ const loadSystemConfig = () => {
     success: (res) => {
       if (res.data && res.data.code === 200) {
         const kws = res.data.data.keywords || []
-        keyword.value = kws.length > 0 ? kws.join('、') : '未配置监控词'
+        keyword.value = kws.length > 0 ? kws.map(k => typeof k === 'string' ? k : k.text || k.keyword || '').join('、') : '未配置监控词'
       }
     }
   })
@@ -403,6 +491,7 @@ const startPollingStatus = () => {
             }
 
             loadDashboardData()
+            loadRadarStatus()
           }
         }
       },
@@ -482,7 +571,8 @@ onMounted(() => {
   loadSystemConfig()
   loadDashboardData()
   loadTopics()
-  loadVolumeStats()
+  loadSchedulerStatus()
+  loadRadarStatus()
   loadTodaySummary()
 })
 
@@ -570,18 +660,6 @@ view, text, scroll-view, button {
   color: #0F172A;
 }
 
-.keyword-tag {
-  font-size: 22rpx;
-  color: #0891B2;
-  background: rgba(8, 145, 178, 0.08);
-  padding: 6rpx 16rpx;
-  border-radius: 20rpx;
-  font-weight: 500;
-  max-width: 280rpx;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 /* Stats Row */
 .card-primary .stats-row {
@@ -985,94 +1063,86 @@ view, text, scroll-view, button {
   border: 1rpx solid #FEE2E2;
 }
 
-/* 7日声量趋势图 */
-.trend-chart {
-  padding: 8rpx 0;
-}
+/* ~~ 折线图（已废弃） ~~ */
+.trend-chart { padding: 4rpx 0; }
+.line-chart-wrap { display: flex; flex-direction: column; gap: 8rpx; }
+.line-row { display: flex; align-items: flex-end; height: 80rpx; position: relative; }
+.line-y-label { font-size: 18rpx; font-family: 'JetBrains Mono', monospace; width: 36rpx; text-align: right; padding-right: 6rpx; flex-shrink: 0; line-height: 1; align-self: flex-end; padding-bottom: 2rpx; }
+.line-y-label.tot-text { color: #334155; }
+.line-y-label.neg-text { color: #DC2626; }
+.line-bars { flex: 1; height: 72rpx; position: relative; }
+.line-dot { position: absolute; width: 10rpx; height: 10rpx; border-radius: 50%; transform: translateX(-50%); }
+.line-dot.total-dot { background: #334155; }
+.line-dot.neg-dot { background: #DC2626; }
+.line-labels { display: flex; justify-content: space-between; margin-top: 8rpx; padding: 0 2rpx; padding-left: 42rpx; }
+.bar-label { font-size: 20rpx; color: #94A3B8; font-family: 'JetBrains Mono', monospace; }
 
-.trend-legend {
+/* 监控状态卡片 */
+.status-grid {
   display: flex;
-  gap: 24rpx;
-  margin-bottom: 16rpx;
+  flex-wrap: wrap;
+  gap: 0;
 }
 
-.trend-legend .legend-item {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-}
-
-.legend-bar {
-  width: 20rpx;
-  height: 8rpx;
-  border-radius: 4rpx;
-}
-.total-bar {
-  background-color: #0F172A;
-}
-.neg-bar {
-  background-color: #DC2626;
-}
-
-.trend-bars {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  height: 160rpx;
-  padding: 0 4rpx;
-}
-
-.bar-item {
-  flex: 1;
+.status-item {
+  width: 50%;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6rpx;
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid #F1F5F9;
 }
 
-.bar-col {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 2rpx;
-  height: 140rpx;
+.status-item:nth-child(odd) {
+  padding-right: 24rpx;
+  border-right: 1rpx solid #F1F5F9;
 }
 
-.bar {
-  width: 24rpx;
-  border-radius: 3rpx 3rpx 0 0;
-  min-height: 4rpx;
-}
-.bar.total-bar {
-  background: linear-gradient(to top, #334155, #0F172A);
-}
-.bar.neg-bar {
-  background: linear-gradient(to top, #F87171, #DC2626);
+.status-item:nth-child(even) {
+  padding-left: 24rpx;
 }
 
-.bar-label {
-  font-size: 20rpx;
+.status-item:nth-last-child(-n+2) {
+  border-bottom: none;
+}
+
+.status-label {
+  font-size: 22rpx;
   color: #94A3B8;
+  margin-bottom: 6rpx;
+}
+
+.status-value {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #0F172A;
   font-family: 'JetBrains Mono', monospace;
 }
 
-/* Chart Placeholder */
-.chart-placeholder {
-  height: 200rpx;
-  background-color: #F8FAFC;
-  border-radius: 12rpx;
-  border: 1px dashed #E2E8F0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.status-badge {
+  font-size: 22rpx;
+  padding: 4rpx 14rpx;
+  border-radius: 20rpx;
+  font-weight: 500;
 }
 
-.placeholder-text {
-  font-size: 26rpx;
+.badge-active {
+  background: #F0FDF4;
+  color: #065F46;
+}
+
+.badge-paused {
+  background: #FFFBEB;
+  color: #B45309;
+}
+
+.badge-inactive {
+  background: #F8FAFC;
   color: #94A3B8;
 }
+
+.txt-on { color: #059669; }
+.txt-off { color: #94A3B8; }
+.txt-warn { color: #D97706; }
 
 /* Primary Button */
 .action-container {
@@ -1135,5 +1205,21 @@ view, text, scroll-view, button {
   font-size: 40rpx;
   font-weight: 700;
   letter-spacing: 2rpx;
+}
+
+/* Chart Placeholder */
+.chart-placeholder {
+  height: 160rpx;
+  background-color: #F8FAFC;
+  border-radius: 12rpx;
+  border: 1px dashed #E2E8F0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.placeholder-text {
+  font-size: 26rpx;
+  color: #94A3B8;
 }
 </style>

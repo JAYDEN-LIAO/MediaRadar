@@ -24,6 +24,15 @@ class AlertPayload(BaseModel):
     email_html: str = ""  # LLM 生成的 HTML 邮件内容，为空则用 channel_email 内部生成
 
 
+class BatchAlertPayload(BaseModel):
+    """批量预警载荷（一次扫描的所有预警）"""
+    keyword: str
+    platform: str
+    alerts: list[AlertPayload] = Field(default_factory=list)
+    generated_at: str = ""
+    email_html: str = ""  # 批量 HTML，为空则各 channel 自生成
+
+
 # ---- 各通道配置模型 ----
 
 class EmailConfig(BaseModel):

@@ -17,6 +17,7 @@
 """
 from .models import (
     AlertPayload,
+    BatchAlertPayload,
     PushChannel,
     AllPushConfigs,
     EmailConfig,
@@ -50,7 +51,7 @@ def send_alert(
     email_html: str = "",
 ) -> dict[PushChannel, bool]:
     """
-    统一预警发送接口
+    统一预警发送接口（单条预警）
 
     返回：{
         PushChannel.EMAIL: True/False,
@@ -72,6 +73,30 @@ def send_alert(
         email_html=email_html,
     )
     return _get_registry().send_alert(payload)
+
+
+def send_batch_alert(
+    keyword: str,
+    platform: str,
+    alerts: list[AlertPayload],
+) -> dict[PushChannel, bool]:
+    """
+    批量预警发送接口（一次扫描的所有预警合并成一封）
+
+    返回：{
+        PushChannel.EMAIL: True/False,
+        PushChannel.WECOM: True/False,
+        PushChannel.FEISHU: True/False,
+    }
+    """
+    import datetime
+    batch = BatchAlertPayload(
+        keyword=keyword,
+        platform=platform,
+        alerts=alerts,
+        generated_at=datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+    )
+    return _get_registry().send_batch_alert(batch)
 
 
 def reload_registry() -> None:

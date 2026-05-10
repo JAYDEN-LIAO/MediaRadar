@@ -71,15 +71,15 @@ def call_vision_llm(image_url: str, post_text: str = "", platform: str = "wb", p
                 if not mime_type:
                     mime_type = "image/jpeg"
                 final_image_url = f"data:{mime_type};base64,{base64_encoded}"
-                logger.info(f"📸 成功加载本地图片 ({local_path})，准备发送至 Vision Agent...")
+                logger.info(f"成功加载本地图片 ({local_path})，准备发送至 Vision Agent...")
         else:
-            logger.warning(f"⚠️ 本地图片未找到({local_path})，将尝试使用原始公网URL...")
+            logger.warning(f"本地图片未找到({local_path})，将尝试使用原始公网URL...")
     except Exception as e:
         logger.error(f"本地图片转换 Base64 异常: {e}")
     # ────────────────────────────────────────────
 
     try:
-        logger.info(f"👉 [VISION INPUT] 传给视觉模型的提示词: {prompt}")
+        logger.info(f"[VISION INPUT] 传给视觉模型的提示词: {prompt}")
 
         response = vision_client.chat.completions.create(
             model=getattr(settings, "VISION_MODEL", "qwen-vl-max"),
@@ -93,7 +93,7 @@ def call_vision_llm(image_url: str, post_text: str = "", platform: str = "wb", p
             max_tokens=300
         )
         result_text = response.choices[0].message.content.strip()
-        logger.info(f"💡 [VISION OUTPUT] 视觉解析结果: {result_text}")
+        logger.info(f"[VISION OUTPUT] 视觉解析结果: {result_text}")
         return result_text
 
     except Exception as e:

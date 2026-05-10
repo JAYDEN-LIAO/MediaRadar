@@ -4,6 +4,7 @@ from core.logger import get_logger
 from .base import NotifierBase
 from .models import (
     AlertPayload,
+    BatchAlertPayload,
     PushChannel,
     AllPushConfigs,
     EmailConfig,
@@ -58,6 +59,26 @@ class NotifierRegistry:
                 results[ch] = ok
             except Exception as e:
                 logger.error(f"[Registry] {ch.value} 发送异常: {e}")
+                results[ch] = False
+        return results
+
+    def send_batch_alert(self, batch: BatchAlertPayload) -> dict[PushChannel, bool]:
+        """向所有已启用通道发送批量预警（合并为一封邮件/一条消息）"""
+        results: dict[PushChannel, bool] = {}
+        if not batch.alerts:
+            return results
+        for ch in PushChannel:
+            notifier = self._channels.get(ch)
+            if not notifier:
+                continue
+            max_level = max((a.risk_level for a in batch.alerts), default=0)
+            if not notifier.should_send(max_level):
+                continue
+            try:
+                ok = notifier.send_batch(batch)
+                results[ch] = ok
+            except Exception as e:
+                logger.error(f"[Registry] {ch.value} 批量发送异常: {e}")
                 results[ch] = False
         return results
 

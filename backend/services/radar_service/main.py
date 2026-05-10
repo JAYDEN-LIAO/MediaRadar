@@ -223,6 +223,11 @@ async def job_async(target_keyword: str = None):
         logger.warning("MONITOR_PLATFORMS 为空，跳过。")
 
     new_risk_count = await run_analysis_pipeline_async()
+
+    # 更新雷达状态（供前端展示上次扫描时间）
+    radar_status.last_new_count = new_risk_count if new_risk_count else 0
+    radar_status.last_run_time = time.strftime('%Y-%m-%d %H:%M:%S')
+
     return new_risk_count
 
 async def run_analysis_pipeline_async():
@@ -283,7 +288,7 @@ async def run_analysis_pipeline_async():
     for i, result in enumerate(all_results):
         platform = MONITOR_PLATFORMS[i]
         if isinstance(result, Exception):
-            logger.error(f"⚠️ 平台 {platform} 执行异常: {result}")
+            logger.error(f"平台 {platform} 执行异常: {result}")
         else:
             total_new_count += result
             logger.info(f"[Pipeline Mode] {platform.upper()} 完成，新增 {result} 条")
@@ -340,13 +345,13 @@ def job(target_keyword=None):
         global MONITOR_KEYWORDS, MONITOR_KEYWORD_LEVELS
         MONITOR_KEYWORDS = [target_keyword]
         MONITOR_KEYWORD_LEVELS = {target_keyword: "balanced"} # 临时任务默认给予 balanced 敏感度
-        logger.info(f"🎯 临时接管监控配置，本次将专注抓取: {target_keyword}")
+        logger.info(f"临时接管监控配置，本次将专注抓取: {target_keyword}")
 
     if MONITOR_PLATFORMS:
         for platform in MONITOR_PLATFORMS:
             run_crawler_for_platform(platform)
     else:
-        logger.warning("⚠️ MONITOR_PLATFORMS 为空，请检查系统设置！爬虫任务被跳过。")
+        logger.warning("MONITOR_PLATFORMS 为空，请检查系统设置！爬虫任务被跳过。")
         
     new_risk_count = run_analysis_pipeline()
     return new_risk_count

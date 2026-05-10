@@ -94,6 +94,8 @@
 | 飞书 | 交互式卡片消息，颜色区分风险等级 |
 | 邮箱 | SMTP TLS 发送，HTML + 纯文本双格式，自动携带核心摘要 |
 
+**批量预警模式**：一次扫描产生的所有高危舆情**合并成一封邮件/一条消息**发送。例如一次扫描检测到 4 条高危舆情，只发一条通知，包含全部 4 条。邮件标题格式：`【舆情预警】{keyword} 监控报告 ({N}条风险舆情)`。
+
 每个通道独立配置，可按风险等级（1-5 级）过滤推送。
 
 ---
@@ -296,6 +298,7 @@ python scripts/rag/migrate_topic_evolution.py
 - `misfire_grace_time=60` 秒 — 漏触发的工作在 60 秒内仍会补执行
 - 配置变更时调用 `reschedule_if_running()` 热重载调度
 - 设置 `monitor_frequency = -1` 可**暂停扫描**而不停止调度器（每日简报不受影响）
+- **批量预警**：一次扫描的所有高危舆情合并为一封通知（每通道一条）
 
 ### 每日简报任务
 
@@ -316,11 +319,20 @@ python scripts/rag/migrate_topic_evolution.py
 
 ## 邮件模板
 
-系统生成两种 HTML 邮件模板（均在 `push_generator.py` 中）：
+系统生成三种 HTML 邮件模板（均在 `push_generator.py` 中）：
+
+### 批量预警模板 (`BATCH_PUSH_HTML_TEMPLATE`)
+
+一次扫描检测到多条高危舆情时触发，所有舆情**合并成一封邮件**。特性：
+- 深色 Banner 表头，显示预警总条数
+- 统计行：极高风险条数 · 高风险条数 · 中风险条数
+- 每条舆情卡片：话题名称 · 风险等级标签 · 波及帖数 · 简报摘要 · 溯源链接
+- 按风险等级从高到低排序（critical → high → medium → low）
+- 由 `EmailNotifier.send_batch()` 调用 `generate_batch_push_html()` 使用
 
 ### 预警邮件模板 (`PUSH_HTML_TEMPLATE`)
 
-随高风险预警触发。特性：
+单个高风险预警触发。特性：
 - 深色 Banner 表头，风险等级颜色编码
 - 统计行：平台 · 风险等级 · 帖子数量
 - 可折叠区块：核心问题 · 预警简报 · 溯源链接
@@ -336,7 +348,7 @@ python scripts/rag/migrate_topic_evolution.py
 - 数据从 `topic_summary` 表按关键词分组
 - 链接通过 `topic_posts` + `ai_results` 表关联查询
 
-两种模板共同特性：
+三种模板共同特性：
 - Table 布局（邮件客户端兼容性）
 - 内联 CSS（无外部依赖）
 - 最大宽度 620px 响应式

@@ -2,7 +2,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 from core.logger import get_logger
-from .models import AlertPayload, PushChannel
+from .models import AlertPayload, BatchAlertPayload, PushChannel
 
 logger = get_logger("notifier.base")
 
@@ -31,17 +31,21 @@ class NotifierBase(ABC):
     def send(self, payload: AlertPayload) -> bool:
         """发送预警，返回是否成功"""
 
+    @abstractmethod
+    def send_batch(self, batch: BatchAlertPayload) -> bool:
+        """批量发送预警，返回是否成功"""
+
     # ---- 通用模板方法 ----
 
     def build_title(self, payload: AlertPayload) -> str:
-        risk_emoji = {
-            "low": "🟢",
-            "medium": "🟡",
-            "high": "🔴",
-            "critical": "🚨",
-            "neutral": "⚪",
-        }.get(payload.risk_class, "⚪")
-        return f"{risk_emoji}【舆情预警】{payload.keyword} 出现风险事件"
+        risk_labels = {
+            "low": "[低]",
+            "medium": "[中]",
+            "high": "[高]",
+            "critical": "[严重]",
+            "neutral": "[未知]",
+        }.get(payload.risk_class, "[未知]")
+        return f"{risk_labels}【舆情预警】{payload.keyword} 出现风险事件"
 
     def build_urls_md(self, urls: list[str]) -> str:
         if not urls:
@@ -49,11 +53,11 @@ class NotifierBase(ABC):
         return "\n".join([f"- [来源链接 {i+1}]({url})" for i, url in enumerate(urls)])
 
     def risk_label(self, level: int, risk_class: str) -> str:
-        emoji = {
-            "low": "🟢 低风险",
-            "medium": "🟡 中风险",
-            "high": "🔴 高风险",
-            "critical": "🚨 极高风险",
-            "neutral": "⚪ 中性",
-        }.get(risk_class, f"未知({level}级)")
-        return f"{emoji}（{level}级）"
+        labels = {
+            "low": "低风险",
+            "medium": "中风险",
+            "high": "高风险",
+            "critical": "极高风险",
+            "neutral": "中性",
+        }.get(risk_class, f"未知")
+        return f"{labels}（{level}级）"

@@ -295,7 +295,7 @@ def get_topic_detail(topic_id: str):
         if ev_data and ev_data.get("evolution"):
             evolution_timeline = ev_data["evolution"].get("timeline", [])
     except Exception as e:
-        logger.warning(f"⚠️ [TopicDetail] 获取演化时间线失败: {e}")
+        logger.warning(f"[TopicDetail] 获取演化时间线失败: {e}")
 
     # 话题整体风险（以 AI 最终决策 alert_recommendation 为准）
     risk_level = summary.get("risk_level", 2)
@@ -595,7 +595,7 @@ def get_today_summary():
                 from .topic_tracker import _call_topic_summary_llm
                 summary = _call_topic_summary_llm(keyword or "舆情", posts_text, len(sample))
             except Exception as e:
-                logger.warning(f"⚠️ [TodaySummary] LLM 生成摘要失败: {e}")
+                logger.warning(f"[TodaySummary] LLM 生成摘要失败: {e}")
 
         if not summary:
             summary = f"今日共捕获相关讨论 {len(today_data)} 条，其中高风险 {high_risk_count} 条。"

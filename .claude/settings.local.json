@@ -115,7 +115,11 @@
       "Bash(venv/Scripts/python -m py_compile backend/services/radar_service/notifier/__init__.py)",
       "Bash(chcp 65001)",
       "Bash(PYTHONIOENCODING=utf-8 python debug_daily.py)",
-      "Bash(ls -la D:/JAYDEN/develop/work/MediaRadar/*.md D:/JAYDEN/develop/work/MediaRadar/*.txt D:/JAYDEN/develop/work/MediaRadar/docs/)"
+      "Bash(ls -la D:/JAYDEN/develop/work/MediaRadar/*.md D:/JAYDEN/develop/work/MediaRadar/*.txt D:/JAYDEN/develop/work/MediaRadar/docs/)",
+      "Bash(find:*)",
+      "Bash(grep -r --include=\"*.py\" -P '[\\\\U0001F300-\\\\U0001F9FF]{2,}' D:/JAYDEN/develop/work/MediaRadar/backend/)",
+      "Bash(ls -la *.py *.md)",
+      "Bash(ls -la update*.md)"
     ]
   },
   "enableAllProjectMcpServers": true,

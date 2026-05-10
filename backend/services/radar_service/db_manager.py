@@ -115,9 +115,9 @@ def _async_index_to_qdrant(result: dict):
     try:
         from .vector_store import index_ai_result
         index_ai_result(result)
-        logger.info(f"📚 [RAG Index] post_id={result['post_id']} 已写入 Qdrant")
+        logger.info(f"[RAG Index] post_id={result['post_id']} 已写入 Qdrant")
     except Exception as e:
-        logger.warning(f"⚠️ [RAG Index] 索引失败（不影响主流程）：{e}")
+        logger.warning(f"[RAG Index] 索引失败（不影响主流程）：{e}")
 
 
 def save_ai_result(post_id, platform, keyword, title, content, url, risk_level, core_issue, report, publish_time="未知时间", sentiment="Neutral"):

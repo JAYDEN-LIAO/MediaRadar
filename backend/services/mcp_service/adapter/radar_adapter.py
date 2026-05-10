@@ -212,7 +212,7 @@ class RadarAdapter:
             try:
                 job(keyword)
             except Exception as e:
-                logger.error(f"❌ 雷达任务执行失败: {e}")
+                logger.error(f"雷达任务执行失败: {e}")
 
         import threading
         threading.Thread(target=_run, daemon=True).start()

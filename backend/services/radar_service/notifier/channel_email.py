@@ -6,7 +6,7 @@ from email.mime.text import MIMEText
 from email.header import Header
 from core.logger import get_logger
 from .base import NotifierBase
-from .models import AlertPayload, PushChannel
+from .models import AlertPayload, BatchAlertPayload, PushChannel
 
 logger = get_logger("notifier.email")
 
@@ -104,3 +104,61 @@ class EmailNotifier(NotifierBase):
   <h3>溯源链接</h3>
   <ul>{urls_html}</ul>
 </div></body></html>"""
+
+    def send_batch(self, batch: BatchAlertPayload) -> bool:
+        """批量发送预警（合并为一封邮件）"""
+        cfg = self._config
+        try:
+            from ..push_generator import generate_batch_push_html
+
+            # 生成批量 HTML
+            if batch.email_html:
+                body_html = batch.email_html
+            else:
+                body_html = generate_batch_push_html(
+                    keyword=batch.keyword,
+                    platform=batch.platform,
+                    alerts=batch.alerts,
+                )
+
+            # 回退纯文本
+            body_text = self._build_batch_text(batch)
+
+            title = f"【舆情预警】{batch.keyword} 监控报告 ({len(batch.alerts)}条风险舆情)"
+
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = Header(title, "utf-8")
+            msg["From"] = cfg["from_addr"]
+            msg["To"] = ", ".join(cfg["to_addrs"])
+
+            msg.attach(MIMEText(body_text, "plain", "utf-8"))
+            msg.attach(MIMEText(body_html, "html", "utf-8"))
+
+            if cfg.get("smtp_use_tls", True):
+                context = ssl.create_default_context()
+                with smtplib.SMTP(cfg["smtp_host"], cfg["smtp_port"]) as server:
+                    server.starttls(context=context)
+                    if cfg.get("smtp_user") and cfg.get("smtp_password"):
+                        server.login(cfg["smtp_user"], cfg["smtp_password"])
+                    server.sendmail(cfg["from_addr"], cfg["to_addrs"], msg.as_string())
+            else:
+                with smtplib.SMTP(cfg["smtp_host"], cfg["smtp_port"]) as server:
+                    if cfg.get("smtp_user") and cfg.get("smtp_password"):
+                        server.login(cfg["smtp_user"], cfg["smtp_password"])
+                    server.sendmail(cfg["from_addr"], cfg["to_addrs"], msg.as_string())
+
+            logger.info(f"[Email] 批量发送成功 ({len(batch.alerts)}条) -> {cfg['to_addrs']}")
+            return True
+        except Exception as e:
+            logger.error(f"[Email] 批量发送失败: {e}")
+            return False
+
+    def _build_batch_text(self, batch: BatchAlertPayload) -> str:
+        lines = [f"【舆情预警】{batch.keyword} 监控报告（共{len(batch.alerts)}条风险舆情）\n"]
+        for i, alert in enumerate(batch.alerts, 1):
+            urls = ", ".join(alert.urls[:3]) if alert.urls else "无"
+            lines.append(f"\n{i}. {alert.core_issue}")
+            lines.append(f"   风险等级：{self.risk_label(alert.risk_level, alert.risk_class)} | 波及 {alert.post_count} 条")
+            lines.append(f"   预警简报：{alert.report[:200]}{'...' if len(alert.report) > 200 else ''}")
+            lines.append(f"   链接：{urls}")
+        return "\n".join(lines)

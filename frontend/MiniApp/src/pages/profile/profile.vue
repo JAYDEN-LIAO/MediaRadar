@@ -8,23 +8,6 @@
     </view>
 
     <view class="content">
-      <view class="stats-card">
-        <view class="stat">
-          <view class="number">128</view>
-          <view class="label">累计扫描</view>
-        </view>
-        <view class="stat-divider"></view>
-        <view class="stat">
-          <view class="number">15</view>
-          <view class="label">已处理预警</view>
-        </view>
-        <view class="stat-divider"></view>
-        <view class="stat">
-          <view class="number">99<span class="unit">%</span></view>
-          <view class="label">系统健康度</view>
-        </view>
-      </view>
-
       <view class="menu-list">
         <view class="menu-item" @click="goToPushSettings">
           <text class="label">推送设置</text>
@@ -46,7 +29,6 @@
 </template>
 
 <script setup>
-const goToSettings = () => uni.navigateTo({ url: '/pages/settings/settings' })
 const goToPushSettings = () => uni.navigateTo({ url: '/pages/settings/pushSettings' })
 const goToApiSettings = () => uni.navigateTo({ url: '/pages/settings/apiSettings' })
 const copyEmail = () => {
@@ -106,50 +88,6 @@ const copyEmail = () => {
 
 .content {
   padding: 32rpx 24rpx;
-  margin-top: -40rpx;
-  position: relative;
-  z-index: 10;
-}
-
-.stats-card {
-  display: flex;
-  align-items: center;
-  background-color: #FFFFFF;
-  border-radius: 16rpx;
-  padding: 40rpx 0;
-  margin-bottom: 24rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
-}
-
-.stats-card .stat {
-  flex: 1;
-  text-align: center;
-  position: relative;
-}
-
-.stats-card .stat .number {
-  font-size: 52rpx;
-  font-weight: 700;
-  color: #0F172A;
-  font-family: 'JetBrains Mono', 'SF Mono', monospace;
-  line-height: 1.1;
-}
-
-.stats-card .stat .unit {
-  font-size: 32rpx;
-  font-weight: 500;
-}
-
-.stats-card .stat .label {
-  font-size: 24rpx;
-  color: #64748B;
-  margin-top: 8rpx;
-}
-
-.stat-divider {
-  width: 1rpx;
-  height: 60rpx;
-  background-color: #E2E8F0;
 }
 
 .menu-list {

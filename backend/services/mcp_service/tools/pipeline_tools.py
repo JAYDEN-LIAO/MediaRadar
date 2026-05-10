@@ -182,7 +182,7 @@ def register_pipeline_tools(mcp):
 
         status_map = {
             "safe": "✅ 安全",
-            "alert": "🚨 预警"
+            "alert": "预警"
         }
 
         return {

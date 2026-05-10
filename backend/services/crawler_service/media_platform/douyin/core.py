@@ -145,8 +145,8 @@ class DouYinCrawler(AbstractCrawler):
                         
                         search_nil_info = posts_res.get("search_nil_info", {})
                         if search_nil_info.get("search_nil_type") == "verify_check":
-                            utils.logger.error("🚨 触发抖音风控！IP或账号被要求验证。")
-                            utils.logger.error("👉 请立刻在弹出的浏览器窗口中，手动点击搜索框搜点东西，完成【滑块验证】！")
+                            utils.logger.error("触发抖音风控！IP或账号被要求验证。")
+                            utils.logger.error("请立刻在弹出的浏览器窗口中，手动点击搜索框搜点东西，完成【滑块验证】！")
                             utils.logger.error("⏳ 程序将暂停 30 秒等待你操作...")
                             await asyncio.sleep(30)
                             continue

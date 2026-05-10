@@ -70,7 +70,7 @@ class KuaiShouClient(AbstractApiClient, ProxyRefreshMixin):
         try:
             data: Dict = response.json()
         except Exception as e:
-            utils.logger.error(f"🚨 [KuaiShouClient.request] 请求失败！状态码: {response.status_code}, 真实返回内容: {response.text[:300]}")
+            utils.logger.error(f"[KuaiShouClient.request] 请求失败！状态码: {response.status_code}, 真实返回内容: {response.text[:300]}")
             raise DataFetchError(f"快手接口返回非 JSON 数据, 状态码: {response.status_code}")
         if data.get("errors"):
             raise DataFetchError(data.get("errors", "unkonw error"))

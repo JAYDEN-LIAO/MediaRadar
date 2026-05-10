@@ -170,7 +170,7 @@ class CrawlerAdapter:
             try:
                 success = asyncio.run(_start())
             except Exception as e:
-                logger.error(f"❌ 启动爬虫失败: {e}")
+                logger.error(f"启动爬虫失败: {e}")
                 return {"success": False, "message": f"启动失败: {e}"}
 
             if not success:
@@ -236,7 +236,7 @@ class CrawlerAdapter:
         try:
             success = asyncio.run(_stop())
         except Exception as e:
-            logger.error(f"❌ 停止爬虫失败: {e}")
+            logger.error(f"停止爬虫失败: {e}")
             return {"success": False, "message": f"停止失败: {e}"}
 
         if success:

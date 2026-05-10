@@ -155,7 +155,7 @@ class DiagnosisEngine:
             return self._error_response(first_error, first_error_type)
 
         if tool_name and not _circuit_registry.is_available(tool_name):
-            logger.warning(f"🔴 [CircuitBreaker] 工具 {tool_name} 已熔断，跳过恢复尝试")
+            logger.warning(f"[CircuitBreaker] 工具 {tool_name} 已熔断，跳过恢复尝试")
             return json.dumps({
                 "success": False,
                 "data": None,
@@ -167,7 +167,7 @@ class DiagnosisEngine:
         diagnosis = self.diagnose(tool_name, first_error, first_error_type, args)
         strategy = diagnosis.get("recovery_strategy", "no_retry")
 
-        logger.info(f"🔧 [Diagnosis] 工具 {tool_name} 失败，诊断: {diagnosis}")
+        logger.info(f"[Diagnosis] 工具 {tool_name} 失败，诊断: {diagnosis}")
 
         # ==================== 执行恢复策略 ====================
         recovered = await self._execute_recovery(

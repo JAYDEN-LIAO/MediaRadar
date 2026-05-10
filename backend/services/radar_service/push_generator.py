@@ -201,22 +201,22 @@ def render_push_html(data: dict) -> str:
 
     # 风险等级颜色 + 标签（冷色调高级感）
     risk_meta = {
-        "critical": ("#c0392b", "🚨 极高风险"),
-        "high": ("#c0392b", "🔴 高风险"),
-        "medium": ("#2471a3", "🔵 中风险"),
-        "low": ("#1e8449", "🟢 低风险"),
-        "neutral": ("#566573", "⚪ 舆情通知"),
+        "critical": ("#c0392b", "极高风险"),
+        "high": ("#c0392b", "高风险"),
+        "medium": ("#2471a3", "中风险"),
+        "low": ("#1e8449", "低风险"),
+        "neutral": ("#566573", "舆情通知"),
     }
     banner_meta = {
-        "critical": ("#1a1a2e", "🚨 极高风险预警"),
-        "high": ("#16213e", "🔴 高风险预警"),
-        "medium": ("#1a3a5c", "🔵 中风险预警"),
-        "low": ("#145a32", "🟢 低风险提醒"),
-        "neutral": ("#34495e", "⚪ 舆情通知"),
+        "critical": ("#1a1a2e", "极高风险预警"),
+        "high": ("#16213e", "高风险预警"),
+        "medium": ("#1a3a5c", "中风险预警"),
+        "low": ("#145a32", "低风险提醒"),
+        "neutral": ("#34495e", "舆情通知"),
     }
 
-    risk_color, risk_label = risk_meta.get(risk_class, ("#6b7280", "⚪ 舆情通知"))
-    banner_bg, banner_label = banner_meta.get(risk_class, ("#6b7280", "⚪ 舆情通知"))
+    risk_color, risk_label = risk_meta.get(risk_class, ("#6b7280", "舆情通知"))
+    banner_bg, banner_label = banner_meta.get(risk_class, ("#6b7280", "舆情通知"))
 
     now = datetime.datetime.now()
     generated_date = now.strftime("%Y-%m-%d")
@@ -370,7 +370,7 @@ DAILY_SUMMARY_TEMPLATE = """
                   <span style="display:inline-block;padding:4px 10px;background:rgba(255,255,255,0.12);
                                border-radius:4px;font-size:11px;font-weight:600;color:rgba(255,255,255,0.85);
                                letter-spacing:0.5px;border:1px solid rgba(255,255,255,0.18);">
-                    📊 每日舆情简报
+                    每日舆情简报
                   </span>
                 </td>
                 <td align="right" style="vertical-align:middle;">
@@ -504,13 +504,13 @@ def _build_daily_keyword_block(keyword: str, items: list, index: int) -> str:
     risk_class = max_risk.get("risk_class", "neutral")
 
     risk_meta = {
-        "critical": ("#c0392b", "🚨 极高"),
-        "high": ("#c0392b", "🔴 高"),
-        "medium": ("#2471a3", "🔵 中"),
-        "low": ("#1e8449", "🟢 低"),
-        "neutral": ("#566573", "⚪ 正常"),
+        "critical": ("#c0392b", "极高"),
+        "high": ("#c0392b", "高"),
+        "medium": ("#2471a3", "中"),
+        "low": ("#1e8449", "低"),
+        "neutral": ("#566573", "正常"),
     }
-    risk_color, risk_label = risk_meta.get(risk_class, ("#566573", "⚪ 正常"))
+    risk_color, risk_label = risk_meta.get(risk_class, ("#566573", "正常"))
 
     # 取第一条的核心问题作摘要
     first_item = items[0]
@@ -740,3 +740,180 @@ async def generate_push_html(
     html = render_push_html(render_data)
     logger.info(f"[PushGen] HTML 生成成功，topic_id={topic_id}")
     return html
+
+
+# ============================================================
+# 批量预警 HTML 模板
+# ============================================================
+
+BATCH_PUSH_HTML_TEMPLATE = """<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>舆情预警报告</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f0f2f5;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f0f2f5;padding:20px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" border="0" style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+          <!-- 顶部 Banner -->
+          <tr>
+            <td style="background:{banner_bg};padding:24px 28px;">
+              <h1 style="margin:0;font-size:20px;color:#fff;font-weight:bold;">
+                【舆情预警】{keyword} 监控报告
+              </h1>
+              <p style="margin:8px 0 0;font-size:13px;color:rgba(255,255,255,0.8);">
+                共检测到 <strong style="color:#fff">{alert_count}</strong> 条风险舆情
+              </p>
+            </td>
+          </tr>
+
+          <!-- 统计摘要 -->
+          <tr>
+            <td style="padding:20px 28px 0;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td width="33%" style="text-align:center;padding:12px 8px;background:#f8f9fa;border-radius:6px;">
+                    <div style="font-size:22px;font-weight:bold;color:#c0392b;">{critical_count}</div>
+                    <div style="font-size:12px;color:#7f8c8d;margin-top:4px;">极高风险</div>
+                  </td>
+                  <td width="33%" style="text-align:center;padding:12px 8px;background:#f8f9fa;border-radius:6px;">
+                    <div style="font-size:22px;font-weight:bold;color:#e67e22;">{high_count}</div>
+                    <div style="font-size:12px;color:#7f8c8d;margin-top:4px;">高风险</div>
+                  </td>
+                  <td width="33%" style="text-align:center;padding:12px 8px;background:#f8f9fa;border-radius:6px;">
+                    <div style="font-size:22px;font-weight:bold;color:#2471a3;">{medium_count}</div>
+                    <div style="font-size:12px;color:#7f8c8d;margin-top:4px;">中风险</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- 分隔线 -->
+          <tr>
+            <td style="padding:16px 28px 0;">
+              <div style="border-bottom:1px solid #eee;"></div>
+            </td>
+          </tr>
+
+          <!-- 舆情列表 -->
+          {alert_items}
+
+          <!-- 底部 -->
+          <tr>
+            <td style="padding:20px 28px 28px;">
+              <p style="margin:0;text-align:center;font-size:10px;color:#8a9aaa;letter-spacing:0.5px;">
+                MediaRadar · 舆情监测系统 · {generated_time}
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
+
+
+def _build_batch_alert_item_html(index: int, alert, risk_colors: dict) -> str:
+    """构建单条预警的 HTML 片段"""
+    color = risk_colors.get(alert.risk_class, "#8c8c8c")
+    level_label = {
+        "low": "低风险",
+        "medium": "中风险",
+        "high": "高风险",
+        "critical": "极高风险",
+        "neutral": "舆情通知",
+    }.get(alert.risk_class, "未知")
+
+    urls_html = "".join(
+        f'<a href="{u}" style="color:#1a3a5c;text-decoration:none;font-size:12px;">链接{i+1}</a>&nbsp;&nbsp;'
+        for i, u in enumerate(alert.urls[:5])
+    ) or "<span style='color:#999;font-size:12px;'>无</span>"
+
+    return f"""
+    <tr>
+      <td style="padding:16px 28px;border-bottom:1px solid #eee;">
+        <!-- 序号 + 话题 -->
+        <div style="display:flex;align-items:center;margin-bottom:10px;">
+          <span style="display:inline-block;width:24px;height:24px;background:#c0392b;color:#fff;
+                       text-align:center;border-radius:4px;font-size:13px;line-height:24px;font-weight:bold;
+                       margin-right:10px;flex-shrink:0;">{index}</span>
+          <h3 style="margin:0;font-size:16px;color:#2c3e50;font-weight:bold;">{alert.core_issue}</h3>
+        </div>
+        <!-- 风险 + 波及 -->
+        <div style="padding-left:34px;margin-bottom:8px;">
+          <span style="display:inline-block;padding:2px 10px;background:{color}20;color:{color};
+                       border-radius:4px;font-size:12px;font-weight:bold;margin-right:12px;">
+            {level_label}（{alert.risk_level}级）
+          </span>
+          <span style="font-size:13px;color:#7f8c8d;">波及 {alert.post_count} 条</span>
+        </div>
+        <!-- 预警简报 -->
+        <div style="padding-left:34px;font-size:13px;color:#555;line-height:1.6;margin-bottom:10px;">
+          {alert.report[:300]}{'...' if len(alert.report) > 300 else ''}
+        </div>
+        <!-- 链接 -->
+        <div style="padding-left:34px;font-size:12px;color:#8a9aaa;">
+          溯源链接：{urls_html}
+        </div>
+      </td>
+    </tr>"""
+
+
+def generate_batch_push_html(keyword: str, platform: str, alerts: list) -> str:
+    """
+    生成批量预警 HTML 邮件。
+    顶部摘要：本轮扫描共 N 条风险舆情，按风险等级分组列出。
+    """
+    sorted_alerts = sorted(alerts, key=lambda a: a.risk_level, reverse=True)
+
+    risk_colors = {
+        "low": "#52c41a",
+        "medium": "#faad14",
+        "high": "#f5222d",
+        "critical": "#d9363e",
+        "neutral": "#8c8c8c",
+    }
+    banner_colors = {
+        "critical": ("#c0392b", "#1a1a2e"),
+        "high": ("#c0392b", "#16213e"),
+        "medium": ("#2471a3", "#1a3a5c"),
+        "low": ("#1e8449", "#145a32"),
+        "neutral": ("#566573", "#34495e"),
+    }
+
+    # 取最高风险等级确定 banner 颜色
+    top_risk = sorted_alerts[0].risk_class if sorted_alerts else "neutral"
+    banner_color, banner_bg = banner_colors.get(top_risk, ("#566573", "#34495e"))
+
+    # 统计各级别数量
+    critical_count = sum(1 for a in sorted_alerts if a.risk_class == "critical")
+    high_count = sum(1 for a in sorted_alerts if a.risk_class == "high")
+    medium_count = sum(1 for a in sorted_alerts if a.risk_class == "medium")
+
+    # 构建每条预警的 HTML
+    alert_items_html = "".join(
+        _build_batch_alert_item_html(i + 1, alert, risk_colors)
+        for i, alert in enumerate(sorted_alerts)
+    )
+
+    now = datetime.datetime.now()
+    generated_time = now.strftime("%Y-%m-%d %H:%M")
+
+    platform_display = PLATFORM_MAP.get(platform, platform)
+
+    return BATCH_PUSH_HTML_TEMPLATE.format(
+        banner_bg=banner_bg,
+        keyword=keyword,
+        alert_count=len(sorted_alerts),
+        critical_count=critical_count,
+        high_count=high_count,
+        medium_count=medium_count,
+        alert_items=alert_items_html,
+        generated_time=generated_time,
+    )

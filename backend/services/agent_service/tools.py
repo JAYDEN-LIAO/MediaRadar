@@ -49,7 +49,7 @@ def tool_trigger_background_crawl(keyword: str = None) -> str:
                 radar_status.set_result_sync(new_count, time.strftime('%Y-%m-%d %H:%M:%S'))
             logger.info(">>> 爬虫线程 job() 执行完毕 <<<")
         except Exception as e:
-            logger.error(f"❌ Agent 触发爬虫任务失败: {e}")
+            logger.error(f"Agent 触发爬虫任务失败: {e}")
             logger.error(traceback.format_exc())
         finally:
             radar_status.set_idle_sync()

@@ -94,6 +94,8 @@ Supports three push channels, independently configurable:
 | Feishu (飞书) | Interactive card messages, color distinguishes risk levels |
 | Email | SMTP TLS, HTML + plain text dual format, auto-bundled summary |
 
+**Batch Alert Mode**: All high-risk alerts from a single scan are **merged into one email/message**. For example, if 4 high-risk public opinions are detected in one scan, only ONE notification is sent containing all 4 items. Subject format: `【舆情预警】{keyword} 监控报告 ({N}条风险舆情)`.
+
 Each channel is independently configured and can filter by risk level (1–5).
 
 ---
@@ -296,6 +298,7 @@ The system uses **APScheduler** (BackgroundScheduler) for time-based task schedu
 - `misfire_grace_time=60` seconds — missed jobs within 60s will still run
 - `reschedule_if_running()` hot-reloads the schedule when `start_time` or `monitor_frequency` changes
 - Set `monitor_frequency = -1` to **pause scanning** without stopping the scheduler (daily summary continues)
+- **Batch alert**: all high-risk alerts from one scan are merged into ONE notification per channel
 
 ### Daily Summary Job
 
@@ -316,11 +319,20 @@ The system uses **APScheduler** (BackgroundScheduler) for time-based task schedu
 
 ## Email Templates
 
-The system generates two types of HTML email templates (both in `push_generator.py`):
+The system generates three types of HTML email templates (all in `push_generator.py`):
+
+### Batch Alert Template (`BATCH_PUSH_HTML_TEMPLATE`)
+
+Triggered when multiple high-risk alerts are detected in a single scan. All alerts are **merged into one email**. Features:
+- Dark banner header with total alert count
+- Stats row: critical count · high count · medium count
+- Per-alert card: topic name · risk level badge · post count · report excerpt · source links
+- Sorted by risk level (critical → high → medium → low)
+- Used by `EmailNotifier.send_batch()` via `generate_batch_push_html()`
 
 ### Alert Template (`PUSH_HTML_TEMPLATE`)
 
-Triggered per high-risk alert. Features:
+Triggered per individual high-risk alert. Features:
 - Dark banner header with risk-level color coding
 - Stats row: platform · risk level · post count
 - Collapsible sections: Core Issue · Alert Report · Source Links
@@ -336,7 +348,7 @@ Triggered by daily summary job. Features:
 - Grouped by keyword from `topic_summary` table
 - Links pulled from `topic_posts` + `ai_results` join
 
-Both templates:
+All templates:
 - Table-based layout (email client compatibility)
 - Inline CSS (no external dependencies)
 - Responsive max-width 620px

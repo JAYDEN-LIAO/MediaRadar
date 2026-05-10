@@ -58,7 +58,7 @@ class ReflectionEngine:
                 content = content.split("```")[1].split("```")[0].strip()
 
             result = json.loads(content)
-            logger.info(f"🔍 [Reflection] 置信度评估: {result.get('confidence')} | {result.get('reasoning', '')[:50]}")
+            logger.info(f"[Reflection] 置信度评估: {result.get('confidence')} | {result.get('reasoning', '')[:50]}")
             return result
         except Exception as e:
             logger.error(f"Reflection LLM 调用失败: {e}")

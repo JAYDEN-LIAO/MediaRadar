@@ -91,7 +91,7 @@ class AgentMemoryManager:
         # 5. 分析并写入行为模式
         self._analyze_and_write_patterns(session_id, messages)
 
-        logger.info(f"💾 [Memory] 已写入对话 {session_id} 的记忆：{len(entities)} 个实体")
+        logger.info(f"[Memory] 已写入对话 {session_id} 的记忆：{len(entities)} 个实体")
 
     def _summarize_conversation(self, messages: List[Dict[str, str]]) -> str:
         """LLM 生成 50 字对话摘要"""

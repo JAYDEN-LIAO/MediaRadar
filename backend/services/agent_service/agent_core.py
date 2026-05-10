@@ -119,7 +119,7 @@ class ToolExecutor:
             if not parsed.get("success", False):
                 # 直调失败，尝试 MCP
                 if self.mcp:
-                    logger.info(f"🔄 [ToolExecutor] 直调 {tool_name} 失败，切换 MCP...")
+                    logger.info(f"[ToolExecutor] 直调 {tool_name} 失败，切换 MCP...")
                     mcp_result = await self.diagnosis_engine.execute_with_diagnosis(
                         self.mcp.execute,
                         {"tool_name": tool_name, "args": args},
@@ -190,13 +190,13 @@ async def chat_with_agent_stream(messages: list, session_id: str = None):
 
     # Token 预算检查
     if token_budget_manager.should_summarize(current_messages):
-        logger.info("📦 [TokenBudget] 超出预算，执行 context summarization...")
+        logger.info("[TokenBudget] 超出预算，执行 context summarization...")
         current_messages = token_budget_manager.summarize_history(current_messages)
 
     max_iterations = getattr(settings, 'AGENT_MAX_ITERATIONS', 6)
 
     for i in range(max_iterations):
-        logger.info(f"🤖 [Agent Core] 正在评估意图 (第 {i+1} 轮思考)...")
+        logger.info(f"[Agent Core] 正在评估意图 (第 {i+1} 轮思考)...")
 
         # 生成回复
         response = agent_client.chat.completions.create(
@@ -220,7 +220,7 @@ async def chat_with_agent_stream(messages: list, session_id: str = None):
             for tool_call in tool_calls:
                 function_name = tool_call.function.name
                 function_args = json.loads(tool_call.function.arguments) if tool_call.function.arguments else {}
-                logger.info(f"🔧 [Agent Core] 决定调用工具: {function_name} | 参数: {function_args}")
+                logger.info(f"[Agent Core] 决定调用工具: {function_name} | 参数: {function_args}")
 
                 # 检查 trigger_background_crawl（特殊处理）
                 if function_name == "trigger_background_crawl":
@@ -350,7 +350,7 @@ async def chat_with_agent_stream(messages: list, session_id: str = None):
 
         else:
             # 无工具调用，生成最终回答
-            logger.info("✍️ [Agent Core] 思考完毕，正在生成最终流式总结...")
+            logger.info("[Agent Core] 思考完毕，正在生成最终流式总结...")
 
             current_messages.append({
                 "role": "system",

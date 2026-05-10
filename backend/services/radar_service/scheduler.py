@@ -35,14 +35,18 @@ def _build_trigger(start_time: str, monitor_frequency: float):
     - 每天在 start_time 执行第一次
     - 之后按 monitor_frequency 小时间隔重复
     - IntervalTrigger 支持所有频率（< 1h / >= 1h / 24h 全部适用）
+    - monitor_frequency < 0 时不应被调用（调用方已做保护）
     """
     hour, minute = map(int, start_time.split(":"))
-    start_date = datetime.datetime.today().replace(
-        hour=hour, minute=minute, second=0, microsecond=0
-    )
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
+    start_date = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    # 如果设定时间已过，从明天开始算，避免 start_date 在过去导致的 Invalid argument
+    if start_date <= now:
+        start_date += datetime.timedelta(days=1)
     return IntervalTrigger(
         hours=monitor_frequency,
         start_date=start_date,
+        timezone="Asia/Shanghai",
     )
 
 
@@ -90,15 +94,21 @@ def scheduler_start() -> tuple[bool, str]:
     monitor_frequency = float(conf.get("monitor_frequency", 1.0))
 
     _scheduler = BackgroundScheduler(timezone="Asia/Shanghai")
-    trigger = _build_trigger(start_time, monitor_frequency)
 
-    _scheduler.add_job(
-        _run_scan,
-        trigger=trigger,
-        id=_get_scan_job_id(),
-        replace_existing=True,
-        misfire_grace_time=60,
-    )
+    # monitor_frequency < 0 时仅暂停扫描任务，不注册扫描 job（但调度器本身保持运行）
+    if monitor_frequency >= 0:
+        trigger = _build_trigger(start_time, monitor_frequency)
+        _scheduler.add_job(
+            _run_scan,
+            trigger=trigger,
+            id=_get_scan_job_id(),
+            replace_existing=True,
+            misfire_grace_time=60,
+        )
+        freq_display = f"{monitor_frequency}h"
+    else:
+        freq_display = "已暂停"
+        logger.info("[Scheduler] 扫描任务已暂停（频率为负值），仅运行每日简报")
 
     _scheduler.start()
     _is_running = True
@@ -106,10 +116,13 @@ def scheduler_start() -> tuple[bool, str]:
     # 注册每日简报任务
     _schedule_daily_summary()
 
-    logger.info(f"[Scheduler] 调度器已启动: start_time={start_time}, frequency={monitor_frequency}h")
-    job = _scheduler.get_job(_get_scan_job_id())
-    next_str = job.next_run_time.isoformat() if job and job.next_run_time else "未知"
-    return True, f"调度器已启动，下次执行: {next_str}"
+    logger.info(f"[Scheduler] 调度器已启动: start_time={start_time}, frequency={freq_display}")
+    if monitor_frequency >= 0:
+        job = _scheduler.get_job(_get_scan_job_id())
+        next_str = job.next_run_time.isoformat() if job and job.next_run_time else "未知"
+        return True, f"调度器已启动，下次执行: {next_str}"
+    else:
+        return True, "调度器已启动，扫描任务已暂停（频率为负值），每日简报继续运行"
 
 
 def scheduler_stop() -> tuple[bool, str]:

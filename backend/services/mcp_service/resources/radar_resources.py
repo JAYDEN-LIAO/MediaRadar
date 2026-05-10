@@ -142,7 +142,7 @@ def _read_alerts(limit: int = 20, min_level: int = 1) -> Dict[str, Any]:
     """读取预警历史 Resource"""
     rows = RadarAdapter.get_recent_alerts(limit=limit, min_level=min_level)
 
-    risk_emoji = {1: "🟢", 2: "🟡", 3: "🟠", 4: "🟠", 5: "🔴"}
+    risk_labels = {1: "低", 2: "偏低", 3: "中", 4: "高", 5: "极高"}
     risk_text_map = {1: "低", 2: "偏低", 3: "中", 4: "高", 5: "极高"}
 
     items = []
@@ -153,7 +153,7 @@ def _read_alerts(limit: int = 20, min_level: int = 1) -> Dict[str, Any]:
             "keyword": r.get("keyword", ""),
             "platform": r.get("platform", ""),
             "risk_level": lvl,
-            "risk_emoji": risk_emoji.get(lvl, "⚪"),
+            "risk_label": risk_labels.get(lvl, "未知"),
             "risk_text": risk_text_map.get(lvl, "未知"),
             "core_issue": r.get("core_issue", "无"),
             "report": r.get("report", ""),

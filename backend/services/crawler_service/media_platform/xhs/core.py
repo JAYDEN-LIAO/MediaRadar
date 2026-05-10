@@ -281,7 +281,7 @@ class XiaoHongShuCrawler(AbstractCrawler):
         note_detail = None
 
         async with semaphore:
-            utils.logger.info(f"[get_note_detail_async_task] 🚀 开始抓取详情 (排队进入), note_id: {note_id}")
+            utils.logger.info(f"[get_note_detail_async_task] 开始抓取详情 (排队进入), note_id: {note_id}")
             try:
                 try:
                     note_detail = await self.xhs_client.get_note_by_id(note_id, xsec_source, xsec_token)
@@ -292,14 +292,14 @@ class XiaoHongShuCrawler(AbstractCrawler):
                     note_detail = await self.xhs_client.get_note_by_id_from_html(note_id, xsec_source, xsec_token,
                                                                                  enable_cookie=True)
                     if not note_detail:
-                        utils.logger.warning(f"[get_note_detail_async_task] ⚠️ 抓取失败(可能遇风控), Id: {note_id}，自动跳过该条...")
+                        utils.logger.warning(f"[get_note_detail_async_task]抓取失败(可能遇风控), Id: {note_id}，自动跳过该条...")
                         return None
 
                 note_detail.update({"xsec_token": xsec_token, "xsec_source": xsec_source})
 
                 # Sleep after fetching note detail
                 await asyncio.sleep(config.CRAWLER_MAX_SLEEP_SEC)
-                utils.logger.info(f"[get_note_detail_async_task] 💤 抓取成功，安全休眠 {config.CRAWLER_MAX_SLEEP_SEC} 秒后继续...")
+                utils.logger.info(f"[get_note_detail_async_task] 抓取成功，安全休眠 {config.CRAWLER_MAX_SLEEP_SEC} 秒后继续...")
 
                 return note_detail
 

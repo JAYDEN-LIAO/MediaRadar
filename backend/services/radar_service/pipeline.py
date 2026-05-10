@@ -159,19 +159,19 @@ class ScreenerStage:
                     pydantic_model=ScreenerResult
                 )
             except Exception as e:
-                logger.error(f"⚠️ [Screener] LLM 调用失败 (ID:{post_id}): {e}")
+                logger.error(f"[Screener] LLM 调用失败 (ID:{post_id}): {e}")
                 return (None, None)
 
             # call_llm 现在返回 LLMCallResult，数据在 .data 中
             if not res.success or res.data is None:
-                logger.error(f"⚠️ [Screener] LLM 返回无效 (ID:{post_id}): {res.error}")
+                logger.error(f"[Screener] LLM 返回无效 (ID:{post_id}): {res.error}")
                 return (None, None)
 
             data = res.data
 
             # 早退：无关且不需看图
             if not data.get("is_relevant") and not data.get("needs_vision"):
-                logger.info(f"⏭️ [早退] 关键词【{keyword}】文本判定无关，跳过 (ID:{post_id})")
+                logger.info(f"[早退] 关键词【{keyword}】文本判定无关，跳过 (ID:{post_id})")
                 return ("rejected", {"post_id": post_id})
 
             # 提取 LLM 生成的标准化标题（用于后续聚类）
@@ -179,7 +179,7 @@ class ScreenerStage:
 
             # 纯文本直接判定相关
             if data.get("is_relevant"):
-                logger.info(f"✅ [通过] 关键词【{keyword}】捕获舆情: {generated_title or post.get('title', '')[:15]}...")
+                logger.info(f"[通过] 关键词【{keyword}】捕获舆情: {generated_title or post.get('title', '')[:15]}...")
                 return ("passed", ScreenedPost(
                     post=post,
                     matched_keyword=keyword,  # 直接使用当前关键词，不再回退
@@ -188,7 +188,7 @@ class ScreenerStage:
                 ))
 
             # needs_vision=True：交给 VisionStage
-            logger.info(f"👀 [待视觉] 关键词【{keyword}】文本存疑需看图 (ID:{post_id})")
+            logger.info(f"[待视觉] 关键词【{keyword}】文本存疑需看图 (ID:{post_id})")
             return ("needs_vision", ScreenedPost(
                 post=post,
                 matched_keyword=keyword,  # 直接使用当前关键词，不再回退
@@ -239,7 +239,7 @@ class ScreenerStage:
         for idx, (keyword, _) in enumerate(all_tasks):
             item = results[idx]
             if isinstance(item, Exception):
-                logger.error(f"⚠️ [Screener] 并发任务异常: {item}")
+                logger.error(f"[Screener] 并发任务异常: {item}")
                 continue
             tag, value = item
             if tag == "passed":
@@ -375,11 +375,11 @@ class VisionStage:
 
         # 兜底：无图片则跳过（理论上不会发生，needs_vision 本身就暗示有图）
         if not image_urls:
-            logger.info(f"⚠️ [Vision] needs_vision 但无图片，跳过 (ID:{post_id})")
+            logger.info(f"[Vision] needs_vision 但无图片，跳过 (ID:{post_id})")
             return None
 
         # 调用视觉模型
-        logger.info(f"📸 [Vision] 提取图片证据 (ID:{post_id})")
+        logger.info(f"[Vision] 提取图片证据 (ID:{post_id})")
         vision_text = call_vision_llm(
             image_urls[0],
             text_content,
@@ -388,7 +388,7 @@ class VisionStage:
         )
 
         if not vision_text:
-            logger.info(f"⚠️ [Vision] 图片解析失败，跳过 (ID:{post_id})")
+            logger.info(f"[Vision] 图片解析失败，跳过 (ID:{post_id})")
             return None
 
         # 视觉补充后二次复判
@@ -406,7 +406,7 @@ class VisionStage:
 
         # call_llm 返回 LLMCallResult，数据在 .data 中
         if not res.success or res.data is None:
-            logger.warning(f"⚠️ [Vision] 融合图文后 LLM 返回无效 (ID:{post_id}): {res.error}")
+            logger.warning(f"[Vision] 融合图文后 LLM 返回无效 (ID:{post_id}): {res.error}")
             return None
 
         data = res.data
@@ -491,14 +491,14 @@ class AnalysisSubGraph:
                 )
 
                 logger.info(
-                    f"📊 [TopicTracker] keyword={cluster.keyword}, "
+                    f"[TopicTracker] keyword={cluster.keyword}, "
                     f"topic={cluster.topic_name[:20]}..., "
                     f"is_new={evolution_timeline.get('is_new_topic')}, "
                     f"signal={evolution_timeline.get('evolution_signal')}"
                 )
 
             except Exception as e:
-                logger.warning(f"⚠️ [TopicTracker] 话题追踪初始化失败: {e}")
+                logger.warning(f"[TopicTracker] 话题追踪初始化失败: {e}")
                 evolution_timeline = {}
 
         # 4. 调用 LangGraph 分析（携带演化上下文）
@@ -649,7 +649,7 @@ class RadarPipeline:
                 core_issue=result.get("core_issue", ""),
                 report=result.get("report", ""),
             )
-            logger.info(f"📊 [TopicTracker] topic_id={topic_id} 已写入/更新 Qdrant")
+            logger.info(f"[TopicTracker] topic_id={topic_id} 已写入/更新 Qdrant")
         except Exception as e:
             logger.error(f"[Pipeline] 话题索引失败: {e}")
             await self._mark_topic_for_retry(topic_id, cluster)
@@ -711,6 +711,7 @@ class RadarPipeline:
         # Stage 5: 收集结果 + 预警 + 话题演化追踪
         final_results: List[PipelineResult] = []
         cluster_results: List[tuple] = []  # (cluster, result) pairs for aggregator
+        alerts_to_send: list = []  # 批量预警暂存
 
         for item in analysis_outputs:
             if isinstance(item, Exception):
@@ -720,36 +721,15 @@ class RadarPipeline:
 
             cluster_results.append((cluster, result))
 
-            # 高危预警
+            # 高危预警（收集到 alerts_to_send，批量发送）
             if result["status"] == "alert" and self.config.alert_negative:
-                from .notifier import send_alert
+                from .notifier.models import AlertPayload
                 urls = [p.get("url", "") for p in cluster.posts if p.get("url")]
                 rl = result["risk_level"]
                 risk_class_map = {1: "low", 2: "low", 3: "medium", 4: "high", 5: "critical"}
                 risk_class = risk_class_map.get(rl, "neutral")
-                posts_summary = "\n".join(
-                    p.get("content", "")[:80] for p in cluster.posts[:3]
-                )
-                # 同步生成精美 HTML（固定模板），然后立即发送
-                email_html = ""
-                try:
-                    from .push_generator import generate_push_html
-                    email_html = await generate_push_html(
-                        keyword=cluster.keyword,
-                        platforms=self.config.platform,
-                        risk_level=rl,
-                        risk_class=risk_class,
-                        core_issue=cluster.topic_name,
-                        report=result["report"],
-                        post_count=len(cluster.posts),
-                        posts_summary=posts_summary,
-                        urls=urls,
-                        topic_id=result.get("topic_id", ""),
-                    )
-                except Exception as e:
-                    logger.warning(f"[Pipeline] 生成精美邮件HTML失败: {e}")
 
-                send_alert(
+                payload = AlertPayload(
                     keyword=cluster.keyword,
                     platform=self.config.platform,
                     risk_level=rl,
@@ -757,9 +737,10 @@ class RadarPipeline:
                     core_issue=cluster.topic_name,
                     report=result["report"],
                     urls=urls,
+                    topic_id=result.get("topic_id", ""),
                     post_count=len(cluster.posts),
-                    email_html=email_html,
                 )
+                alerts_to_send.append(payload)
 
             # 收集后台索引任务（asyncio.Task 替代 daemon thread）
             if result["risk_level"] >= 3 and evolution_timeline:
@@ -791,7 +772,22 @@ class RadarPipeline:
                 results_for_agg = [r for _, r in cluster_results]
                 self.aggregator.aggregate_clusters(clusters_for_agg, results_for_agg)
             except Exception as e:
-                logger.warning(f"⚠️ [Pipeline] 话题聚合失败: {e}")
+                logger.warning(f"[Pipeline] 话题聚合失败: {e}")
+        # ─────────────────────────────────────────────────
+
+        # ── 批量预警发送（合并为一封邮件）──────────────────
+        if alerts_to_send:
+            try:
+                from .notifier import send_batch_alert
+                keyword = self.config.keywords[0] if self.config.keywords else "监控关键词"
+                send_batch_alert(
+                    keyword=keyword,
+                    platform=self.config.platform,
+                    alerts=alerts_to_send,
+                )
+                logger.info(f"[Pipeline] 批量预警发送完成，共 {len(alerts_to_send)} 条")
+            except Exception as e:
+                logger.error(f"[Pipeline] 批量预警发送失败: {e}")
         # ─────────────────────────────────────────────────
 
         logger.info(f"[Pipeline] 完成，共产出 {len(final_results)} 条结果")

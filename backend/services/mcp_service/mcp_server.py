@@ -81,23 +81,23 @@ mcp = FastMCP(
 # 注册 Tools
 # ============================================================
 
-logger.info("📦 注册 Crawl Tools...")
+logger.info("注册 Crawl Tools...")
 register_crawl_tools(mcp)
 
-logger.info("📦 注册 Pipeline Tools...")
+logger.info("注册 Pipeline Tools...")
 register_pipeline_tools(mcp)
 
-logger.info("📦 注册 Alert Tools...")
+logger.info("注册 Alert Tools...")
 register_alert_tools(mcp)
 
-logger.info("📦 注册 Config Tools...")
+logger.info("注册 Config Tools...")
 register_config_tools(mcp)
 
 # ============================================================
 # 注册 Resources
 # ============================================================
 
-logger.info("📦 注册 Resources...")
+logger.info("注册 Resources...")
 register_resources(mcp)
 
 # ============================================================
@@ -127,10 +127,10 @@ async def main():
     args = parser.parse_args()
 
     if args.transport == "stdio":
-        logger.info("🚀 启动 MCP Server（stdio 模式）...")
+        logger.info("启动 MCP Server（stdio 模式）...")
         await mcp.run_stdio_async()
     else:
-        logger.info(f"🚀 启动 MCP Server（HTTP 模式，{args.host}:{args.port}）...")
+        logger.info(f"启动 MCP Server（HTTP 模式，{args.host}:{args.port}）...")
         # HTTP 模式：挂载为 ASGI app
         app = mcp.streamable_http_app()
         import uvicorn

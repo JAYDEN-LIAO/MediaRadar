@@ -66,7 +66,7 @@ class TopicAggregator:
             try:
                 self._aggregate_single(cluster, result)
             except Exception as e:
-                logger.warning(f"⚠️ [TopicAggregator] 聚合失败 topic={cluster.topic_name}: {e}")
+                logger.warning(f"[TopicAggregator] 聚合失败 topic={cluster.topic_name}: {e}")
 
     def _aggregate_single(self, cluster: Cluster, analysis_result: dict):
         """
@@ -149,7 +149,7 @@ class TopicAggregator:
                 add_post_to_topic(topic_id, post_id, is_current=1)
 
         logger.info(
-            f"📦 [TopicAggregator] topic_id={topic_id}, "
+            f"[TopicAggregator] topic_id={topic_id}, "
             f"topic={cluster.topic_name[:20]}, "
             f"posts={len(cluster.posts)}, "
             f"risk={risk_level} ({risk_class}), "
