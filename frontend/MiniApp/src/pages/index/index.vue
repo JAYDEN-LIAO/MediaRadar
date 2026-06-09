@@ -589,6 +589,8 @@ view, text, scroll-view, button {
   flex-direction: column;
   background-color: #F8FAFC;
   overflow: hidden;
+  max-width: 750rpx;
+  margin: 0 auto;
 }
 
 .header {

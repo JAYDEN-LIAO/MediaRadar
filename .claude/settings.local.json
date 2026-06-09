@@ -119,7 +119,13 @@
       "Bash(find:*)",
       "Bash(grep -r --include=\"*.py\" -P '[\\\\U0001F300-\\\\U0001F9FF]{2,}' D:/JAYDEN/develop/work/MediaRadar/backend/)",
       "Bash(ls -la *.py *.md)",
-      "Bash(ls -la update*.md)"
+      "Bash(ls -la update*.md)",
+      "Bash(rsync -av --exclude 'venv' --exclude 'frontend/MiniApp/node_modules' --exclude '.env' --exclude 'backend/data/*.db' --exclude 'backend/data/*.db-* --exclude 'logs' --exclude '__pycache__' --exclude '*.pyc' --exclude '.git' --exclude '.pytest_cache' --exclude 'plans' --exclude 'debug_test.py' --exclude 'test_email.html' --exclude '.mcp.json' --exclude 'plans/' --exclude 'agent_zone' --exclude 'debug_tools' --exclude '.refer' --exclude '/browser_data' --exclude '/temp_image' --exclude '*.xml' --exclude '*.iml' --exclude '.idea' --exclude '/.vscode' --exclude '/.DS_Store' --exclude 'plans/' ./ \"../deploy/MediaRadar/\" 2>&1 | tail -20)",
+      "Bash(./venv/Scripts/pip.exe index:*)",
+      "Bash(./venv/Scripts/python.exe --version)",
+      "Bash(./venv/Scripts/pip.exe show:*)",
+      "Bash(./venv/Scripts/pip.exe freeze:*)",
+      "Read(//d/JAYDEN/deploy/**)"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -9,9 +9,12 @@ export default {
 <style>
 /* 全局基础样式 */
 page {
-  background-color: #f5f5f5;
+  background-color: #F8FAFC;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   color: #333;
+  width: 100%;
+  max-width: 750rpx;
+  margin: 0 auto;
 }
 
 /* 隐藏滚动条 */
