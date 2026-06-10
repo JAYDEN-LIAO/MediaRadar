@@ -1,454 +1,158 @@
-# MediaRadar Public Opinion Monitoring System
+# MediaRadar
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.11+-blue.svg" alt="Python">
-  <img src="https://img.shields.io/badge/FastAPI-0.104+-green.svg" alt="FastAPI">
-  <img src="https://img.shields.io/badge/Vue-3.0-42b883.svg" alt="Vue">
-  <img src="https://img.shields.io/badge/Qdrant-1.7+-46A0B6.svg" alt="Qdrant">
-</p>
+Multi-platform social media monitoring, search engine, and AI-powered opinion analysis system.
 
-> 「 Not just a crawler — it's an industrial-grade **AI brain** for public opinion monitoring, featuring **multimodal vision**, **multi-agent collaboration**, **topic evolution tracking**, and **RAG knowledge base**. 」
+## Overview
 
-An enterprise-grade public opinion monitoring system built with FastAPI + uni-app. Through deep integration of multiple large language models and a proprietary high-availability crawler architecture, it achieves full-network data collection, cross-modal evidence parsing, multi-AI cross-validation, topic aggregation, evolution tracking, and real-time alert pushing.
+MediaRadar is a full-stack platform for crawling, searching, and analyzing public opinion across Chinese social media platforms. It supports real-time search, scheduled monitoring, AI-powered risk assessment, and multi-channel alerting.
 
----
+### Key Features
 
-## Key Features
+- **Media Search Engine** — On-demand crawling across 7 platforms (Weibo, Xiaohongshu, Bilibili, Douyin, Kuaishou, Tieba, Zhihu)
+- **Opinion Monitoring** — Scheduled crawling + AI analysis with risk level assessment
+- **Multi-Agent AI Analysis** — LangGraph pipeline: analyst → reviewer → director
+- **Multi-channel Alerts** — Email, WeCom, Feishu push notifications
+- **Multi-user & Auth** — Email/password registration + Google OAuth + JWT
+- **Web Dashboard** — Next.js 15 + Tailwind CSS + shadcn/ui
+- **WeChat Mini Program** — uni-app mobile client
+- **Prometheus Metrics** — LLM calls, pipeline duration, agent metrics
 
-### 🔄 Multi-Agent Collaboration Pipeline
-
-```
-Crawler collects raw posts
-     │
-     ▼
-┌─────────────────────────────────────────────┐
-│ ① Screener (Initial Filtering)              │
-│    Early Exit for irrelevant posts          │
-└─────────────────────────────────────────────┘
-     │
-     ▼
-┌─────────────────────────────────────────────┐
-│ ② Vision Agent (Image Evidence Extraction) │
-│    Joint image-text judgment (conditional)  │
-└─────────────────────────────────────────────┘
-     │
-     ▼
-┌─────────────────────────────────────────────┐
-│ ③ Cluster (HDBSCAN + Semantic Clustering)   │
-│    Topic aggregation + union-find safety net │
-└─────────────────────────────────────────────┘
-     │
-     ▼
-┌─────────────────────────────────────────────┐
-│ ④ Analyst (Risk Assessment)                 │
-│    RAG context from topic evolution          │
-└─────────────────────────────────────────────┘
-     │
-     ▼
-┌─────────────────────────────────────────────┐
-│ ⑤ Reviewer (Cross-Validation)               │
-│    Prevent single-model hallucinations      │
-└─────────────────────────────────────────────┘
-     │
-     ▼
-┌─────────────────────────────────────────────┐
-│ ⑥ Director (Alert Briefing)                 │
-│    High-risk alert generation               │
-└─────────────────────────────────────────────┘
-     │
-     ▼
-Alert Push + Topic Aggregation Write + Async Qdrant Index
-```
-
-### 📊 Topic Aggregation & Evolution Tracking
-
-Elevated from **post-level** to **topic-level** for more precise risk management:
-
-| Capability | Description |
-|------------|-------------|
-| Semantic Clustering | HDBSCAN groups semantically similar posts into topic clusters |
-| Smart Merging | Union-find safety net automatically merges highly similar topics |
-| Evolution Tracking | Shows "risk evolution path" e.g. `2 → 3 → 4` |
-| Evolution Signals | Identifies topics as escalating / stable / de-escalating |
-| RAG Enhancement | Auto-links historical cases for Analyst |
-
-### 👁️ Multimodal Vision Detective
-
-Automatically reads local HD images, precisely capturing and parsing visual evidence such as "foreign objects, messiness, error screenshots" in images — solving the image-text separation problem.
-
-### ⚖️ Cross-Source LLM Cross-Validation
-
-```
-Analyst (logical reasoning) ──┐
-                               ├──► Dual-track review defense
-Reviewer (deep review + report) ┘
-```
-
-### 📢 Multi-Channel Alert Push
-
-Supports three push channels, independently configurable:
-
-| Channel | Description |
-|---------|-------------|
-| WeCom (企业微信) | Webhook bot, Markdown format, color-coded risk levels |
-| Feishu (飞书) | Interactive card messages, color distinguishes risk levels |
-| Email | SMTP TLS, HTML + plain text dual format, auto-bundled summary |
-
-**Batch Alert Mode**: All high-risk alerts from a single scan are **merged into one email/message**. For example, if 4 high-risk public opinions are detected in one scan, only ONE notification is sent containing all 4 items. Subject format: `【舆情预警】{keyword} 监控报告 ({N}条风险舆情)`.
-
-Each channel is independently configured and can filter by risk level (1–5).
-
----
-
-## Supported Platforms
-
-<p float="left">
-  <img src="https://img.shields.io/badge/-%E5%B0%8F%E7%BA%A2%E4%B9%A6-EA5A89?style=flat-square" alt="小红书">
-  <img src="https://img.shields.io/badge/-%E5%BE%AE%E5%8D%9A-F0999D?style=flat-square" alt="微博">
-  <img src="https://img.shields.io/badge/-%E6%8A%96%E9%9F%B3-25F4EE?style=flat-square" alt="抖音">
-  <img src="https://img.shields.io/badge/-%E7%9F%A5%E4%B9%8E-0084FF?style=flat-square" alt="知乎">
-  <img src="https://img.shields.io/badge/-B%E7%AB%99-FF9C02?style=flat-square" alt="B站">
-  <img src="https://img.shields.io/badge/-%E8%B4%B0%E9%82%BA-BA1C26?style=flat-square" alt="贴吧">
-</p>
-
----
-
-## Architecture
-
-### Dual-Layer RAG Knowledge Base
-
-| Collection | Storage Unit | Purpose |
-|------------|--------------|---------|
-| `yq_history` | Single-post analysis results | Analyst historical case reference |
-| `topic_evolution` | Topic cluster summary + evolution track | Analyst topic timeline context |
-
-### Tech Stack
+## Tech Stack
 
 | Layer | Technology |
-|-------|------------|
-| Backend Framework | FastAPI · SQLite · asyncio |
-| AI Analysis | DeepSeek · Kimi/Moonshot · Qwen-VL-Max |
-| Vector Engine | BGE-M3 · Qdrant (dual collections) |
-| Clustering | HDBSCAN (adaptive density) + Union-Find |
-| Dialogue Engine | DeepSeek + Function Calling + SSE |
-| Frontend | uni-app (Vue 3) |
-| Crawler | Playwright / Selenium |
-
-### Model Configuration Mechanism
-
-The system supports independent model configuration for each Agent role, with automatic fallback to the **default model** when not configured:
-
-| Role | Purpose |
-|------|---------|
-| Default Model | Fallback for all agents |
-| Analyst | Public opinion risk analysis |
-| Reviewer | Cross-validation and judgment |
-| Embedding Engine | Text vector clustering (BGE-M3) |
-| Vision Engine | Image evidence parsing (Qwen-VL) |
-
----
+|-------|-----------|
+| Backend | Python 3.11, FastAPI, SQLite |
+| AI/LLM | LangGraph, DeepSeek, Kimi, Qwen-VL, BGE-M3 |
+| Crawler | Playwright, httpx |
+| Frontend (Web) | Next.js 15, Tailwind CSS, shadcn/ui, Framer Motion |
+| Frontend (Mini) | uni-app (Vue 3) |
+| Auth | JWT (HS256), bcrypt, Google OAuth 2.0 |
+| Scheduler | APScheduler |
+| Monitoring | Prometheus |
 
 ## Quick Start
 
-### Environment Setup
+### Prerequisites
+
+- Python 3.11+
+- Node.js 20+
+
+### Backend
 
 ```bash
-# Ensure Python 3.11+
-python --version
-
-# Initialize browser environment
-playwright install
+cd backend
+pip install -r ../requirements.txt
+cp ../.env.example ../.env   # Edit with your API keys
+python gateway/main.py       # API at http://localhost:8008
 ```
 
-### Configure Environment Variables
+### Web Frontend
 
 ```bash
-# Create .env in project root
-cat > .env << 'EOF'
-# ======== Default Model (fallback for all agents) ========
-DEFAULT_BASE_URL="https://api.deepseek.com/v1"
-DEFAULT_API_KEY="sk-xxx"
-DEFAULT_MODEL="deepseek-chat"
-
-# ======== Analyst (optional, overrides default) ========
-ANALYST_API_KEY=""
-ANALYST_BASE_URL=""
-ANALYST_MODEL=""
-
-# ======== Reviewer (optional, overrides default) ========
-REVIEWER_API_KEY=""
-REVIEWER_BASE_URL=""
-REVIEWER_MODEL=""
-
-# ======== Embedding Engine (optional, overrides default) ========
-EMBEDDING_API_KEY=""
-EMBEDDING_BASE_URL=""
-EMBEDDING_MODEL=""
-
-# ======== Vision Engine (optional, overrides default) ========
-VISION_API_KEY=""
-VISION_BASE_URL=""
-VISION_MODEL=""
-
-# ======== Qdrant Vector Database ========
-QDRANT_HOST="127.0.0.1"
-QDRANT_PORT="6333"
-QDRANT_COLLECTION="yq_history"
-TOPIC_COLLECTION="topic_evolution"
-
-# ======== Push Channels (optional) ========
-# WeCom Webhook
-WECOM_WEBHOOK_URL=""
-# Feishu Webhook
-FEISHU_WEBHOOK_URL=""
-# Email SMTP
-SMTP_HOST=""
-SMTP_PORT="587"
-SMTP_USER=""
-SMTP_PASSWORD=""
-SMTP_FROM=""
-
-# ======== Logging (optional) ========
-LOG_LEVEL="INFO"
-LOG_FORMAT="text"
-LOG_TO_FILE="true"
-LOG_TO_CONSOLE="true"
-EOF
+cd frontend/web
+npm install
+npm run dev                  # UI at http://localhost:3003
 ```
 
-### Start Services
+### Mini Program
 
 ```bash
-# 1. Start Qdrant
-docker run -d --name mediaradar-qdrant \
-  -p 6333:6333 -p 6334:6334 \
-  -v $(pwd)/data/qdrant:/qdrant/storage \
-  qdrant/qdrant:latest
-
-# 2. Start backend
-python backend/gateway/main.py
-# Visit http://127.0.0.1:8000/docs for API docs
-
-# 3. Initialize topic evolution knowledge base (one-time)
-python scripts/rag/migrate_topic_evolution.py
-
-# 4. Start frontend
-# Use HBuilderX to open frontend/MiniApp directory and run
+cd frontend/MiniApp
+npm install
+# Open with HBuilder X or Weixin DevTools
 ```
-
----
-
-## API Endpoints
-
-### Radar Operations
-
-| Endpoint | Method | Description |
-|----------|:------:|-------------|
-| `/api/start_task` | POST | Trigger full-network scan (background) |
-| `/api/radar_status` | GET | Get radar running status |
-| `/api/settings` | GET / POST | Get/save system configuration |
-| `/api/mcp/health` | GET | MCP Server health check |
-
-### Push Channels
-
-| Endpoint | Method | Description |
-|----------|:------:|-------------|
-| `/api/push/configs` | GET | Get all push configurations |
-| `/api/push/config/{channel}` | GET | Get specific channel config |
-| `/api/push/config/{channel}` | POST | Save push channel config |
-| `/api/push/test` | POST | Test push channel connectivity |
-
-### Model Configuration
-
-| Endpoint | Method | Description |
-|----------|:------:|-------------|
-| `/api/llm/configs` | GET | Get all Agent model configurations |
-| `/api/llm/config/{agent}` | POST | Update specific Agent model config |
-| `/api/llm/test/{agent}` | POST | Test specific Agent model connectivity |
-
-### Topic Aggregation
-
-| Endpoint | Method | Description |
-|----------|:------:|-------------|
-| `/api/topic_list` | GET | Topic aggregation list |
-| `/api/topic/{topic_id}` | GET | Topic detail (posts + evolution timeline) |
-| `/api/topic/{topic_id}/process` | POST | Mark topic as processed |
-| `/api/topic_evolution` | GET | Get full topic evolution timeline |
-| `/api/topic_evolution/migrate_clusters` | POST | Batch migrate historical data |
-| `/api/topic_stats` | GET | Topic evolution library statistics |
-
-### Public Opinion & AI Assistant
-
-| Endpoint | Method | Description |
-|----------|:------:|-------------|
-| `/api/yq_list` | GET | Public opinion list (latest 50) |
-| `/api/agent/chat` | POST | AI assistant streaming chat (SSE + Function Calling) |
-
----
-
-## Scheduling System
-
-The system uses **APScheduler** (BackgroundScheduler) for time-based task scheduling, with two types of scheduled jobs:
-
-### Radar Scanning Job
-
-- Runs at `start_time` (default 08:00) and repeats every `monitor_frequency` hours
-- Uses `IntervalTrigger` for all frequency ranges (< 1h / ≥ 1h / 24h)
-- Global `asyncio.Lock` (`_scan_lock`) prevents concurrent scans
-- `misfire_grace_time=60` seconds — missed jobs within 60s will still run
-- `reschedule_if_running()` hot-reloads the schedule when `start_time` or `monitor_frequency` changes
-- Set `monitor_frequency = -1` to **pause scanning** without stopping the scheduler (daily summary continues)
-- **Batch alert**: all high-risk alerts from one scan are merged into ONE notification per channel
-
-### Daily Summary Job
-
-- Triggered by `push_time` (default 18:00), controlled by `push_summary` switch
-- Uses `CronTrigger` (fixed clock time, not interval)
-- Generates HTML digest via `generate_daily_summary_html()` and sends via all active push channels
-- `reschedule_daily_summary_if_running()` hot-reloads when `push_summary` or `push_time` changes
-
-### Scheduler Control API
-
-| Endpoint | Method | Description |
-|----------|:------:|-------------|
-| `/api/scheduler/start` | POST | Start the scheduler |
-| `/api/scheduler/stop` | POST | Stop the scheduler |
-| `/api/scheduler/status` | GET | Get scheduler status (active, next_run, interval, scan_in_progress) |
-
----
-
-## Email Templates
-
-The system generates three types of HTML email templates (all in `push_generator.py`):
-
-### Batch Alert Template (`BATCH_PUSH_HTML_TEMPLATE`)
-
-Triggered when multiple high-risk alerts are detected in a single scan. All alerts are **merged into one email**. Features:
-- Dark banner header with total alert count
-- Stats row: critical count · high count · medium count
-- Per-alert card: topic name · risk level badge · post count · report excerpt · source links
-- Sorted by risk level (critical → high → medium → low)
-- Used by `EmailNotifier.send_batch()` via `generate_batch_push_html()`
-
-### Alert Template (`PUSH_HTML_TEMPLATE`)
-
-Triggered per individual high-risk alert. Features:
-- Dark banner header with risk-level color coding
-- Stats row: platform · risk level · post count
-- Collapsible sections: Core Issue · Alert Report · Source Links
-- LLM-enhanced structured data extraction via `generate_push_data()`
-- Renders via `render_push_html()` with fallback if LLM fails
-
-### Daily Summary Template (`DAILY_SUMMARY_TEMPLATE`)
-
-Triggered by daily summary job. Features:
-- Statistics row: total count · high-risk count · platform count
-- Per-keyword blocks with highest risk badge
-- AI-generated summary via `_generate_daily_summary_text()` (calls LLM)
-- Grouped by keyword from `topic_summary` table
-- Links pulled from `topic_posts` + `ai_results` join
-
-All templates:
-- Table-based layout (email client compatibility)
-- Inline CSS (no external dependencies)
-- Responsive max-width 620px
-- Support collapsible `<details>` elements with ▼/▶ indicators
-
----
-
-## Logging System
-
-Logs are stored by module subdirectory, supporting `text` / `json` dual format:
-
-```
-logs/
-├── radar/          # Radar service (pipeline / cluster / analysis / tracker...)
-├── crawler/        # Crawler service
-├── agent/          # AI assistant service
-├── gateway/        # API gateway
-├── audit/          # Audit logs (alerts, config changes)
-└── error/          # Error summary
-```
-
-```python
-from core.logger import get_logger
-from core.context import set_task_context
-
-logger = get_logger("radar.pipeline")
-
-# Request-level context tracking
-set_task_context(task_id="xxx", keyword="Li Ronghao", platform="WB")
-```
-
----
 
 ## Project Structure
 
 ```
-MediaRadar/
-├── backend/
-│   ├── core/                    # Global core
-│   │   ├── config.py           # Configuration (Qdrant / LLM configs)
-│   │   ├── database.py         # SQLite connection
-│   │   ├── logger.py           # Log factory (text/json dual format)
-│   │   ├── context.py          # Request context (task_id tracking)
-│   │   └── audit.py            # Audit log
-│   ├── gateway/
-│   │   └── main.py             # FastAPI unified gateway (port 8000)
-│   └── services/
-│       ├── agent_service/       # AI opinion assistant
-│       │   ├── agent_core.py   # Streaming dialogue engine + Function Calling
-│       │   ├── tools.py        # Toolset
-│       │   └── api.py
-│       ├── radar_service/       # Core opinion analysis
-│       │   ├── main.py         # Dispatcher main program
-│       │   ├── pipeline.py     # Pipeline dispatcher
-│       │   ├── llm_pipeline.py # LangGraph analysis subgraph
-│       │   ├── embed_cluster.py # HDBSCAN clustering
-│       │   ├── analysis_graph.py # LangGraph graph
-│       │   ├── topic_tracker.py # Topic evolution tracking
-│       │   ├── topic_aggregator.py # Topic aggregation
-│       │   ├── vector_store.py  # Qdrant wrapper
-│       │   ├── vision_agent.py # Visual evidence extraction
-│       │   ├── llm_gateway.py  # LLM gateway
-│       │   ├── db_manager.py   # SQLite CRUD
-│       │   ├── schemas.py      # Data contracts
-│       │   ├── prompt_templates.py
-│       │   ├── notifier/       # Alert push (package)
-│       │   │   ├── __init__.py
-│       │   │   ├── base.py     # NotifierBase abstract class
-│       │   │   ├── registry.py # Push dispatcher
-│       │   │   ├── models.py  # Data models
-│       │   │   ├── channel_email.py
-│       │   │   ├── channel_wecom.py
-│       │   │   └── channel_feishu.py
-│       │   └── api.py
-│       └── crawler_service/     # Crawler engine
-├── frontend/
-│   └── MiniApp/                 # uni-app (Vue 3)
-│       └── src/
-│           └── pages/
-│               ├── index/        # Dashboard
-│               ├── list/         # Opinion list / topic detail
-│               ├── chat/         # AI assistant
-│               ├── profile/      # Profile center
-│               └── settings/      # Monitor settings / push settings / model settings
-├── scripts/
-│   └── rag/                     # Data migration scripts
-├── plans/                       # Planning documents
-└── .env
+backend/
+├── gateway/main.py           # FastAPI entry point
+├── core/                     # Core components
+│   ├── config.py             # Settings (env vars)
+│   ├── auth*.py              # JWT, user DB, auth deps
+│   ├── circuit_breaker.py    # LLM circuit breaker
+│   ├── logger.py             # Logging (JSON/colored)
+│   ├── metrics.py            # Prometheus metrics
+│   ├── sanitize.py           # HTML sanitization
+│   ├── security_middleware.py # Security headers & rate limiting
+│   └── rate_limiter.py       # Rate limiter
+├── services/
+│   ├── radar_service/        # Opinion monitoring core
+│   │   ├── pipeline.py       # Pipeline orchestrator
+│   │   ├── analysis_graph.py # LangGraph analysis
+│   │   ├── db_manager.py     # SQLite operations
+│   │   ├── scheduler.py      # APScheduler
+│   │   ├── push_generator.py # HTML email templates
+│   │   └── notifier/         # Alert pushes
+│   ├── agent_service/        # AI chat agent
+│   │   ├── agent_core.py     # Chat engine + function calling
+│   │   ├── tools.py          # Status/crawl/alert tools
+│   │   └── memory/           # Agent memory (jieba, TTL)
+│   ├── auth_service/         # Multi-user auth & OAuth
+│   │   └── oauth_providers/  # Google OAuth
+│   └── crawler_service/      # Platform crawlers (independent)
+frontend/
+├── web/                      # Next.js dashboard
+└── MiniApp/                  # uni-app mobile
+tests/
+├── unit/                     # Phase 1-7 + security tests
+└── api_e2e_test.py           # API end-to-end tests
 ```
 
----
+## Core Architecture
 
-## Changelog
+```
+Search / Cron Trigger
+        │
+        ▼
+  Pipeline Orchestrator
+  ① Screener → ② Vision → ③ Cluster
+                                  │
+                                  ▼
+                       LangGraph Analysis
+                       Analyst → Reviewer → Director
+                                  │
+                                  ▼
+                         Alert / Push Notification
+```
 
-| Version | Content |
-|---------|---------|
-| v2.1 | Multi-channel alert push: WeCom / Feishu / Email, independent risk level config |
-| v2.1 | Model settings page: default model fallback + per-agent independent config |
-| v2.0 | Logging system refactored, stored by module, text/json dual format |
-| v2.0 | Topic aggregation, upgraded from post-level to topic cluster level |
-| v2.0 | Topic evolution tracking, RAG enhancement + risk evolution path display |
-| v1.0 | Pipeline 5-stage dispatcher, LangGraph Multi-Agent architecture |
-| v1.0 | Vision Agent, multimodal visual evidence extraction |
+## API Overview
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/auth/register` | POST | Email/password registration |
+| `/api/auth/login` | POST | Email/password login |
+| `/api/auth/oauth/google/login` | GET | Google OAuth |
+| `/api/auth/me` | GET | Current user info |
+| `/api/radar_status` | GET | Radar status |
+| `/api/today_summary` | GET | Today's AI summary |
+| `/api/volume_stats` | GET | Volume stats with keyword breakdown |
+| `/api/topic_list` | GET | Paginated topic list |
+| `/api/agent/chat` | POST | AI agent chat (SSE stream) |
+| `/api/circuit/states` | GET | Circuit breaker status |
+| `/metrics` | GET | Prometheus metrics |
+
+## Configuration
+
+Key environment variables (`.env`):
+
+```env
+# LLM API Keys
+DEFAULT_API_KEY=sk-...
+ANALYST_API_KEY=sk-...
+
+# Auth
+JWT_SECRET=your-secret-32bytes-min
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+
+# Deployment
+ENV=dev|prod
+ALLOWED_ORIGINS=https://your-domain.com
+```
+
+See `.env.production.example` for full reference.
+
+## License
+
+MIT

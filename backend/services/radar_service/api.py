@@ -1,8 +1,9 @@
 # backend/services/radar_service/api.py
-from fastapi import APIRouter, BackgroundTasks, Security
+from fastapi import APIRouter, BackgroundTasks, Security, Depends
 from pydantic import BaseModel
 from core.logger import get_logger
 from core.auth import verify_api_key
+from core.auth_deps import get_current_user, get_optional_user
 
 logger = get_logger("radar.api")
 from .db_manager import (
@@ -12,7 +13,7 @@ from .db_manager import (
 )
 from core.database import get_db_connection
 from .main import api_start_task, radar_status, reload_config
-from typing import List
+from typing import List, Optional, Dict, Any
 
 router = APIRouter()
 
@@ -33,9 +34,31 @@ def mcp_health_check():
         "is_running": radar_status.is_running
     }
 
+
+# ============================================================
+# 熔断器状态端点（修复 #3.1）
+# ============================================================
+
+@router.get("/api/circuit/states")
+def get_circuit_states():
+    """
+    返回所有熔断器当前状态（修复 #3.1）
+    """
+    from .llm_gateway import get_all_breakers
+    breakers = get_all_breakers()
+    breaker_dicts = [b.to_dict() for b in breakers]
+    summary = {
+        "total": len(breaker_dicts),
+        "open": sum(1 for b in breaker_dicts if b["state"] == "open"),
+        "half_open": sum(1 for b in breaker_dicts if b["state"] == "half_open"),
+        "closed": sum(1 for b in breaker_dicts if b["state"] == "closed"),
+    }
+    return {"code": 200, "msg": "OK", "data": {"breakers": breaker_dicts, "summary": summary}}
+
 @router.post("/api/start_task", dependencies=[Security(verify_api_key)])
-def start_task(background_tasks: BackgroundTasks):
-    success, msg = api_start_task(background_tasks)
+def start_task(background_tasks: BackgroundTasks, current_user: dict = Depends(get_current_user)):
+    """WS4.6：扫描结果归属到当前用户"""
+    success, msg = api_start_task(background_tasks, owner_id=current_user["id"])
     if success:
         return {"code": 200, "msg": msg}
     else:
@@ -74,8 +97,11 @@ def get_radar_status():
     return {"code": 200, "data": radar_status.get_status_dict()}
 
 @router.get("/api/yq_list")
-def get_yq_list():
-    db_results = get_latest_results(limit=50)
+def get_yq_list(current_user: dict = Depends(get_optional_user)):
+    """WS4.6：按 owner 过滤（无 token 视为 admin 看全部）"""
+    is_admin = current_user.get("role") == "admin" if current_user else True
+    owner_id = current_user["id"] if current_user and not is_admin else None
+    db_results = get_latest_results(limit=50, owner_id=owner_id, is_admin=is_admin)
     
     plat_name_map = {
         "wb": "微博",
@@ -136,7 +162,19 @@ class SettingsRequest(BaseModel):
 
 @router.get("/api/settings")
 def api_get_settings():
-    return {"code": 200, "data": get_system_settings()}
+    data = get_system_settings()
+    # 兼容旧数据：keywords 可能是 [{"text":"...", "level":"..."}]，转成 ["..."]
+    if data and "keywords" in data and isinstance(data["keywords"], list):
+        data["keywords"] = [
+            k["text"] if isinstance(k, dict) else str(k)
+            for k in data["keywords"]
+        ]
+    if data and "inactive_keywords" in data and isinstance(data["inactive_keywords"], list):
+        data["inactive_keywords"] = [
+            k["text"] if isinstance(k, dict) else str(k)
+            for k in data["inactive_keywords"]
+        ]
+    return {"code": 200, "data": data}
 
 @router.post("/api/settings")
 def api_save_settings(req: SettingsRequest):
@@ -164,23 +202,23 @@ def get_topic_list(
     sentiment: str = None,
     is_processed: int = None,
     limit: int = 50,
+    current_user: dict = Depends(get_optional_user),
 ):
     """
     获取话题聚合列表，替换原来的 /api/yq_list 单帖列表。
 
-    筛选参数：
-        keyword:   按监控关键词过滤
-        platform:  按涉及平台过滤（wb/xhs/bili/zhihu/dy/ks/tieba）
-        sentiment: 按情感过滤（negative/positive/neutral）
-        is_processed: 按处理状态过滤（0/1）
-        limit:     返回条数上限（默认 50）
+    WS4.6：无 token 视为 admin 看全部数据。
     """
+    is_admin = current_user.get("role") == "admin" if current_user else True
+    owner_id = current_user["id"] if current_user and not is_admin else None
     rows = get_topic_summary_list(
         keyword=keyword,
         platform=platform,
         sentiment=sentiment,
         is_processed=is_processed,
         limit=limit,
+        owner_id=owner_id,
+        is_admin=is_admin,
     )
 
     # 平台英文标识 → 中文映射
@@ -236,17 +274,20 @@ def get_topic_list(
 
 
 @router.get("/api/topic/{topic_id}")
-def get_topic_detail(topic_id: str):
+def get_topic_detail(topic_id: str, current_user: dict = Depends(get_optional_user)):
     """
     获取话题详情（含关联帖子列表 + 演化时间线）。
+    WS4.6：无 token 视为 admin 看全部
     """
+    is_admin = current_user.get("role") == "admin" if current_user else True
+    owner_id = current_user["id"] if current_user and not is_admin else None
     # 话题聚合信息
-    summary = get_topic_summary_by_id(topic_id)
+    summary = get_topic_summary_by_id(topic_id, owner_id=owner_id, is_admin=is_admin)
     if not summary:
         return {"code": 404, "msg": "话题不存在"}
 
     # 关联帖子列表
-    posts = get_topic_posts(topic_id)
+    posts = get_topic_posts(topic_id, owner_id=owner_id, is_admin=is_admin)
 
     # 平台映射
     plat_name_map = {
@@ -339,8 +380,13 @@ def get_topic_detail(topic_id: str):
 
 
 @router.post("/api/topic/{topic_id}/process")
-def api_mark_topic_processed(topic_id: str):
-    """标记话题为已处理"""
+def api_mark_topic_processed(topic_id: str, current_user: dict = Depends(get_current_user)):
+    """WS4.6：标记话题为已处理（仅本人或 admin）"""
+    is_admin = current_user.get("role") == "admin"
+    # 先校验权限
+    summary = get_topic_summary_by_id(topic_id, owner_id=current_user["id"], is_admin=is_admin)
+    if not summary:
+        return {"code": 404, "msg": "话题不存在或无权访问"}
     success = mark_topic_processed(topic_id)
     if success:
         return {"code": 200, "msg": "话题已标记处理"}
@@ -447,9 +493,10 @@ def get_topic_stats(keyword: str = ""):
 # ============================================================
 
 @router.get("/api/volume_stats")
-def get_volume_stats(keyword: str = ""):
+def get_volume_stats(keyword: str = "", current_user: dict = Depends(get_optional_user)):
     """
     获取近7日每日声量数据（用于首页趋势图）。
+    WS4.6：无 token 视为 admin 看全部
 
     参数：
         keyword: 可选，按关键词过滤
@@ -468,20 +515,35 @@ def get_volume_stats(keyword: str = ""):
 
     today = datetime.date.today()
     week_ago = today - datetime.timedelta(days=6)
+    is_admin = current_user.get("role") == "admin" if current_user else True
+    owner_id = current_user["id"] if current_user and not is_admin else None
 
     with get_db_connection() as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        cursor.execute('''
-            SELECT DATE(create_time) as day,
-                   COUNT(*) as total_count,
-                   SUM(CASE WHEN sentiment = 'negative' THEN 1 ELSE 0 END) as neg_count
-            FROM ai_results
-            WHERE DATE(create_time) >= ?
-              AND (? = '' OR keyword = ?)
-            GROUP BY DATE(create_time)
-            ORDER BY day ASC
-        ''', (week_ago.isoformat(), keyword, keyword))
+        if is_admin:
+            cursor.execute('''
+                SELECT DATE(create_time) as day,
+                       COUNT(*) as total_count,
+                       SUM(CASE WHEN sentiment = 'negative' THEN 1 ELSE 0 END) as neg_count
+                FROM ai_results
+                WHERE DATE(create_time) >= ?
+                  AND (? = '' OR keyword = ?)
+                GROUP BY DATE(create_time)
+                ORDER BY day ASC
+            ''', (week_ago.isoformat(), keyword, keyword))
+        else:
+            cursor.execute('''
+                SELECT DATE(create_time) as day,
+                       COUNT(*) as total_count,
+                       SUM(CASE WHEN sentiment = 'negative' THEN 1 ELSE 0 END) as neg_count
+                FROM ai_results
+                WHERE DATE(create_time) >= ?
+                  AND (? = '' OR keyword = ?)
+                  AND (owner_id = ? OR owner_id IS NULL)
+                GROUP BY DATE(create_time)
+                ORDER BY day ASC
+            ''', (week_ago.isoformat(), keyword, keyword, owner_id))
         rows = cursor.fetchall()
 
     # 补全7天数据（无数据的日期填0）
@@ -496,12 +558,51 @@ def get_volume_stats(keyword: str = ""):
         neg_vols.append(r["neg_count"] if r else 0)
         cur += datetime.timedelta(days=1)
 
+    # 按关键词拆分声量（取 Top 5 关键词，前端多线图用）
+    keywords_volumes = {}
+    try:
+        week_start = (today - datetime.timedelta(days=6)).isoformat()
+        if is_admin:
+            cursor.execute('''
+                SELECT keyword, DATE(create_time) as day, COUNT(*) as cnt
+                FROM ai_results
+                WHERE DATE(create_time) >= ?
+                GROUP BY keyword, DATE(create_time)
+                ORDER BY keyword, day
+            ''', (week_start,))
+        else:
+            cursor.execute('''
+                SELECT keyword, DATE(create_time) as day, COUNT(*) as cnt
+                FROM ai_results
+                WHERE DATE(create_time) >= ?
+                  AND (owner_id = ? OR owner_id IS NULL)
+                GROUP BY keyword, DATE(create_time)
+                ORDER BY keyword, day
+            ''', (week_start, owner_id))
+        kw_rows = cursor.fetchall()
+
+        # 聚合成 {keyword: {day_iso: count}}
+        kw_map: dict[str, dict[str, int]] = {}
+        for r in kw_rows:
+            kw_map.setdefault(r["keyword"], {})[r["day"]] = r["cnt"]
+
+        # 取总量前 5 的关键词
+        top_kws = sorted(kw_map.items(), key=lambda x: sum(x[1].values()), reverse=True)[:5]
+        for kw, day_counts in top_kws:
+            keywords_volumes[kw] = [
+                day_counts.get(cur.isoformat(), 0)
+                for cur in (week_ago + datetime.timedelta(days=i) for i in range(7))
+            ]
+    except Exception:
+        pass
+
     return {
         "code": 200,
         "data": {
             "days": days,
             "volumes": volumes,
             "negative_volumes": neg_vols,
+            "keywords_volumes": keywords_volumes,
             "total": sum(volumes),
             "negative_total": sum(neg_vols),
         }
@@ -509,9 +610,10 @@ def get_volume_stats(keyword: str = ""):
 
 
 @router.get("/api/today_summary")
-def get_today_summary():
+def get_today_summary(current_user: dict = Depends(get_optional_user)):
     """
     获取今日舆情 AI 摘要。
+    WS4.6：无 token 视为 admin 看全部
 
     返回：
         {
@@ -527,17 +629,30 @@ def get_today_summary():
     import sqlite3
 
     today = datetime.date.today().isoformat()
+    is_admin = current_user.get("role") == "admin" if current_user else True
+    user_id = current_user["id"] if current_user else None
+
+    # 风险等级分布（从 topic_summary 统计）
+    risk_distribution = {"high": 0, "medium": 0, "low": 0, "pending": 0}
 
     with get_db_connection() as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
-        # 今日数据
-        cursor.execute('''
-            SELECT * FROM ai_results
-            WHERE DATE(create_time) = ?
-            ORDER BY create_time DESC
-        ''', (today,))
+        # 今日数据（按 owner 过滤）
+        if is_admin:
+            cursor.execute('''
+                SELECT * FROM ai_results
+                WHERE DATE(create_time) = ?
+                ORDER BY create_time DESC
+            ''', (today,))
+        else:
+            cursor.execute('''
+                SELECT * FROM ai_results
+                WHERE DATE(create_time) = ?
+                  AND (owner_id = ? OR owner_id IS NULL)
+                ORDER BY create_time DESC
+            ''', (today, user_id))
         rows = cursor.fetchall()
         today_data = [dict(r) for r in rows]
 
@@ -560,16 +675,27 @@ def get_today_summary():
 
         # 取监控关键词（从系统设置）
         settings = get_system_settings()
-        keyword = (settings.get("keywords") or [""])[0] if settings else ""
+        raw = (settings.get("keywords") or [""])[0] if settings else ""
+        keyword = raw.get("text", str(raw)) if isinstance(raw, dict) else str(raw)
 
-        # 获取今日新增话题（按 last_seen 过滤今天）
-        cursor.execute('''
-            SELECT topic_name, risk_class, post_count, core_issue
-            FROM topic_summary
-            WHERE DATE(last_seen) = ?
-            ORDER BY risk_level DESC
-            LIMIT 5
-        ''', (today,))
+        # 获取今日新增话题（按 last_seen 过滤今天，按 owner 过滤）
+        if is_admin:
+            cursor.execute('''
+                SELECT topic_name, risk_class, post_count, core_issue
+                FROM topic_summary
+                WHERE DATE(last_seen) = ?
+                ORDER BY risk_level DESC
+                LIMIT 5
+            ''', (today,))
+        else:
+            cursor.execute('''
+                SELECT topic_name, risk_class, post_count, core_issue
+                FROM topic_summary
+                WHERE DATE(last_seen) = ?
+                  AND (owner_id = ? OR owner_id IS NULL)
+                ORDER BY risk_level DESC
+                LIMIT 5
+            ''', (today, user_id))
         topic_rows = cursor.fetchall()
         topics = [dict(r) for r in topic_rows]
 
@@ -600,6 +726,37 @@ def get_today_summary():
         if not summary:
             summary = f"今日共捕获相关讨论 {len(today_data)} 条，其中高风险 {high_risk_count} 条。"
 
+        # 风险等级分布（从 topic_summary 统计所有 active 话题）
+        try:
+            if is_admin:
+                cursor.execute('''
+                    SELECT
+                        SUM(CASE WHEN CAST(risk_level AS INTEGER) >= 4 THEN 1 ELSE 0 END) as high,
+                        SUM(CASE WHEN CAST(risk_level AS INTEGER) = 3 THEN 1 ELSE 0 END) as medium,
+                        SUM(CASE WHEN CAST(risk_level AS INTEGER) <= 2 THEN 1 ELSE 0 END) as low
+                    FROM topic_summary
+                    WHERE DATE(last_seen) >= ?
+                ''', (today,))
+            else:
+                cursor.execute('''
+                    SELECT
+                        SUM(CASE WHEN CAST(risk_level AS INTEGER) >= 4 THEN 1 ELSE 0 END) as high,
+                        SUM(CASE WHEN CAST(risk_level AS INTEGER) = 3 THEN 1 ELSE 0 END) as medium,
+                        SUM(CASE WHEN CAST(risk_level AS INTEGER) <= 2 THEN 1 ELSE 0 END) as low
+                    FROM topic_summary
+                    WHERE DATE(last_seen) >= ?
+                      AND (owner_id = ? OR owner_id IS NULL)
+                ''', (today, user_id))
+            dist_row = cursor.fetchone()
+            if dist_row:
+                risk_distribution = {
+                    "high": dist_row[0] or 0,
+                    "medium": dist_row[1] or 0,
+                    "low": dist_row[2] or 0,
+                }
+        except Exception:
+            pass
+
         return {
             "code": 200,
             "data": {
@@ -609,6 +766,7 @@ def get_today_summary():
                 "high_risk_count": high_risk_count,
                 "hottest_topic": hottest_topic,
                 "escalating_topics": escalating,
+                "risk_distribution": risk_distribution,
             }
         }
 

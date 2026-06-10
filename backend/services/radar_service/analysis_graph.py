@@ -383,7 +383,7 @@ async def analyze_and_report_async(
     内部将同步 call_llm 扔到线程池执行，不阻塞事件循环。
     返回值与 analyze_and_report 一致，包含 evolution_timeline（含 cluster_summary）。
     """
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     return await loop.run_in_executor(
         None,
         analyze_and_report,

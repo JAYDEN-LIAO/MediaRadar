@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import List, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if BASE_DIR not in sys.path:
@@ -49,7 +49,7 @@ class TopicAggregator:
     def __init__(self):
         pass
 
-    def aggregate_clusters(self, clusters: List[Cluster], analysis_results: List[dict]):
+    def aggregate_clusters(self, clusters: List[Cluster], analysis_results: List[dict], owner_id: Optional[str] = None):
         """
         聚合一批 Cluster。
 
@@ -58,17 +58,18 @@ class TopicAggregator:
             analysis_results: 与 clusters 一一对应的分析结果列表
                               每个元素为 { "risk_level": int, "risk_class": str,
                                           "core_issue": str, "report": str }
+            owner_id: WS4.6 数据归属（None = 公共/历史）
         """
         if not clusters:
             return
 
         for cluster, result in zip(clusters, analysis_results):
             try:
-                self._aggregate_single(cluster, result)
+                self._aggregate_single(cluster, result, owner_id=owner_id)
             except Exception as e:
                 logger.warning(f"[TopicAggregator] 聚合失败 topic={cluster.topic_name}: {e}")
 
-    def _aggregate_single(self, cluster: Cluster, analysis_result: dict):
+    def _aggregate_single(self, cluster: Cluster, analysis_result: dict, owner_id: Optional[str] = None):
         """
         将单个 Cluster 聚合为一个话题记录。
         """
@@ -127,7 +128,7 @@ class TopicAggregator:
         }
         platforms_cn = [plat_name_map.get(p, p) for p in platforms]
 
-        # 写入 / 更新 topic_summary
+        # 写入 / 更新 topic_summary（WS4.6：带 owner_id）
         is_new = create_or_update_topic_summary(
             topic_id=topic_id,
             keyword=cluster.keyword,
@@ -140,6 +141,7 @@ class TopicAggregator:
             report=report,
             platforms=platforms_cn,
             sentiment=risk_class,
+            owner_id=owner_id,
         )
 
         # 写入 topic_posts 关联

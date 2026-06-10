@@ -33,6 +33,29 @@ class TaskContext:
 # 使用 ContextVar 进行线程安全的上下文管理
 _task_context: ContextVar[TaskContext] = ContextVar("task_context", default=TaskContext())
 
+# 8.1：trace_id ContextVar（用于 HTTP 请求级别日志关联）
+_trace_id: ContextVar[str] = ContextVar("trace_id", default="")
+
+
+def generate_trace_id() -> str:
+    """生成新的 trace_id（uuid4 hex）"""
+    return uuid.uuid4().hex
+
+
+def set_trace_id(trace_id: str):
+    """设置当前请求的 trace_id"""
+    _trace_id.set(trace_id)
+
+
+def get_trace_id() -> str:
+    """获取当前请求的 trace_id（无则返回空串）"""
+    return _trace_id.get()
+
+
+def clear_trace_id():
+    """清除当前请求的 trace_id"""
+    _trace_id.set("")
+
 
 def generate_task_id() -> str:
     """生成唯一的任务 ID"""

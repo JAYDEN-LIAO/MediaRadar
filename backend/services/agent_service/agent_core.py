@@ -8,8 +8,14 @@ import json
 import uuid
 import asyncio
 from openai import OpenAI
-from core.config import settings
+from core.config import settings, get_agent_config
 from core.logger import get_logger
+from core.metrics import (
+    AGENT_TURNS,
+    AGENT_TOOL_CALLS,
+    AGENT_TOOL_LATENCY,
+    AGENT_MEMORY_WRITES,
+)
 
 logger = get_logger("agent")
 
@@ -27,32 +33,27 @@ class TokenBudgetManager:
 
     def __init__(self, budget: int = None):
         self.budget = budget or getattr(settings, 'AGENT_TOKEN_BUDGET', 1500)
-        self._client = None
 
-    @property
-    def client(self):
-        if self._client is None:
-            self._client = OpenAI(
-                api_key=settings.ANALYST_API_KEY,
-                base_url=settings.ANALYST_BASE_URL
-            )
-        return self._client
+    def _fresh_client(self):
+        """每次返回新 OpenAI 客户端实例（修复 #2.1：配置热刷新）"""
+        key, url, _ = get_agent_config()
+        return OpenAI(api_key=key, base_url=url)
 
     def count_tokens(self, messages: list) -> int:
-        """简单估算 tokens（按字符数 / 4 估算）"""
+        """估算 tokens（修复 #2.2：char/2 而非 char/4，中文偏差 < 20%）"""
         total = 0
         for m in messages:
             # ChatCompletionMessage 等 SDK 对象无法 json.dumps，先转 dict
             if hasattr(m, 'model_dump'):
                 m = m.model_dump()
-            total += len(json.dumps(m, ensure_ascii=False)) // 4
+            total += len(json.dumps(m, ensure_ascii=False)) // 2
         return total
 
     def should_summarize(self, messages: list) -> bool:
         return self.count_tokens(messages) > self.budget
 
     def summarize_history(self, messages: list) -> list:
-        """将历史压缩为摘要"""
+        """将历史压缩为摘要（修复 #2.1：使用 get_agent_config 替代硬编码 deepseek-chat）"""
         # 保留 system prompt + 最近 2 条 + 摘要
         system = messages[0] if messages and messages[0]["role"] == "system" else None
         recent = messages[-4:] if len(messages) > 4 else messages
@@ -69,14 +70,15 @@ class TokenBudgetManager:
 直接返回摘要，不要有其他内容。"""
 
         try:
-            response = self.client.chat.completions.create(
-                model="deepseek-chat",
+            key, url, model = get_agent_config()
+            response = self._fresh_client().chat.completions.create(
+                model=model or settings.DEFAULT_MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=200,
                 temperature=0.3
             )
             summary = response.choices[0].message.content.strip()
-        except:
+        except Exception:
             summary = f"[历史对话，包含 {len(recent)} 条消息]"
 
         result = []
@@ -105,36 +107,59 @@ class ToolExecutor:
         1. 优先直调（快）
         2. 直调失败且启用 MCP → 走 MCP HTTP
         3. 所有工具走 SelfHealingExecutor
+        4. 记录 AGENT_TOOL_CALLS / AGENT_TOOL_LATENCY 指标
         """
+        import time as _time
+        start_ts = _time.perf_counter()
+        status_label = "success"
+
         # 优先直调
         if self.direct.supports(tool_name):
-            result = await self.diagnosis_engine.execute_with_diagnosis(
-                self.direct.execute,
-                {"tool_name": tool_name, "args": args},
-                tool_name=tool_name,
-                other_tools={k: v for k, v in AVAILABLE_TOOLS.items() if k != tool_name}
-            )
-            # 解析 DirectAdapter.execute 返回（它是两层 JSON）
-            parsed = json.loads(result)
-            if not parsed.get("success", False):
-                # 直调失败，尝试 MCP
-                if self.mcp:
-                    logger.info(f"[ToolExecutor] 直调 {tool_name} 失败，切换 MCP...")
-                    mcp_result = await self.diagnosis_engine.execute_with_diagnosis(
-                        self.mcp.execute,
-                        {"tool_name": tool_name, "args": args},
-                        tool_name=tool_name
-                    )
-                    return mcp_result
-            return result
+            try:
+                result = await self.diagnosis_engine.execute_with_diagnosis(
+                    self.direct.execute,
+                    {"tool_name": tool_name, "args": args},
+                    tool_name=tool_name,
+                    other_tools={k: v for k, v in AVAILABLE_TOOLS.items() if k != tool_name}
+                )
+                # 解析 DirectAdapter.execute 返回（它是两层 JSON）
+                parsed = json.loads(result)
+                if not parsed.get("success", False):
+                    status_label = "error"
+                    # 直调失败，尝试 MCP
+                    if self.mcp:
+                        logger.info(f"[ToolExecutor] 直调 {tool_name} 失败，切换 MCP...")
+                        mcp_result = await self.diagnosis_engine.execute_with_diagnosis(
+                            self.mcp.execute,
+                            {"tool_name": tool_name, "args": args},
+                            tool_name=tool_name
+                        )
+                        return mcp_result
+                return result
+            except Exception as e:
+                status_label = "error"
+                raise
+            finally:
+                # 记录指标（修复 #2.4）
+                latency = _time.perf_counter() - start_ts
+                AGENT_TOOL_CALLS.labels(tool=tool_name, status=status_label).inc()
+                AGENT_TOOL_LATENCY.labels(tool=tool_name).observe(latency)
 
         # MCP 专属工具
         if self.mcp and self.mcp.supports(tool_name):
-            return await self.diagnosis_engine.execute_with_diagnosis(
-                self.mcp.execute,
-                {"tool_name": tool_name, "args": args},
-                tool_name=tool_name
-            )
+            try:
+                return await self.diagnosis_engine.execute_with_diagnosis(
+                    self.mcp.execute,
+                    {"tool_name": tool_name, "args": args},
+                    tool_name=tool_name
+                )
+            except Exception as e:
+                status_label = "error"
+                raise
+            finally:
+                latency = _time.perf_counter() - start_ts
+                AGENT_TOOL_CALLS.labels(tool=tool_name, status=status_label).inc()
+                AGENT_TOOL_LATENCY.labels(tool=tool_name).observe(latency)
 
         return json.dumps({
             "success": False,
@@ -146,17 +171,40 @@ class ToolExecutor:
 
 # ==================== Agent 主循环 ====================
 
-# 初始化客户端和组件
-agent_client = OpenAI(
-    api_key=settings.ANALYST_API_KEY,
-    base_url=settings.ANALYST_BASE_URL
-)
-
-# 全局组件实例
+# 全局组件实例（修复 #2.1：客户端不缓存，每次 _get_agent_client 重新创建以支持热刷新）
 memory_manager = AgentMemoryManager()
 reflection_engine = ReflectionEngine()
 token_budget_manager = TokenBudgetManager()
 tool_executor = ToolExecutor()
+
+
+def _get_agent_client():
+    """返回全新 OpenAI 客户端（修复 #2.1：配置热刷新）
+
+    不再使用模块级 `agent_client` 缓存对象。
+    每次调用都从 settings 重新读取 api_key / base_url，让前端更新配置后立即生效。
+    """
+    key, url, _ = get_agent_config()
+    return OpenAI(api_key=key, base_url=url)
+
+
+def _stream_response(messages: list):
+    """统一流式响应生成器（修复 #2.3：DRY 抽取，4 处统一调用）
+
+    同步生成器（OpenAI SDK 流式模式返回 sync iterator）。
+    在 async 函数中通过 to_thread 包装避免阻塞事件循环。
+    返回值是 SSE "data: {content}\\n\\n" 字符串迭代器。
+    """
+    client = _get_agent_client()
+    _, _, model = get_agent_config()
+    response = client.chat.completions.create(
+        model=model or settings.DEFAULT_MODEL,
+        messages=messages,
+        stream=True,
+    )
+    for chunk in response:
+        if chunk.choices and chunk.choices[0].delta.content is not None:
+            yield f"data: {chunk.choices[0].delta.content}\n\n"
 
 
 async def chat_with_agent_stream(messages: list, session_id: str = None):
@@ -195,12 +243,18 @@ async def chat_with_agent_stream(messages: list, session_id: str = None):
 
     max_iterations = getattr(settings, 'AGENT_MAX_ITERATIONS', 6)
 
+    # 修复 #5.1：medi 追问次数上限（每 session 最多 1 次）
+    medi_count = 0
+
     for i in range(max_iterations):
         logger.info(f"[Agent Core] 正在评估意图 (第 {i+1} 轮思考)...")
+        AGENT_TURNS.inc()  # 修复 #2.4
 
-        # 生成回复
-        response = agent_client.chat.completions.create(
-            model="deepseek-chat",
+        # 生成回复（每次新建 client，支持热刷新）
+        client = _get_agent_client()
+        _, _, model_name = get_agent_config()
+        response = client.chat.completions.create(
+            model=model_name or settings.DEFAULT_MODEL,
             messages=current_messages,
             tools=TOOLS_SCHEMA,
             tool_choice="auto"
@@ -232,14 +286,8 @@ async def chat_with_agent_stream(messages: list, session_id: str = None):
                         "content": tool_result,
                     })
                     # 特殊处理：立即停止，直接告诉用户任务已启动
-                    final_stream = agent_client.chat.completions.create(
-                        model="deepseek-chat",
-                        messages=current_messages,
-                        stream=True
-                    )
-                    for chunk in final_stream:
-                        if chunk.choices and chunk.choices[0].delta.content is not None:
-                            yield f"data: {chunk.choices[0].delta.content}\n\n"
+                    for chunk in _stream_response(current_messages):
+                        yield chunk
                     yield "data: [DONE]\n\n"
 
                     # 异步写入记忆
@@ -270,38 +318,29 @@ async def chat_with_agent_stream(messages: list, session_id: str = None):
                             "role": "assistant",
                             "content": degrade_answer
                         })
-                        for chunk in agent_client.chat.completions.create(
-                            model="deepseek-chat",
-                            messages=current_messages,
-                            stream=True
-                        ):
-                            if chunk.choices and chunk.choices[0].delta.content is not None:
-                                yield f"data: {chunk.choices[0].delta.content}\n\n"
+                        for chunk in _stream_response(current_messages):
+                            yield chunk
                         yield "data: [DONE]\n\n"
                         asyncio.create_task(_write_memory_async(session_id, messages))
                         return
 
                     elif confidence == "medi":
-                        # 补充探查
+                        # 修复 #5.1：medi 追问上限 — 第二次 medi 触发时强制降级
+                        # 1. 先看是否还能 follow_up
                         medi_action = reflection_engine.handle_medi(
                             user_q, tool_result, eval_result.get("missing_info", "")
                         )
-                        if medi_action.get("action") == "follow_up":
-                            current_messages.append({
-                                "tool_call_id": tool_call.id,
-                                "role": "tool",
-                                "name": function_name,
-                                "content": tool_result,
-                            })
-                            # 追加追问，继续循环
-                            follow_up_q = medi_action.get("follow_up_question", "")
-                            current_messages.append({
-                                "role": "user",
-                                "content": f"【系统追问】{follow_up_q}"
-                            })
-                            continue
-                        else:
-                            degrade_answer = medi_action.get("degrade_answer", "")
+                        can_follow_up = (
+                            medi_action.get("action") == "follow_up"
+                            and medi_count < 1   # 守卫：每 session 最多 1 次 follow_up
+                        )
+                        if not can_follow_up:
+                            # 走降级（无论是第二次 medi 还是 reflection 判定不可 follow_up）
+                            degrade_answer = (
+                                medi_action.get("degrade_answer", "")
+                                if "degrade_answer" in medi_action
+                                else reflection_engine.get_degrade_answer(tool_result)
+                            )
                             current_messages.append({
                                 "tool_call_id": tool_call.id,
                                 "role": "tool",
@@ -312,16 +351,26 @@ async def chat_with_agent_stream(messages: list, session_id: str = None):
                                 "role": "assistant",
                                 "content": degrade_answer
                             })
-                            for chunk in agent_client.chat.completions.create(
-                                model="deepseek-chat",
-                                messages=current_messages,
-                                stream=True
-                            ):
-                                if chunk.choices and chunk.choices[0].delta.content is not None:
-                                    yield f"data: {chunk.choices[0].delta.content}\n\n"
+                            for chunk in _stream_response(current_messages):
+                                yield chunk
                             yield "data: [DONE]\n\n"
                             asyncio.create_task(_write_memory_async(session_id, messages))
                             return
+
+                        # 第一次 follow_up：追加追问，继续循环
+                        medi_count += 1
+                        current_messages.append({
+                            "tool_call_id": tool_call.id,
+                            "role": "tool",
+                            "name": function_name,
+                            "content": tool_result,
+                        })
+                        follow_up_q = medi_action.get("follow_up_question", "")
+                        current_messages.append({
+                            "role": "user",
+                            "content": f"【系统追问】{follow_up_q}"
+                        })
+                        continue
 
                     else:
                         # high: 正常处理
@@ -357,16 +406,8 @@ async def chat_with_agent_stream(messages: list, session_id: str = None):
                 "content": "【系统强制指令】所有数据获取已完毕。现在请用自然语言回答用户。绝对禁止在回答中输出任何包含 <|DSML|>、andowski 或 JSON 格式的内部代码！"
             })
 
-            final_stream = agent_client.chat.completions.create(
-                model="deepseek-chat",
-                messages=current_messages,
-                stream=True
-            )
-
-            for chunk in final_stream:
-                if chunk.choices and chunk.choices[0].delta.content is not None:
-                    yield f"data: {chunk.choices[0].delta.content}\n\n"
-
+            for chunk in _stream_response(current_messages):
+                yield chunk
             yield "data: [DONE]\n\n"
 
             # 异步写入记忆
@@ -380,8 +421,10 @@ async def chat_with_agent_stream(messages: list, session_id: str = None):
 
 
 async def _write_memory_async(session_id: str, messages: list):
-    """异步写入对话记忆（不影响主流程）"""
+    """异步写入对话记忆（不影响主流程，记录 AGENT_MEMORY_WRITES 指标）"""
     try:
         memory_manager.write_from_conversation(session_id, messages)
+        AGENT_MEMORY_WRITES.labels(status="success").inc()
     except Exception as e:
+        AGENT_MEMORY_WRITES.labels(status="error").inc()
         logger.error(f"记忆写入失败: {e}")

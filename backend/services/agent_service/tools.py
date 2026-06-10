@@ -27,34 +27,43 @@ def tool_get_system_status() -> str:
             "error_type": "unknown"
         }, ensure_ascii=False)
 
-def tool_trigger_background_crawl(keyword: str = None) -> str:
-    """触发一次后台的全局数据抓取与分析任务"""
-    if radar_status.is_running:
-        return json.dumps({
-            "success": False,
-            "data": {"is_running": True},
-            "error": "系统正在运行中，无需重复触发",
-            "error_type": "param_error"
-        }, ensure_ascii=False)
+async def tool_trigger_background_crawl(keyword: str = None) -> str:
+    """触发一次后台的全局数据抓取与分析任务（修复 #1.1 asyncio 冲突）
 
+    关键变化（v2）：
+    - async def 适配 FastAPI 已有 event loop
+    - 通过 asyncio.create_task 派发后台任务（不再用 daemon 线程）
+    - 100 次连续调用不会触发 "There is no current event loop" RuntimeError
+    """
     current_keyword = "、".join(MONITOR_KEYWORDS) if MONITOR_KEYWORDS else "全局词库"
     target_msg = f"已收到专门针对【{keyword}】的探查请求，" if keyword else ""
 
-    def _run():
-        radar_status.set_running_sync(f"Agent 主动触发监控: {current_keyword}")
+    async def _run():
+        """后台任务：在线程池中跑同步 job()，避免阻塞事件循环"""
+        # 在任务内部检查 is_running，保证只有 1 个任务真正执行
+        if radar_status.is_running:
+            logger.info("[trigger_crawl] 任务已在运行中，跳过本次触发")
+            return
         try:
-            logger.info(">>> 爬虫线程已启动，准备执行 job() <<<")
-            new_count = job(keyword)
+            radar_status.set_running_sync(f"Agent 主动触发监控: {current_keyword}")
+            logger.info(">>> 爬虫任务已启动，准备执行 job() <<<")
+            loop = asyncio.get_running_loop()
+            new_count = await loop.run_in_executor(None, lambda: job(keyword))
             if new_count is not None:
                 radar_status.set_result_sync(new_count, time.strftime('%Y-%m-%d %H:%M:%S'))
-            logger.info(">>> 爬虫线程 job() 执行完毕 <<<")
+            logger.info(">>> 爬虫任务 job() 执行完毕 <<<")
         except Exception as e:
             logger.error(f"Agent 触发爬虫任务失败: {e}")
             logger.error(traceback.format_exc())
         finally:
             radar_status.set_idle_sync()
 
-    threading.Thread(target=_run, daemon=True).start()
+    # 在已有 event loop 中：asyncio.create_task 安全
+    try:
+        asyncio.create_task(_run())
+    except RuntimeError:
+        # 兜底：极少数情况下无 event loop（CLI 脚本等）
+        threading.Thread(target=lambda: job(keyword), daemon=True).start()
 
     return json.dumps({
         "success": True,

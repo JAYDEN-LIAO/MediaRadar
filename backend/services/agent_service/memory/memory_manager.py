@@ -6,11 +6,15 @@ import uuid
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from openai import OpenAI
-from core.config import settings
+from core.config import settings, get_agent_config
 from core.logger import get_logger
 from .memory_store import AgentMemoryStore
 
 logger = get_logger("agent.memory")
+
+# 修复 #4.2：working_memory 800 字符上限
+WORKING_MEMORY_MAX_CHARS = 800
+
 
 class AgentMemoryManager:
     """记忆管理器"""
@@ -18,20 +22,16 @@ class AgentMemoryManager:
     def __init__(self):
         self.store = AgentMemoryStore()
         self.ttl_days = getattr(settings, 'AGENT_MEMORY_TTL_DAYS', 90)
-        self._client = None
 
-    @property
-    def client(self):
-        if self._client is None:
-            self._client = OpenAI(
-                api_key=settings.ANALYST_API_KEY,
-                base_url=settings.ANALYST_BASE_URL
-            )
-        return self._client
+    def _fresh_client(self):
+        """每次新建客户端（修复 #2.1：配置热刷新）"""
+        key, url, _ = get_agent_config()
+        return OpenAI(api_key=key, base_url=url)
 
     def build_working_memory(self, session_id: str) -> str:
         """
         对话开始时调用：检索长期记忆，构建【用户记忆】段落。
+        修复 #4.2：>800 字符时降级（只保留 entity+fact 两段）
         """
         parts = []
 
@@ -63,7 +63,19 @@ class AgentMemoryManager:
         if not parts:
             return ""
 
-        return "\n\n".join(parts)
+        full = "\n\n".join(parts)
+
+        # 修复 #4.2：超 800 字符时降级
+        if len(full) > WORKING_MEMORY_MAX_CHARS:
+            degraded_parts = []
+            for p in parts:
+                if "【用户高频关注实体】" in p or "【已确认事实】" in p:
+                    degraded_parts.append(p)
+            if degraded_parts:
+                return "\n\n".join(degraded_parts)
+            return parts[0] if parts else ""
+
+        return full
 
     def write_from_conversation(
         self,
@@ -78,7 +90,7 @@ class AgentMemoryManager:
         # 1. LLM 生成摘要
         summary = self._summarize_conversation(messages)
 
-        # 2. 提取实体
+        # 2. 提取实体（jieba.posseg 取代硬编码白名单 — 修复 #4.1）
         entities = self._extract_entities(summary)
 
         # 3. 写入摘要
@@ -110,8 +122,10 @@ class AgentMemoryManager:
 直接返回摘要文字，不需要解释。"""
 
         try:
-            response = self.client.chat.completions.create(
-                model="deepseek-chat",
+            key, url, model = get_agent_config()
+            client = OpenAI(api_key=key, base_url=url)
+            response = client.chat.completions.create(
+                model=model or settings.DEFAULT_MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=100,
                 temperature=0.3
@@ -122,19 +136,46 @@ class AgentMemoryManager:
             return f"对话包含 {len(messages)} 条消息"
 
     def _extract_entities(self, summary: str) -> List[tuple]:
-        """从摘要中提取实体（简单规则 + LLM）"""
-        # 简单实体识别（关键词/品牌）
-        known_entities = ["华为", "苹果", "小米", "抖音", "微博", "小红书", "知乎", "B站"]
-        found = []
-        for entity in known_entities:
-            if entity in summary:
-                found.append((entity, "brand"))
+        """
+        从摘要中提取实体（修复 #4.1：使用 jieba.posseg 替代硬编码白名单）。
 
-        if found:
-            return found
+        词性映射：
+            nr  → person  （人名）
+            ns  → place   （地名）
+            nt  → org     （机构/团体）
+            nz  → brand   （专名/品牌）
+            其他 → 跳过
+        """
+        if not summary:
+            return []
+        try:
+            import jieba.posseg as pseg
+        except ImportError:
+            logger.warning("[Memory] jieba.posseg 不可用，跳过实体抽取")
+            return []
 
-        # 无已知实体，返回空
-        return []
+        pos_map = {
+            "nr": "person",
+            "ns": "place",
+            "nt": "org",
+            "nz": "brand",
+        }
+        found: list = []
+        seen: set = set()
+        try:
+            for word, flag in pseg.cut(summary):
+                if len(word) < 2:
+                    continue  # 过滤单字
+                if flag in pos_map:
+                    if word in seen:
+                        continue
+                    seen.add(word)
+                    found.append((word, pos_map[flag]))
+        except Exception as e:
+            logger.warning(f"[Memory] jieba.posseg 抽取异常: {e}")
+            return []
+
+        return found
 
     def _analyze_and_write_patterns(self, session_id: str, messages: List[Dict[str, str]]):
         """分析并写入行为模式"""
@@ -150,6 +191,10 @@ class AgentMemoryManager:
             self.store.upsert_pattern(session_id, "answer_length", "medium")
         else:
             self.store.upsert_pattern(session_id, "answer_length", "long")
+
+    def cleanup_expired_memory(self) -> int:
+        """包装 store 调用，返回清理条数（修复 #4.3）"""
+        return self.store.cleanup_expired_facts()
 
     def delete_session(self, session_id: str):
         """删除某次对话记忆"""

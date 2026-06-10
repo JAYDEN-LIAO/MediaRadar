@@ -12,6 +12,7 @@ import datetime
 from typing import Optional
 
 from core.logger import get_logger
+from core.sanitize import sanitize_email_field, sanitize_url
 
 logger = get_logger("radar.push_generator")
 
@@ -174,13 +175,15 @@ PUSH_HTML_TEMPLATE = """
 
 
 def _build_link_items(urls: list[str]) -> str:
-    """构建链接列表 HTML"""
+    """构建链接列表 HTML（已净化：URL 协议过滤 + 引号转义）"""
     items = []
     for i, url in enumerate(urls[:10], 1):  # 最多10条
-        truncated = url[:70] + "..." if len(url) > 70 else url
+        safe_url = sanitize_url(url)
+        # sanitize_url 已对非 http(s) 返回 "about:blank"，已 escape quote
+        truncated = (url[:70] + "...") if len(url) > 70 else url
         items.append(
             f'<p style="margin:0 0 8px;font-size:12px;line-height:1.5;">'
-            f'<a href="{url}" style="color:#1a3a5c;text-decoration:none;">'
+            f'<a href="{safe_url}" style="color:#1a3a5c;text-decoration:none;">'
             f'<span style="display:inline-block;min-width:18px;height:18px;background:#1a3a5c;color:#fff;text-align:center;'
             f'border-radius:3px;font-size:10px;line-height:18px;margin-right:8px;vertical-align:middle;">{i}</span>'
             f'<span style="color:#2c3e50;font-size:12px;">{truncated}</span></a></p>'
@@ -225,9 +228,11 @@ def render_push_html(data: dict) -> str:
     # 平台名处理
     platform_display = PLATFORM_MAP.get(data.get("platform", ""), data.get("platform", "全部平台"))
 
-    # 处理 core_issue 和 report
+    # 处理 core_issue 和 report（修复 #1.2：XSS / URL 注入净化）
     core_issue = data.get("core_issue", "无") or "无"
     report = data.get("report", "无") or "无"
+    core_issue = sanitize_email_field(core_issue)
+    report = sanitize_email_field(report)
 
     # 如果 core_issue 或 report 太长，在摘要里截断
     if len(core_issue) > 200:
@@ -275,9 +280,9 @@ LLM_JSON_PROMPT = """你是一个舆情分析数据提取专家。从以下舆�
 
 async def _call_llm_async(prompt: str, text: str) -> Optional[str]:
     """异步调用 LLM，返回文本内容"""
-    loop = asyncio.get_event_loop()
     try:
         from .llm_gateway import call_llm
+        loop = asyncio.get_running_loop()
         res = await loop.run_in_executor(
             None,
             lambda: call_llm(

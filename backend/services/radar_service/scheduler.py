@@ -116,6 +116,9 @@ def scheduler_start() -> tuple[bool, str]:
     # 注册每日简报任务
     _schedule_daily_summary()
 
+    # 修复 #4.3：注册每日 03:00 fact_memory 过期清理
+    _schedule_memory_cleanup()
+
     logger.info(f"[Scheduler] 调度器已启动: start_time={start_time}, frequency={freq_display}")
     if monitor_frequency >= 0:
         job = _scheduler.get_job(_get_scan_job_id())
@@ -301,3 +304,41 @@ def reschedule_daily_summary_if_running() -> bool:
         return False
     _schedule_daily_summary()
     return True
+
+
+# ---- 修复 #4.3：每日 03:00 fact_memory TTL 清理 ----
+
+def _get_memory_cleanup_job_id() -> str:
+    return "agent_memory_cleanup"
+
+
+def _run_memory_cleanup():
+    """每日 03:00 执行 fact_memory 过期清理"""
+    try:
+        from services.agent_service.memory.memory_manager import AgentMemoryManager
+        mgr = AgentMemoryManager()
+        deleted = mgr.cleanup_expired_memory()
+        logger.info(f"[Scheduler] 记忆清理完成: 删除 {deleted} 条过期 fact")
+    except Exception as e:
+        logger.error(f"[Scheduler] 记忆清理异常: {e}")
+
+
+def _schedule_memory_cleanup():
+    """注册每日 03:00 fact_memory 过期清理任务（修复 #4.3）"""
+    global _scheduler
+    if _scheduler is None:
+        return
+
+    old_job = _scheduler.get_job(_get_memory_cleanup_job_id())
+    if old_job:
+        _scheduler.remove_job(_get_memory_cleanup_job_id())
+
+    trigger = CronTrigger(hour=3, minute=0, second=0, timezone="Asia/Shanghai")
+    _scheduler.add_job(
+        _run_memory_cleanup,
+        trigger=trigger,
+        id=_get_memory_cleanup_job_id(),
+        replace_existing=True,
+        misfire_grace_time=600,
+    )
+    logger.info("[Scheduler] fact_memory 过期清理任务已注册: 03:00 (Asia/Shanghai)")

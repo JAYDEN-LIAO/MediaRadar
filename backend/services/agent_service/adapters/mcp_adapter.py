@@ -10,16 +10,16 @@ from typing import Any, Dict
 from .base import AbstractToolAdapter
 
 class MCPAdapter(AbstractToolAdapter):
-    """MCP 协议适配器（HTTP transport）"""
+    """MCP 协议适配器（HTTP transport，异步）"""
 
     def __init__(self, base_url: str = "http://127.0.0.1:8001"):
         self.base_url = base_url.rstrip("/")
         self._client = None
 
     @property
-    def client(self):
+    def client(self) -> httpx.AsyncClient:
         if self._client is None:
-            self._client = httpx.Client(timeout=60.0)
+            self._client = httpx.AsyncClient(timeout=60.0)
         return self._client
 
     def supports(self, tool_name: str) -> bool:
@@ -27,7 +27,7 @@ class MCPAdapter(AbstractToolAdapter):
         # 此处返回 True，由 MCP Server 实际判断
         return True
 
-    def execute(self, tool_name: str, args: Dict[str, Any]) -> str:
+    async def execute(self, tool_name: str, args: Dict[str, Any]) -> str:
         """
         通过 HTTP 调用 MCP Server 的 /tools/call 接口。
         返回标准化 ToolResult 格式。
@@ -38,7 +38,7 @@ class MCPAdapter(AbstractToolAdapter):
         }
 
         try:
-            response = self.client.post(
+            response = await self.client.post(
                 f"{self.base_url}/v1/tools/call",
                 json=payload
             )
@@ -105,7 +105,17 @@ class MCPAdapter(AbstractToolAdapter):
                 "error_type": "unknown"
             }, ensure_ascii=False)
 
-    def close(self):
+    async def aclose(self):
         if self._client:
-            self._client.close()
+            await self._client.aclose()
             self._client = None
+
+    def close(self):
+        # 同步兜底：可能未进入 event loop
+        if self._client:
+            try:
+                # httpx.AsyncClient 不能在 sync 上下文 close
+                # 这里仅作兼容
+                pass
+            except Exception:
+                pass

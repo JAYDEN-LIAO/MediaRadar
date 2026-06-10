@@ -6,6 +6,7 @@ import os
 import sys
 import asyncio
 from dataclasses import dataclass, field
+from typing import Optional
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 BACKEND_DIR = os.path.dirname(os.path.dirname(CURRENT_DIR))
@@ -207,8 +208,10 @@ async def run_crawler_for_platform_async(platform: str):
         process.kill()
         logger.error(f"[Async Crawler] {platform.upper()} timeout.")
 
-async def job_async(target_keyword: str = None):
-    """雷达核心任务流（异步版）"""
+async def job_async(target_keyword: str = None, owner_id: Optional[str] = None):
+    """雷达核心任务流（异步版）
+    WS4.6：owner_id 标识本次扫描的归属用户（None 表示公共/历史扫描）
+    """
     global MONITOR_KEYWORDS, MONITOR_KEYWORD_LEVELS
     reload_config()
     if target_keyword:
@@ -222,7 +225,7 @@ async def job_async(target_keyword: str = None):
     else:
         logger.warning("MONITOR_PLATFORMS 为空，跳过。")
 
-    new_risk_count = await run_analysis_pipeline_async()
+    new_risk_count = await run_analysis_pipeline_async(owner_id=owner_id)
 
     # 更新雷达状态（供前端展示上次扫描时间）
     radar_status.last_new_count = new_risk_count if new_risk_count else 0
@@ -230,8 +233,10 @@ async def job_async(target_keyword: str = None):
 
     return new_risk_count
 
-async def run_analysis_pipeline_async():
-    """使用 RadarPipeline 执行完整分析流程（多平台 asyncio 并行）。"""
+async def run_analysis_pipeline_async(owner_id: Optional[str] = None):
+    """使用 RadarPipeline 执行完整分析流程（多平台 asyncio 并行）。
+    WS4.6：owner_id 透传到 save_ai_result / create_or_update_topic_summary
+    """
     import asyncio
 
     async def _run_single_platform(platform: str) -> int:
@@ -248,6 +253,7 @@ async def run_analysis_pipeline_async():
             keyword_levels=MONITOR_KEYWORD_LEVELS,
             platform=platform,
             alert_negative=ALERT_NEGATIVE,
+            owner_id=owner_id,
         )
         pipeline = RadarPipeline(config)
         results = await pipeline.run(posts)
@@ -257,7 +263,7 @@ async def run_analysis_pipeline_async():
             processed_records = [(pid, platform) for pid in all_post_ids]
             mark_processed_batch(processed_records)
 
-        # 保存结果入库
+        # 保存结果入库（WS4.6：传入 owner_id）
         new_count = 0
         for pr in results:
             save_ai_result(
@@ -272,6 +278,7 @@ async def run_analysis_pipeline_async():
                 report=pr.report,
                 publish_time=pr.publish_time,
                 sentiment=getattr(pr, 'sentiment', 'Neutral'),
+                owner_id=owner_id,
             )
             new_count += 1
         return new_count
@@ -296,13 +303,13 @@ async def run_analysis_pipeline_async():
     return total_new_count
 
 
-def run_analysis_pipeline():
-    """同步入口，内部启动 asyncio 事件循环。"""
+def run_analysis_pipeline(owner_id: Optional[str] = None):
+    """同步入口（WS4.6：带 owner_id）"""
     import asyncio
-    return asyncio.run(run_analysis_pipeline_async())
+    return asyncio.run(run_analysis_pipeline_async(owner_id=owner_id))
 
 
-def api_start_task(background_tasks):
+def api_start_task(background_tasks, owner_id: Optional[str] = None):
     # 检查调度器全局锁
     try:
         from .scheduler import _scan_lock
@@ -320,7 +327,7 @@ def api_start_task(background_tasks):
     def _run_in_background():
         radar_status.set_running_sync(f"正在监控: {current_keyword}")
         try:
-            new_count = job()
+            new_count = job(owner_id=owner_id)
             radar_status.last_new_count = new_count if new_count else 0
             radar_status.last_run_time = time.strftime('%Y-%m-%d %H:%M:%S')
         except Exception as e:
@@ -332,13 +339,14 @@ def api_start_task(background_tasks):
     background_tasks.add_task(_run_in_background)
     return True, "扫描任务已启动"
 
-def job(target_keyword=None):
+def job(target_keyword=None, owner_id: Optional[str] = None):
     """
     雷达核心任务流
     :param target_keyword: 如果指定了该关键字，本次爬虫和分析将只针对该词进行（用于 Agent 动态触发）
+    :param owner_id: WS4.6 数据归属（None=公共/历史）
     """
-    logger.info(f"Starting radar job pipeline (target_keyword={target_keyword})")
-    
+    logger.info(f"Starting radar job pipeline (target_keyword={target_keyword}, owner_id={owner_id})")
+
     reload_config()
 
     if target_keyword:
@@ -352,8 +360,8 @@ def job(target_keyword=None):
             run_crawler_for_platform(platform)
     else:
         logger.warning("MONITOR_PLATFORMS 为空，请检查系统设置！爬虫任务被跳过。")
-        
-    new_risk_count = run_analysis_pipeline()
+
+    new_risk_count = run_analysis_pipeline(owner_id=owner_id)
     return new_risk_count
 
 if __name__ == "__main__":

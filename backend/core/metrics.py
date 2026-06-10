@@ -42,3 +42,33 @@ ACTIVE_ANALYSIS_TASKS = Gauge(
     "active_analysis_tasks",
     "当前活跃的分析任务数"
 )
+
+# 熔断器状态（修复 #3.2 — 状态 → Gauge 实时同步）
+# 状态值：0=CLOSED, 1=HALF_OPEN, 2=OPEN
+CIRCUIT_BREAKER_STATE = Gauge(
+    "circuit_breaker_state",
+    "熔断器状态（0=CLOSED, 1=HALF_OPEN, 2=OPEN）",
+    ["name"]
+)
+
+# Agent 指标（修复 #2.4 + #7.2）
+AGENT_TURNS = Counter(
+    "agent_turns_total",
+    "Agent 主循环轮次"
+)
+AGENT_TOOL_CALLS = Counter(
+    "agent_tool_calls_total",
+    "Agent 工具调用次数",
+    ["tool", "status"]  # status: success / error
+)
+AGENT_TOOL_LATENCY = Histogram(
+    "agent_tool_latency_seconds",
+    "Agent 工具调用延迟",
+    ["tool"],
+    buckets=(0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0)
+)
+AGENT_MEMORY_WRITES = Counter(
+    "agent_memory_writes_total",
+    "Agent 记忆写入次数",
+    ["status"]  # status: success / error
+)

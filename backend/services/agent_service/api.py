@@ -45,17 +45,15 @@ class MemoryResponse(BaseModel):
 @router.get("/api/agent/memory")
 async def get_memory_stats():
     """
-    查看当前记忆库统计状态
+    返回历史会话列表（前端侧边栏用）
     """
     try:
-        stats = memory_manager.get_stats()
+        sessions = memory_manager.store.get_all_sessions(limit=50)
         return {
             "success": True,
             "data": {
-                "entity_memory_count": stats.get("entity_memory", 0),
-                "fact_memory_count": stats.get("fact_memory", 0),
-                "pattern_memory_count": stats.get("pattern_memory", 0),
-                "conversation_summary_count": stats.get("conversation_summary", 0),
+                "sessions": sessions,
+                "total": len(sessions),
             }
         }
     except Exception as e:

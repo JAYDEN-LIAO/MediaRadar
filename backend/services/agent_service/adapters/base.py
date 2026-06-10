@@ -8,8 +8,8 @@ class AbstractToolAdapter(ABC):
     """工具适配器基类"""
 
     @abstractmethod
-    def execute(self, tool_name: str, args: Dict[str, Any]) -> str:
-        """执行工具，返回标准化 JSON 字符串"""
+    async def execute(self, tool_name: str, args: Dict[str, Any]) -> str:
+        """异步执行工具，返回标准化 JSON 字符串（修复 #1.1：async 支持）"""
         pass
 
     @abstractmethod

@@ -2,12 +2,93 @@
 import logging
 import os
 import json
+import re
 import socket
 import threading
 from datetime import datetime
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
 from typing import Optional, Dict, Any
 from core.config import settings
+
+
+# ==================== WS3.4: 日志敏感数据脱敏 ====================
+
+_SENSITIVE_PATTERNS = [
+    # API Key: sk-xxxx (OpenAI style)
+    (re.compile(r'(?i)(api_key|apikey|api.key)\s*[=:]\s*["\']?(sk-[A-Za-z0-9]{8,})["\']?'), r'\1=***'),
+    (re.compile(r'(?i)(sk-[A-Za-z0-9]{8,})'), 'sk-***'),
+    # JWT / Bearer token
+    (re.compile(r'(?i)(bearer\s+)[A-Za-z0-9._-]{16,}'), r'\1***'),
+    # Password
+    (re.compile(r'(?i)(password|passwd|pwd)\s*[=:]\s*["\']?([^"\'&\s]{3,})["\']?'), r'\1=***'),
+    # Secret
+    (re.compile(r'(?i)(secret|client_secret|app_secret)\s*[=:]\s*["\']?([^"\'&\s]{3,})["\']?'), r'\1=***'),
+    # Token in query string / URL
+    (re.compile(r'(?i)(token|access_token|refresh_token)=[^&\s]{8,}'), r'\1=***'),
+    # Private key PEM
+    (re.compile(r'-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----[\s\S]*?-----END\s+(?:RSA\s+)?PRIVATE\s+KEY-----'), '*** PRIVATE KEY ***'),
+]
+
+
+def sanitize_log_message(msg: str) -> str:
+    """脱敏日志消息中的敏感数据（WS3.4）"""
+    if not isinstance(msg, str):
+        return str(msg)
+    for pattern, replacement in _SENSITIVE_PATTERNS:
+        msg = pattern.sub(replacement, msg)
+    return msg
+
+
+class SensitiveDataFilter(logging.Filter):
+    """日志记录级脱敏 — 在 LogRecord 层面处理消息体"""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if hasattr(record, "msg") and isinstance(record.msg, str):
+            record.msg = sanitize_log_message(record.msg)
+        # 也脱敏 args（可能含格式化参数）
+        if record.args:
+            record.args = tuple(
+                sanitize_log_message(str(a)) if isinstance(a, str) else a
+                for a in record.args
+            )
+        return True
+
+
+def _attach_sensitive_data_filter(logger: logging.Logger):
+    """给 logger 挂上敏感数据脱敏 filter"""
+    f = SensitiveDataFilter()
+    if not any(isinstance(x, SensitiveDataFilter) for x in logger.filters):
+        logger.addFilter(f)
+    for h in logger.handlers:
+        if not any(isinstance(x, SensitiveDataFilter) for x in h.filters):
+            h.addFilter(f)
+
+
+# ==================== 8.1: TraceId 过滤器 ====================
+# 把当前请求的 trace_id 从 ContextVar 注入到 LogRecord，
+# 让所有 logger 调用都能在输出时携带 trace_id。
+
+class TraceIdFilter(logging.Filter):
+    """LogRecord 注入 trace_id（修复 #8.1）"""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            from core.context import get_trace_id
+            tid = get_trace_id() or ""
+        except Exception:
+            tid = ""
+        record.trace_id = tid
+        return True
+
+
+def _attach_trace_id_filter(logger: logging.Logger):
+    """给 logger 及其所有 handler 挂上 TraceIdFilter"""
+    f = TraceIdFilter()
+    if not any(isinstance(x, TraceIdFilter) for x in logger.filters):
+        logger.addFilter(f)
+    for h in logger.handlers:
+        if not any(isinstance(x, TraceIdFilter) for x in h.filters):
+            h.addFilter(f)
 
 
 class JSONFormatter(logging.Formatter):
@@ -29,6 +110,11 @@ class JSONFormatter(logging.Formatter):
             "line": record.lineno,
             "hostname": self._hostname,
         }
+
+        # trace_id
+        tid = getattr(record, "trace_id", "") or ""
+        if tid:
+            log_data["trace_id"] = tid
 
         # 添加组件信息（从 extra 获取）
         if hasattr(record, "component") and record.component:
@@ -80,14 +166,18 @@ class ColoredConsoleFormatter(logging.Formatter):
         task_id = getattr(record, "task_id", "") or ""
         task_str = f" [{task_id[:8]}]" if task_id else ""
 
+        # 8.1：trace_id 前缀（取前 8 字符）
+        tid = getattr(record, "trace_id", "") or ""
+        trace_str = f" [t:{tid[:8]}]" if tid else ""
+
         # 消息处理（去掉 emoji）
         msg = record.getMessage()
 
         level_str = f"{color}{record.levelname:<8}{reset}"
         if self.use_color:
-            return f"[{time_str}] [{level_str}] [{component}]{task_str} {msg}"
+            return f"[{time_str}] [{level_str}] [{component}]{task_str}{trace_str} {msg}"
         else:
-            return f"[{time_str}] [{record.levelname:<8}] [{component}]{task_str} {msg}"
+            return f"[{time_str}] [{record.levelname:<8}] [{component}]{task_str}{trace_str} {msg}"
 
 
 class PlainFormatter(logging.Formatter):
@@ -256,6 +346,12 @@ class LoggerFactory:
             if self._log_to_console:
                 console_handler = self._create_console_handler(logger.level)
                 logger.addHandler(console_handler)
+
+            # 8.1：注入 trace_id filter
+            _attach_trace_id_filter(logger)
+
+            # WS3.4：注入敏感数据脱敏 filter
+            _attach_sensitive_data_filter(logger)
 
             self._loggers[name] = logger
             return logger

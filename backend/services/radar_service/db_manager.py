@@ -4,6 +4,8 @@ import os
 import json
 import sys
 import threading
+from datetime import datetime
+from typing import Optional
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if BASE_DIR not in sys.path:
@@ -47,6 +49,28 @@ def init_radar_db():
                 id INTEGER PRIMARY KEY CHECK (id = 1),
                 config_json TEXT
             )
+        ''')
+
+        # ── 审计日志表（修复 #7.1）───────────────────────────────
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                action TEXT NOT NULL,
+                keyword TEXT,
+                topic_id TEXT,
+                risk_level INTEGER DEFAULT 0,
+                level TEXT DEFAULT 'INFO',
+                detail TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_audit_log_created_at
+                ON audit_log(created_at)
+        ''')
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_audit_log_action
+                ON audit_log(action)
         ''')
 
         # ── 话题聚合表（任务1）───────────────────────────────
@@ -110,6 +134,35 @@ def init_radar_db():
         except sqlite3.OperationalError:
             pass
 
+        # 7.1：审计日志表
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                action TEXT NOT NULL,
+                keyword TEXT,
+                topic_id TEXT,
+                risk_level INTEGER DEFAULT 0,
+                detail TEXT,
+                level TEXT DEFAULT 'INFO',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at DESC)')
+
+        # ── WS4.6：数据隔离 owner_id 迁移（幂等）────────────────────
+        # 旧数据 owner_id = NULL（公共/历史数据，所有用户可见）
+        for alter_sql in [
+            "ALTER TABLE ai_results ADD COLUMN owner_id TEXT",
+            "ALTER TABLE topic_summary ADD COLUMN owner_id TEXT",
+        ]:
+            try:
+                cursor.execute(alter_sql)
+            except sqlite3.OperationalError:
+                pass
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_ai_results_owner_id ON ai_results(owner_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_topic_summary_owner_id ON topic_summary(owner_id)')
+        # ────────────────────────────────────────────────────────────
+
 def _async_index_to_qdrant(result: dict):
     """异步将 ai_results 写入 Qdrant（不阻塞主流程）"""
     try:
@@ -120,14 +173,19 @@ def _async_index_to_qdrant(result: dict):
         logger.warning(f"[RAG Index] 索引失败（不影响主流程）：{e}")
 
 
-def save_ai_result(post_id, platform, keyword, title, content, url, risk_level, core_issue, report, publish_time="未知时间", sentiment="Neutral"):
+def save_ai_result(post_id, platform, keyword, title, content, url, risk_level, core_issue, report, publish_time="未知时间", sentiment="Neutral", owner_id: Optional[str] = None):
+    """
+    WS4.6：owner_id 标识数据归属。
+    - owner_id=None  → 公共/历史数据（所有用户可见）
+    - owner_id="u_xxx" → 该用户私有数据
+    """
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute('''
             INSERT OR REPLACE INTO ai_results
-            (post_id, platform, keyword, title, content, url, risk_level, core_issue, report, publish_time, sentiment)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (post_id, platform, keyword, title, content, url, risk_level, core_issue, report, publish_time, sentiment))
+            (post_id, platform, keyword, title, content, url, risk_level, core_issue, report, publish_time, sentiment, owner_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (post_id, platform, keyword, title, content, url, risk_level, core_issue, report, publish_time, sentiment, owner_id))
         conn.commit()
 
     # ── 异步触发 RAG 索引（新增）───────────────────
@@ -147,11 +205,28 @@ def save_ai_result(post_id, platform, keyword, title, content, url, risk_level, 
     threading.Thread(target=_async_index_to_qdrant, args=(result_dict,), daemon=True).start()
     # ───────────────────────────────────────────────
 
-def get_latest_results(limit=50):
+def get_latest_results(limit=50, owner_id: Optional[str] = None, is_admin: bool = False):
+    """
+    WS4.6：按 owner 过滤查询。
+    - is_admin=True   → 看到全部（管理员）
+    - owner_id 传值   → 仅看 owner_id == ? OR owner_id IS NULL（自己的 + 公共）
+    - owner_id=None   → 仅看公共（owner_id IS NULL）
+    """
     with get_db_connection() as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        cursor.execute('SELECT * FROM ai_results ORDER BY create_time DESC LIMIT ?', (limit,))
+        if is_admin:
+            cursor.execute('SELECT * FROM ai_results ORDER BY create_time DESC LIMIT ?', (limit,))
+        elif owner_id is not None:
+            cursor.execute(
+                'SELECT * FROM ai_results WHERE owner_id = ? OR owner_id IS NULL ORDER BY create_time DESC LIMIT ?',
+                (owner_id, limit),
+            )
+        else:
+            cursor.execute(
+                'SELECT * FROM ai_results WHERE owner_id IS NULL ORDER BY create_time DESC LIMIT ?',
+                (limit,),
+            )
         rows = cursor.fetchall()
     return [dict(r) for r in rows]
 
@@ -367,11 +442,16 @@ def create_or_update_topic_summary(
     report: str = "",
     platforms: list = None,
     sentiment: str = "neutral",
+    owner_id: Optional[str] = None,
 ) -> bool:
     """
     创建或更新话题聚合记录。
     如果话题已存在（topic_id 相同），则合并（更新 post_count、scan_count、last_seen 等）。
     返回 True 表示新建，False 表示更新。
+
+    WS4.6：owner_id 标识数据归属。
+    - 新建时：写入 owner_id
+    - 更新时：不动 owner_id（保持最初创建者；后续扫描若来自同 owner 自然一致）
 
     alert_recommendation: AI 最终决策结论，取值范围:
         - "high":     高风险预警（需处理）
@@ -394,7 +474,7 @@ def create_or_update_topic_summary(
         platforms_json = json.dumps(platforms)
 
         if exists:
-            # 更新：累加 post_count、scan_count，更新 last_seen
+            # 更新：累加 post_count、scan_count，更新 last_seen（不动 owner_id）
             cursor.execute('''
                 UPDATE topic_summary SET
                     cluster_summary = COALESCE(NULLIF(?, ''), cluster_summary),
@@ -428,15 +508,17 @@ def create_or_update_topic_summary(
             conn.commit()
             return False
         else:
-            # 新建
+            # 新建（带 owner_id）
             cursor.execute('''
                 INSERT INTO topic_summary
                 (topic_id, keyword, topic_name, cluster_summary, risk_level, risk_class,
-                 alert_recommendation, core_issue, report, platforms, sentiment, first_seen, last_seen, post_count)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 alert_recommendation, core_issue, report, platforms, sentiment,
+                 first_seen, last_seen, post_count, owner_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 topic_id, keyword, topic_name, cluster_summary, risk_level, risk_class,
-                alert_recommendation, core_issue, report, platforms_json, sentiment, now, now, 0
+                alert_recommendation, core_issue, report, platforms_json, sentiment,
+                now, now, 0, owner_id
             ))
             conn.commit()
             return True
@@ -473,8 +555,16 @@ def get_topic_summary_list(
     sentiment: str = None,
     is_processed: int = None,
     limit: int = 50,
+    owner_id: Optional[str] = None,
+    is_admin: bool = False,
 ) -> list:
-    """获取话题聚合列表（支持筛选）"""
+    """
+    获取话题聚合列表（支持筛选）
+    WS4.6：按 owner_id 过滤
+    - is_admin=True → 全部
+    - owner_id 传值 → owner_id = ? OR owner_id IS NULL
+    - owner_id=None → 仅 owner_id IS NULL
+    """
     with get_db_connection() as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
@@ -493,6 +583,15 @@ def get_topic_summary_list(
         if is_processed is not None:
             query += " AND is_processed = ?"
             params.append(is_processed)
+
+        # WS4.6 隔离
+        if is_admin:
+            pass  # 不过滤
+        elif owner_id is not None:
+            query += " AND (owner_id = ? OR owner_id IS NULL)"
+            params.append(owner_id)
+        else:
+            query += " AND owner_id IS NULL"
 
         query += " ORDER BY last_seen DESC LIMIT ?"
         params.append(limit)
@@ -533,12 +632,26 @@ def get_topic_summary_list(
     return results
 
 
-def get_topic_summary_by_id(topic_id: str) -> dict:
-    """获取单个话题聚合详情"""
+def get_topic_summary_by_id(topic_id: str, owner_id: Optional[str] = None, is_admin: bool = False) -> dict:
+    """
+    获取单个话题聚合详情
+    WS4.6：返回 None 表示无权访问 / 不存在
+    """
     with get_db_connection() as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM topic_summary WHERE topic_id = ?", (topic_id,))
+        if is_admin:
+            cursor.execute("SELECT * FROM topic_summary WHERE topic_id = ?", (topic_id,))
+        elif owner_id is not None:
+            cursor.execute(
+                "SELECT * FROM topic_summary WHERE topic_id = ? AND (owner_id = ? OR owner_id IS NULL)",
+                (topic_id, owner_id),
+            )
+        else:
+            cursor.execute(
+                "SELECT * FROM topic_summary WHERE topic_id = ? AND owner_id IS NULL",
+                (topic_id,),
+            )
         row = cursor.fetchone()
 
     if not row:
@@ -560,17 +673,35 @@ def get_topic_summary_by_id(topic_id: str) -> dict:
     return d
 
 
-def get_topic_posts(topic_id: str) -> list:
-    """获取话题关联的所有帖子详情"""
+def get_topic_posts(topic_id: str, owner_id: Optional[str] = None, is_admin: bool = False) -> list:
+    """
+    获取话题关联的所有帖子详情
+    WS4.6：按 owner_id 过滤
+    """
     with get_db_connection() as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        cursor.execute('''
-            SELECT ar.* FROM topic_posts tp
-            JOIN ai_results ar ON ar.post_id = tp.post_id
-            WHERE tp.topic_id = ?
-            ORDER BY tp.is_current DESC, ar.create_time DESC
-        ''', (topic_id,))
+        if is_admin:
+            cursor.execute('''
+                SELECT ar.* FROM topic_posts tp
+                JOIN ai_results ar ON ar.post_id = tp.post_id
+                WHERE tp.topic_id = ?
+                ORDER BY tp.is_current DESC, ar.create_time DESC
+            ''', (topic_id,))
+        elif owner_id is not None:
+            cursor.execute('''
+                SELECT ar.* FROM topic_posts tp
+                JOIN ai_results ar ON ar.post_id = tp.post_id
+                WHERE tp.topic_id = ? AND (ar.owner_id = ? OR ar.owner_id IS NULL)
+                ORDER BY tp.is_current DESC, ar.create_time DESC
+            ''', (topic_id, owner_id))
+        else:
+            cursor.execute('''
+                SELECT ar.* FROM topic_posts tp
+                JOIN ai_results ar ON ar.post_id = tp.post_id
+                WHERE tp.topic_id = ? AND ar.owner_id IS NULL
+                ORDER BY tp.is_current DESC, ar.create_time DESC
+            ''', (topic_id,))
         rows = cursor.fetchall()
     return [dict(r) for r in rows]
 
@@ -653,6 +784,77 @@ def get_all_push_configs() -> dict[str, dict]:
             result[ch] = {"enabled": False, "risk_min_level": 2}
     return result
 
+
+# ============================================================
+# 审计日志（修复 #7.1）
+# ============================================================
+
+def insert_audit_log(
+    action: str,
+    detail: dict = None,
+    keyword: str = "",
+    topic_id: str = "",
+    risk_level: int = 0,
+    level: str = "INFO",
+) -> int:
+    """插入一条审计日志，返回 rowid。"""
+    init_radar_db()
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO audit_log
+                (action, keyword, topic_id, risk_level, level, detail, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                action,
+                keyword,
+                topic_id,
+                int(risk_level or 0),
+                level,
+                json.dumps(detail or {}, ensure_ascii=False),
+                datetime.now().isoformat(),
+            ),
+        )
+        conn.commit()
+        return cursor.lastrowid or 0
+
+
+def get_audit_log(limit: int = 50, action: str = None) -> list:
+    """查询审计日志（按时间倒序）。"""
+    init_radar_db()
+    with get_db_connection() as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        if action:
+            cursor.execute(
+                """
+                SELECT id, action, keyword, topic_id, risk_level, level, detail, created_at
+                FROM audit_log
+                WHERE action = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (action, int(limit)),
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT id, action, keyword, topic_id, risk_level, level, detail, created_at
+                FROM audit_log
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (int(limit),),
+            )
+        rows = [dict(r) for r in cursor.fetchall()]
+    for r in rows:
+        try:
+            r["detail"] = json.loads(r.get("detail") or "{}")
+        except Exception:
+            r["detail"] = {}
+    return rows
 
 
 init_radar_db()

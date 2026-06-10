@@ -1,0 +1,43 @@
+# MediaRadar production requirements
+# 从代码 import 反向生成；部署时使用 pip install -r requirements.txt
+
+# Web 框架
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.5.0
+
+# 数据库
+SQLAlchemy>=2.0.0
+# 注：项目实际使用 sqlite3 标准库，不需要 SQLAlchemy；但保留供未来扩展
+
+# 认证（WS4）
+PyJWT>=2.8.0
+httpx>=0.27.0         # Google OAuth / 通用 HTTP 客户端
+
+# 第三方 SDK（OpenAI 兼容）
+openai>=1.30.0
+
+# 配置 / 工具
+python-dotenv>=1.0.0
+pydantic-settings>=2.0.0
+
+# 调度器
+APScheduler>=3.10.0
+
+# 中文分词（Agent 记忆）
+jieba>=0.42.1
+
+# 可观测性
+prometheus-client>=0.19.0
+
+# 爬虫（可选，部分功能依赖）
+# playwright>=1.40.0
+# selenium>=4.10.0
+
+# 推送通道（HTTP webhook）
+# requests 已被 httpx 替代
+
+# 加密 / 安全
+cryptography>=42.0.0
+passlib[bcrypt]>=1.7.4
+bcrypt>=4.0.0,<4.1.0

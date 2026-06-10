@@ -219,6 +219,25 @@ class AgentMemoryStore:
             """, (session_id, summary, json.dumps(entities, ensure_ascii=False), outcome, now))
             conn.commit()
 
+    def get_all_sessions(self, limit: int = 50) -> list:
+        """获取所有会话列表（按创建时间倒序）"""
+        with self._get_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT session_id, summary, created_at FROM conversation_summary ORDER BY created_at DESC LIMIT ?",
+                (limit,),
+            )
+            rows = []
+            for r in cursor.fetchall():
+                summary_text = r["summary"] or ""
+                rows.append({
+                    "session_id": r["session_id"],
+                    "title": summary_text[:30] + "…" if len(summary_text) > 30 else summary_text or "新对话",
+                    "created_at": r["created_at"],
+                })
+            return rows
+
     def get_summary(self, session_id: str) -> Optional[Dict]:
         """获取对话摘要"""
         with self._get_conn() as conn:
@@ -232,6 +251,20 @@ class AgentMemoryStore:
             return dict(row) if row else None
 
     # ==================== 清理 ====================
+
+    def cleanup_expired_facts(self) -> int:
+        """删除 fact_memory 中 expires_at < now 的行（修复 #4.3 TTL 清理）"""
+        now = datetime.now().isoformat()
+        with self._get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "DELETE FROM fact_memory WHERE expires_at < ?", (now,)
+            )
+            deleted = cursor.rowcount
+            conn.commit()
+        if deleted:
+            logger.info(f"[MemoryStore] 清理过期 fact_memory: {deleted} 条")
+        return deleted
 
     def delete_session(self, session_id: str):
         """删除某次对话的所有记忆"""

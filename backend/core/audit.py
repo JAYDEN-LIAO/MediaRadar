@@ -36,7 +36,7 @@ class AuditLogger:
         risk_level: int = 0,
     ):
         """
-        记录审计日志
+        记录审计日志（修复 #7.1：同步写入 DB audit_log 表）
 
         Args:
             action: 动作类型
@@ -63,6 +63,21 @@ class AuditLogger:
             "task_id": topic_id or "",
             "keyword": keyword,
         })
+
+        # 修复 #7.1：DB 落库（异步失败不影响主流程）
+        try:
+            from services.radar_service.db_manager import insert_audit_log
+            insert_audit_log(
+                action=action,
+                detail=detail,
+                keyword=keyword,
+                topic_id=topic_id,
+                risk_level=risk_level,
+                level=level,
+            )
+        except Exception:
+            # DB 写入失败不影响审计日志主流程
+            pass
 
     def alert_triggered(
         self,

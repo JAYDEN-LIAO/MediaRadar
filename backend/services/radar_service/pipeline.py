@@ -19,7 +19,7 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
-from typing import List, NamedTuple
+from typing import List, NamedTuple, Optional
 from dataclasses import dataclass
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -577,6 +577,8 @@ class PipelineConfig:
     concurrent_limit: int = 2
     screener_concurrency: int = 10  # 新增
     vision_concurrency: int = 5    # 新增
+    # WS4.6：数据归属（None = 公共/历史）
+    owner_id: Optional[str] = None
 
 
 class RadarPipeline:
@@ -746,7 +748,7 @@ class RadarPipeline:
             if result["risk_level"] >= 3 and evolution_timeline:
                 from .topic_tracker import build_topic_id
                 topic_id = build_topic_id(cluster.keyword, cluster.topic_name)
-                task = asyncio.get_event_loop().create_task(
+                task = asyncio.create_task(
                     self._background_index(topic_id, cluster, result, evolution_timeline)
                 )
                 background_tasks.append(task)
@@ -770,7 +772,9 @@ class RadarPipeline:
             try:
                 clusters_for_agg = [c for c, _ in cluster_results]
                 results_for_agg = [r for _, r in cluster_results]
-                self.aggregator.aggregate_clusters(clusters_for_agg, results_for_agg)
+                self.aggregator.aggregate_clusters(
+                    clusters_for_agg, results_for_agg, owner_id=self.config.owner_id
+                )
             except Exception as e:
                 logger.warning(f"[Pipeline] 话题聚合失败: {e}")
         # ─────────────────────────────────────────────────

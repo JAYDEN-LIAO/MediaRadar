@@ -3,11 +3,14 @@ Embedding + HDBSCAN 聚类引擎
 
 使用 BGE-M3 生成向量，HDBSCAN 自适应密度聚类，
 将多个帖子按语义相似度归并为话题簇。
-"""
 
+修复 #9.2：cluster_related_posts 增加 LRU 缓存（OrderedDict + sha256 哈希 key）
+"""
+import hashlib
 import hdbscan
 import numpy as np
 import umap
+from collections import OrderedDict
 from typing import List
 
 from core.logger import get_logger
@@ -17,16 +20,39 @@ from core.config import settings
 from .llm_gateway import call_llm, embedding_client
 
 
+# 修复 #9.2：LRU 缓存（OrderedDict 容量 32）
+_CLUSTER_CACHE_MAX = 32
+_cluster_cache: "OrderedDict[str, list]" = OrderedDict()
+
+
+def _make_cache_key(relevant_posts, keyword: str) -> str:
+    """生成稳定缓存 key（post_id 集合 + keyword，与顺序无关）"""
+    post_ids = sorted([p.get("post_id", "") for p in relevant_posts])
+    raw = f"{keyword}|{','.join(post_ids)}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _get_cached_result(key: str):
+    """读取并 promote LRU 顺序"""
+    if key in _cluster_cache:
+        _cluster_cache.move_to_end(key)
+        return _cluster_cache[key]
+    return None
+
+
+def _set_cached_result(key: str, value: list):
+    """写入并按容量淘汰最久未使用"""
+    _cluster_cache[key] = value
+    _cluster_cache.move_to_end(key)
+    while len(_cluster_cache) > _CLUSTER_CACHE_MAX:
+        _cluster_cache.popitem(last=False)
+
+
 def cluster_related_posts(relevant_posts, keyword):
     """
     将帖子列表通过向量聚类归并为话题簇。
 
-    Args:
-        relevant_posts: 待聚类的帖子列表
-        keyword: 监控关键词
-
-    Returns:
-        List[dict]，每个 dict 包含 topic_name 和 post_ids
+    修复 #9.2：同 post_id 集合 + 相同 keyword → 直接返回缓存结果。
     """
     if len(relevant_posts) <= 2:
         return [
@@ -35,6 +61,13 @@ def cluster_related_posts(relevant_posts, keyword):
              "posts": [p]}
             for p in relevant_posts
         ]
+
+    # 修复 #9.2：缓存命中检查
+    cache_key = _make_cache_key(relevant_posts, keyword)
+    cached = _get_cached_result(cache_key)
+    if cached is not None:
+        logger.info(f"[CLUSTER AGENT] 缓存命中 (key={cache_key[:12]}...)")
+        return cached
 
     logger.info(f"[CLUSTER AGENT] 正在通过云端 API 对 {len(relevant_posts)} 条舆情进行聚类...")
 
@@ -155,6 +188,8 @@ def cluster_related_posts(relevant_posts, keyword):
             "posts": posts               # 包含 posts，供 merge_similar_clusters 使用
         })
 
+    # 修复 #9.2：缓存写入
+    _set_cached_result(cache_key, final_clusters)
     return final_clusters
 
 

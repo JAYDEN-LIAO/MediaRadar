@@ -1,20 +1,21 @@
 """
 Direct tool adapter - 直接调用 tools.py 中的函数（无协议开销）。
 """
+import asyncio
 import json
 from typing import Any, Dict
 from .base import AbstractToolAdapter
 from ..tools import AVAILABLE_TOOLS
 
 class DirectAdapter(AbstractToolAdapter):
-    """直调 tools.py 的适配器"""
+    """直调 tools.py 的适配器（同时支持 sync / async 工具）"""
 
     def supports(self, tool_name: str) -> bool:
         return tool_name in AVAILABLE_TOOLS
 
-    def execute(self, tool_name: str, args: Dict[str, Any]) -> str:
+    async def execute(self, tool_name: str, args: Dict[str, Any]) -> str:
         """
-        直接调用 tools.py 中对应的函数。
+        异步执行 tools.py 中对应的函数。
         返回格式统一为：{"success": bool, "data": Any, "error": str, "error_type": str}
         """
         func = AVAILABLE_TOOLS.get(tool_name)
@@ -27,7 +28,11 @@ class DirectAdapter(AbstractToolAdapter):
             }, ensure_ascii=False)
 
         try:
-            result = func(**args)
+            # 修复 #1.1：同时支持 sync 和 async 工具
+            if asyncio.iscoroutinefunction(func):
+                result = await func(**args)
+            else:
+                result = func(**args)
             # tools.py 目前返回的是 json.dumps 后的字符串
             # 解析后重新包装为统一格式
             try:

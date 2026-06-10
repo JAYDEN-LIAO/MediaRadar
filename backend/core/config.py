@@ -29,6 +29,11 @@ class Settings:
     REVIEWER_BASE_URL = os.getenv("REVIEWER_BASE_URL", "").strip()
     REVIEWER_MODEL = os.getenv("REVIEWER_MODEL", "").strip()
 
+    # ======== 配置 (v2 修复 #2.1): Agent 智能体（分析/对话助手） ========
+    AGENT_API_KEY = os.getenv("AGENT_API_KEY", "").strip()
+    AGENT_BASE_URL = os.getenv("AGENT_BASE_URL", "").strip()
+    AGENT_MODEL = os.getenv("AGENT_MODEL", "").strip()
+
     # ======== 配置3: 向量引擎 ========
     EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY", "")
     EMBEDDING_BASE_URL = os.getenv("EMBEDDING_BASE_URL", "").strip()
@@ -61,8 +66,24 @@ class Settings:
     CRAWLER_DB_PATH = os.getenv("CRAWLER_DB_PATH", os.path.join(BACKEND_DIR, "data", "sqlite_tables.db"))
     LOG_DIR = os.getenv("LOG_DIR", os.path.join(PROJECT_ROOT, "logs"))
 
+    # ======== 环境标识（用于 CORS 等配置按环境区分）=======
+    ENV = os.getenv("ENV", "dev").lower()  # dev | prod
+    ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "").strip()  # 逗号分隔
+
     # ======== API 认证配置 ========
     API_KEYS = os.getenv("API_KEYS", "")
+
+    # ======== WS4: JWT 认证配置 ========
+    JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret-change-me-in-prod-please-32bytes").strip()
+    JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256").strip()
+    JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "24"))
+
+    # ======== WS4: OAuth 配置（v2 上线时填真实值）=======
+    GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+    GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
+    WECHAT_APP_ID = os.getenv("WECHAT_APP_ID", "").strip()
+    WECHAT_APP_SECRET = os.getenv("WECHAT_APP_SECRET", "").strip()
+    OAUTH_REDIRECT_BASE = os.getenv("OAUTH_REDIRECT_BASE", "https://mediaradar.jaydennn.xyz").strip()
 
     # ======== 日志配置 ========
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -80,45 +101,32 @@ from core.agent_memory_db import init_db as _  # Agent 记忆库初始化
 
 def update_llm_config(agent: str, config: dict) -> bool:
     """
-    更新指定 Agent 的 LLM 配置（写入 .env + 内存立即生效）。
-    agent: "default" | "analyst" | "reviewer" | "embedding" | "vision"
-    返回是否成功。
+    更新指定 Agent 的 LLM 配置（仅内存生效，不再写入 .env 文件）。
+    agent: "default" | "analyst" | "reviewer" | "embedding" | "vision" | "agent"
+
+    注意：此函数只更新运行时 settings 对象。
+    如需持久化，请手动编辑 .env 文件，或通过前端设置页保存。
     """
+    _BAD_VALUES = {"test", "sk-test", "", "gpt-4"}
+
     prefix_map = {
         "default":   "DEFAULT",
         "analyst":   "ANALYST",
         "reviewer":  "REVIEWER",
         "embedding": "EMBEDDING",
         "vision":    "VISION",
+        "agent":     "AGENT",
     }
     if agent not in prefix_map:
         return False
 
     prefix = prefix_map[agent]
-    lines_to_add = []
     for field, value in config.items():
-        key = f"{prefix}_{field.upper()}"
-        lines_to_add.append(f"{key}={value}")
+        if not isinstance(value, str) or value.strip().lower() in _BAD_VALUES:
+            continue
         attr = f"{prefix}_{field.upper()}"
         if hasattr(settings, attr):
-            setattr(settings, attr, value)
-
-    if lines_to_add:
-        # 读取现有 .env，合并更新（避免同一 key 重复追加）
-        existing = {}
-        if os.path.exists(ENV_PATH):
-            with open(ENV_PATH, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if "=" in line and not line.startswith("#"):
-                        k, v = line.split("=", 1)
-                        existing[k.strip()] = v.strip()
-        for line in lines_to_add:
-            k = line.split("=", 1)[0]
-            existing[k] = line.split("=", 1)[1]
-        with open(ENV_PATH, "w", encoding="utf-8") as f:
-            for k, v in existing.items():
-                f.write(f"{k}={v}\n")
+            setattr(settings, attr, value.strip())
 
     return True
 
@@ -126,13 +134,14 @@ def update_llm_config(agent: str, config: dict) -> bool:
 def get_effective_llm_config(agent: str) -> dict:
     """
     获取指定 Agent 的有效配置，空缺字段自动回退到 DEFAULT。
-    agent: "analyst" | "reviewer" | "embedding" | "vision"
+    agent: "analyst" | "reviewer" | "embedding" | "vision" | "agent"
     """
     prefix_map = {
         "analyst":   "ANALYST",
         "reviewer":  "REVIEWER",
         "embedding": "EMBEDDING",
         "vision":    "VISION",
+        "agent":     "AGENT",   # v2 修复 #2.1
     }
     prefix = prefix_map.get(agent)
     if not prefix:
@@ -147,3 +156,24 @@ def get_effective_llm_config(agent: str) -> dict:
         "base_url": field("base_url"),
         "model": field("model"),
     }
+
+
+def get_agent_config() -> tuple[str, str, str]:
+    """
+    Agent 智能体配置回退链（修复 #2.1）：
+        AGENT_* → ANALYST_* → DEFAULT_*
+    返回 (api_key, base_url, model)
+    """
+    def field(name: str) -> str:
+        # AGENT 优先
+        v = getattr(settings, f"AGENT_{name.upper()}", "") or ""
+        if v:
+            return v
+        # 回退到 ANALYST
+        v = getattr(settings, f"ANALYST_{name.upper()}", "") or ""
+        if v:
+            return v
+        # 回退到 DEFAULT
+        return getattr(settings, f"DEFAULT_{name.upper()}", "") or ""
+
+    return field("api_key"), field("base_url"), field("model")
