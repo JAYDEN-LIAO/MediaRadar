@@ -800,12 +800,12 @@ class PushTestRequest(BaseModel):
 
 
 @router.get("/api/push/configs")
-def get_all_push_configs():
+def get_all_push_configs(current_user: dict = Depends(get_current_user)):
     """
-    获取所有推送通道的简洁配置（不含密码）
+    获取当前用户的所有推送通道的简洁配置（不含密码，v2.2 per-owner）
     """
-    from .db_manager import get_all_push_configs
-    configs = get_all_push_configs()
+    from .db_manager import get_all_push_configs as _db_get_all
+    configs = _db_get_all(owner_id=current_user["id"])
     # 隐藏密码
     for ch in configs.values():
         ch.pop("smtp_password", None)
@@ -813,13 +813,13 @@ def get_all_push_configs():
 
 
 @router.get("/api/push/config/{channel}")
-def get_push_config(channel: str):
-    """获取单个通道的完整配置（含密码，仅管理员可见）"""
+def get_push_config(channel: str, current_user: dict = Depends(get_current_user)):
+    """获取当前用户指定通道的完整配置（含密码）"""
     valid = [c.value for c in PushChannel]
     if channel not in valid:
         return {"code": 400, "msg": f"无效通道，支持: {valid}"}
-    from .db_manager import get_push_config
-    cfg = get_push_config(channel)
+    from .db_manager import get_push_config as _db_get
+    cfg = _db_get(current_user["id"], channel)
     # 隐藏密码返回
     safe_cfg = dict(cfg)
     safe_cfg.pop("smtp_password", None)
@@ -827,12 +827,12 @@ def get_push_config(channel: str):
 
 
 @router.post("/api/push/config/{channel}")
-def save_push_config(channel: str, req: PushConfigUpdateRequest):
-    """保存推送通道配置"""
+def save_push_config(channel: str, req: PushConfigUpdateRequest, current_user: dict = Depends(get_current_user)):
+    """保存当前用户的指定通道配置（v2.2 per-owner）"""
     valid = [c.value for c in PushChannel]
     if channel not in valid:
         return {"code": 400, "msg": f"无效通道，支持: {valid}"}
-    from .db_manager import save_push_config
+    from .db_manager import save_push_config as _db_save
     from .notifier import reload_registry
 
     # 根据通道类型构建完整配置
@@ -850,26 +850,28 @@ def save_push_config(channel: str, req: PushConfigUpdateRequest):
             "from_addr": req.from_addr,
             "to_addrs": req.to_addrs,
         })
+    elif channel == "rss":
+        cfg["access_token"] = req.webhook_url or ""
     else:
         cfg["webhook_url"] = req.webhook_url
 
-    save_push_config(channel, cfg)
+    _db_save(current_user["id"], channel, cfg)
     reload_registry()
     return {"code": 200, "msg": f"{channel} 配置已保存"}
 
 
 @router.post("/api/push/test")
-def test_push_channel(req: PushTestRequest):
-    """发送测试消息到指定通道"""
+def test_push_channel(req: PushTestRequest, current_user: dict = Depends(get_current_user)):
+    """发送测试消息到当前用户指定的通道"""
     from .notifier import test_channel
-    from .db_manager import get_push_config
+    from .db_manager import get_push_config as _db_get
 
     try:
         ch = PushChannel(req.channel)
     except ValueError:
         return {"code": 400, "msg": f"无效通道: {req.channel}"}
 
-    cfg = get_push_config(req.channel)
+    cfg = _db_get(current_user["id"], req.channel)
     if not cfg.get("enabled"):
         return {"code": 400, "msg": "请先启用该通道再测试"}
 

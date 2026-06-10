@@ -163,6 +163,69 @@ def init_radar_db():
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_topic_summary_owner_id ON topic_summary(owner_id)')
         # ────────────────────────────────────────────────────────────
 
+        # ── v2.2：订阅表（per-owner，替代 system_settings.keywords）───
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS subscription (
+                id TEXT PRIMARY KEY,
+                owner_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                type TEXT NOT NULL DEFAULT 'keyword',
+                polarity TEXT DEFAULT 'all',
+                sensitivity TEXT DEFAULT 'balanced',
+                frequency_min INTEGER DEFAULT 60,
+                platforms TEXT DEFAULT '[]',
+                push_mode TEXT DEFAULT 'important',
+                show_risk_alert INTEGER DEFAULT 0,
+                is_active INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_subscription_owner ON subscription(owner_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_subscription_active ON subscription(is_active)')
+
+        # ── v2.2：订阅-话题多对多关联表 ─────────────────────────
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS subscription_topic (
+                subscription_id TEXT NOT NULL,
+                topic_id TEXT NOT NULL,
+                first_subscribed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (subscription_id, topic_id)
+            )
+        ''')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_sub_topic_sub ON subscription_topic(subscription_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_sub_topic_topic ON subscription_topic(topic_id)')
+
+        # ── v2.2：模型配置表（per-user，5 个 Agent 角色）────────
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS model_config (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                owner_id TEXT NOT NULL,
+                agent_role TEXT NOT NULL,
+                provider TEXT,
+                model TEXT,
+                api_key TEXT,
+                base_url TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(owner_id, agent_role)
+            )
+        ''')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_model_config_owner ON model_config(owner_id)')
+
+        # ── v2.2：配额表（per-user）───────────────────────────────
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS quota (
+                owner_id TEXT PRIMARY KEY,
+                max_subscriptions INTEGER DEFAULT 20,
+                history_retention_days INTEGER DEFAULT 30,
+                max_chat_per_month INTEGER DEFAULT 200,
+                used_chat_this_month INTEGER DEFAULT 0,
+                month_reset_at TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        # ────────────────────────────────────────────────────────────
+
 def _async_index_to_qdrant(result: dict):
     """异步将 ai_results 写入 Qdrant（不阻塞主流程）"""
     try:
@@ -723,26 +786,40 @@ def mark_topic_processed(topic_id: str) -> bool:
 # ============================================================
 
 def _ensure_push_settings_table():
-    """确保 push_settings 表存在"""
+    """确保 push_settings 表存在（v2.2：per-owner，含 rss 通道）"""
     with get_db_connection() as conn:
         cursor = conn.cursor()
+        # 检查表是否已有 owner_id 列（v2.2 迁移）
+        cursor.execute("PRAGMA table_info(push_settings)")
+        cols = {row[1] for row in cursor.fetchall()}
+
+        if cols and "owner_id" not in cols:
+            # 旧表（无 owner_id），按 v2.2 决策"重零开始"，直接 drop
+            logger.warning("[push_settings] 旧表无 owner_id，按 v2.2 决策 drop 后重建")
+            cursor.execute("DROP TABLE push_settings")
+            cols = set()
+
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS push_settings (
-                channel TEXT PRIMARY KEY,
-                config_json TEXT NOT NULL
+                owner_id TEXT NOT NULL,
+                channel TEXT NOT NULL,
+                config_json TEXT NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (owner_id, channel)
             )
         ''')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_push_settings_owner ON push_settings(owner_id)')
         conn.commit()
 
 
-def get_push_config(channel: str) -> dict:
-    """读取指定通道的配置"""
+def get_push_config(owner_id: str, channel: str) -> dict:
+    """读取指定用户指定通道的配置（v2.2：per-owner）"""
     _ensure_push_settings_table()
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT config_json FROM push_settings WHERE channel = ?",
-            (channel,)
+            "SELECT config_json FROM push_settings WHERE owner_id = ? AND channel = ?",
+            (owner_id, channel)
         )
         row = cursor.fetchone()
     if row:
@@ -752,36 +829,57 @@ def get_push_config(channel: str) -> dict:
         "email": {"enabled": False, "risk_min_level": 3},
         "wecom": {"enabled": False, "risk_min_level": 2},
         "feishu": {"enabled": False, "risk_min_level": 2},
+        "rss": {"enabled": False, "access_token": ""},
     }
     return defaults.get(channel, {"enabled": False, "risk_min_level": 1})
 
 
-def save_push_config(channel: str, config: dict) -> None:
-    """保存指定通道的配置"""
+def save_push_config(owner_id: str, channel: str, config: dict) -> None:
+    """保存指定用户指定通道的配置（v2.2：per-owner）"""
     _ensure_push_settings_table()
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute(
-            "INSERT OR REPLACE INTO push_settings (channel, config_json) VALUES (?, ?)",
-            (channel, json.dumps(config))
-        )
+        cursor.execute('''
+            INSERT INTO push_settings (owner_id, channel, config_json, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(owner_id, channel) DO UPDATE SET
+                config_json = excluded.config_json,
+                updated_at = CURRENT_TIMESTAMP
+        ''', (owner_id, channel, json.dumps(config)))
         conn.commit()
 
 
-def get_all_push_configs() -> dict[str, dict]:
-    """返回所有推送通道配置（供 registry 初始化用）"""
+def get_all_push_configs(owner_id: Optional[str] = None) -> dict[str, dict]:
+    """返回某用户的所有推送通道配置（v2.2：per-owner）
+    owner_id=None 时返回全部（admin 视角）"""
     _ensure_push_settings_table()
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT channel, config_json FROM push_settings")
-        rows = cursor.fetchall()
-    result = {}
+        if owner_id is None:
+            cursor.execute("SELECT owner_id, channel, config_json FROM push_settings")
+            rows = cursor.fetchall()
+        else:
+            cursor.execute(
+                "SELECT channel, config_json FROM push_settings WHERE owner_id = ?",
+                (owner_id,)
+            )
+            rows = cursor.fetchall()
+    result: dict[str, dict] = {}
     for row in rows:
-        result[row[0]] = json.loads(row[1])
+        if owner_id is None and len(row) == 3:
+            # 全部模式：{(owner_id, channel): config}
+            result[f"{row[0]}:{row[1]}"] = json.loads(row[2])
+        else:
+            result[row[0]] = json.loads(row[1])
     # 补全未配置的通道默认值
-    for ch in ("email", "wecom", "feishu"):
-        if ch not in result:
-            result[ch] = {"enabled": False, "risk_min_level": 2}
+    default_channels = ("email", "wecom", "feishu", "rss")
+    if owner_id is not None:
+        for ch in default_channels:
+            if ch not in result:
+                if ch == "rss":
+                    result[ch] = {"enabled": False, "access_token": ""}
+                else:
+                    result[ch] = {"enabled": False, "risk_min_level": 2}
     return result
 
 

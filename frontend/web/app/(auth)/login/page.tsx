@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { authApi } from '@/lib/api';
+import { persistAuth } from '@/lib/auth-client';
 import { toast } from 'sonner';
 
 function LoginForm() {
@@ -28,7 +29,7 @@ function LoginForm() {
       const res = mode === 'login'
         ? await authApi.login(email, password)
         : await authApi.register(email, password, nickname || email.split('@')[0]);
-      localStorage.setItem('mediaradar_token', res.token);
+      persistAuth(res.token, res.user.role);  // 写 token + role cookie 供 middleware 读
       toast.success(mode === 'login' ? '登录成功' : '注册成功');
       router.replace(redirect);
     } catch (err: unknown) {

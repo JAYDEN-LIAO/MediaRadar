@@ -16,6 +16,7 @@ if BASE_DIR not in sys.path:
 from services.radar_service.api import router as radar_router
 from services.agent_service.api import router as agent_router
 from services.auth_service.api import router as auth_router  # WS4: 多用户认证
+from services.subscription_service.api import router as subscription_router  # v2.2: 订阅/模型/配额/admin
 
 # 触发 agent_service 模块加载，确保其 Counter/Histogram 已注册到 prometheus 默认注册表
 import services.agent_service.agent_core  # noqa: F401
@@ -29,6 +30,8 @@ from core.security_middleware import (
     add_security_headers_middleware,
     add_max_body_size_middleware,
 )
+# v2.2: 触发订阅表初始化
+import services.radar_service.db_manager  # noqa: F401  触发 init_radar_db
 logger = get_logger("gateway")
 
 app = FastAPI(
@@ -100,6 +103,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(radar_router, tags=["舆情雷达业务层"])
 app.include_router(agent_router, tags=["AI助手业务层"])
 app.include_router(auth_router, tags=["WS4 用户认证"])
+app.include_router(subscription_router, tags=["v2.2 订阅/模型/配额"])
 
 
 @app.get("/metrics", tags=["可观测性"])

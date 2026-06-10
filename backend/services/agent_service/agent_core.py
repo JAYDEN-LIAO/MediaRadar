@@ -7,6 +7,7 @@ Agent Core - 主循环重构
 import json
 import uuid
 import asyncio
+from typing import Optional
 from openai import OpenAI
 from core.config import settings, get_agent_config
 from core.logger import get_logger
@@ -20,7 +21,15 @@ from core.metrics import (
 logger = get_logger("agent")
 
 # 导入工具适配器
-from .tools import TOOLS_SCHEMA, AVAILABLE_TOOLS
+from .tools import TOOLS_SCHEMA, AVAILABLE_TOOLS, STREAMABLE_TOOLS
+from .sse import (
+    emit_done,
+    emit_error,
+    emit_text,
+    emit_tool_call,
+    emit_tool_progress,
+    emit_tool_result,
+)
 from .adapters import DirectAdapter, MCPAdapter
 from .memory import AgentMemoryManager
 from .reflection import ReflectionEngine
@@ -101,13 +110,25 @@ class ToolExecutor:
         self.mcp = MCPAdapter() if getattr(settings, 'AGENT_MCP_ENABLED', False) else None
         self.diagnosis_engine = DiagnosisEngine()
 
-    async def execute(self, tool_name: str, args: dict, messages: list) -> str:
+    async def execute(
+        self,
+        tool_name: str,
+        args: dict,
+        messages: list,
+        on_progress=None,
+        _request: Optional[dict] = None,
+    ) -> str:
         """
         执行工具：
         1. 优先直调（快）
         2. 直调失败且启用 MCP → 走 MCP HTTP
         3. 所有工具走 SelfHealingExecutor
         4. 记录 AGENT_TOOL_CALLS / AGENT_TOOL_LATENCY 指标
+
+        v2.2 P2 新增：
+        - on_progress(partial)：流式工具调它推送增量；普通工具为 None
+        - _request：请求上下文 dict（owner_id/session_id/trace_id），
+          DirectAdapter 会把它注入到工具函数（仅当函数声明 `_request=None` 参数时）
         """
         import time as _time
         start_ts = _time.perf_counter()
@@ -118,7 +139,12 @@ class ToolExecutor:
             try:
                 result = await self.diagnosis_engine.execute_with_diagnosis(
                     self.direct.execute,
-                    {"tool_name": tool_name, "args": args},
+                    {
+                        "tool_name": tool_name,
+                        "args": args,
+                        "on_progress": on_progress,
+                        "_request": _request,
+                    },
                     tool_name=tool_name,
                     other_tools={k: v for k, v in AVAILABLE_TOOLS.items() if k != tool_name}
                 )
@@ -131,7 +157,12 @@ class ToolExecutor:
                         logger.info(f"[ToolExecutor] 直调 {tool_name} 失败，切换 MCP...")
                         mcp_result = await self.diagnosis_engine.execute_with_diagnosis(
                             self.mcp.execute,
-                            {"tool_name": tool_name, "args": args},
+                            {
+                                "tool_name": tool_name,
+                                "args": args,
+                                "on_progress": on_progress,
+                                "_request": _request,
+                            },
                             tool_name=tool_name
                         )
                         return mcp_result
@@ -150,7 +181,12 @@ class ToolExecutor:
             try:
                 return await self.diagnosis_engine.execute_with_diagnosis(
                     self.mcp.execute,
-                    {"tool_name": tool_name, "args": args},
+                    {
+                        "tool_name": tool_name,
+                        "args": args,
+                        "on_progress": on_progress,
+                        "_request": _request,
+                    },
                     tool_name=tool_name
                 )
             except Exception as e:
@@ -204,13 +240,22 @@ def _stream_response(messages: list):
     )
     for chunk in response:
         if chunk.choices and chunk.choices[0].delta.content is not None:
-            yield f"data: {chunk.choices[0].delta.content}\n\n"
+            yield emit_text(chunk.choices[0].delta.content)
 
 
-async def chat_with_agent_stream(messages: list, session_id: str = None):
+async def chat_with_agent_stream(
+    messages: list,
+    session_id: str = None,
+    _request: Optional[dict] = None,
+):
     """
-    Agent 主循环。
-    session_id: 对话会话 ID，用于记忆管理（可自动生成）
+    Agent 主循环（v2.2 P2：SSE 多事件协议）
+
+    事件顺序：text / tool_call / [tool_progress]* / tool_result / text / done
+    流式工具（标记 streamable=True）通过 on_progress 推 partial，非流式工具不推。
+
+    _request: 透传上下文（owner_id / session_id / trace_id 等）；
+              工具函数声明 _request=None 即可接收；与 contextvar 双重保险。
     """
     session_id = session_id or str(uuid.uuid4())
 
@@ -218,13 +263,11 @@ async def chat_with_agent_stream(messages: list, session_id: str = None):
     system_prompt = {
         "role": "system",
         "content": (
-            "你是企业的首席舆情分析官(AI Agent)。你拥有系统工具的调用权限。\n"
-            "你可以查询雷达状态、下发实时爬虫任务、查询历史高危舆情。\n"
-            "请用专业、简洁、有洞察力的公关总监口吻回答用户。\n"
-            "【注意】：如果需要抓取新数据，请直接调用 trigger_background_crawl 工具，绝不要自行编造工具名！\n"
-            "【trigger_background_crawl 参数格式】：keyword=关键词（字符串），depth 和 target 不是有效参数！\n"
-            "【最高优先级指令】：如果你调用了 trigger_background_crawl 工具，说明新数据已经在抓取中。"
-            "此时绝对不要再调用任何其他工具（如查历史）！必须立刻停止思考，直接用自然语言告诉用户任务已在后台执行！"
+            "你是 MediaRadar 媒体信息订阅平台的 AI 管家。"
+            "你拥有 7 组共 30 个工具（A 订阅 / B 扫描 / C 查询 / D 推送 / E 模型 / F 搜索 / G 系统）。\n"
+            "请用专业、简洁、有洞察力的口吻回答用户。\n"
+            "【注意】：所有 per-user 操作都通过 _owner_id 上下文隔离，不要让用户感知内部实现。\n"
+            "【trigger_background_crawl 是 legacy 别名】：核心扫描请用 trigger_scan。"
         )
     }
 
@@ -274,122 +317,133 @@ async def chat_with_agent_stream(messages: list, session_id: str = None):
             for tool_call in tool_calls:
                 function_name = tool_call.function.name
                 function_args = json.loads(tool_call.function.arguments) if tool_call.function.arguments else {}
+                call_id = tool_call.id
                 logger.info(f"[Agent Core] 决定调用工具: {function_name} | 参数: {function_args}")
 
-                # 检查 trigger_background_crawl（特殊处理）
-                if function_name == "trigger_background_crawl":
-                    tool_result = await tool_executor.execute(function_name, function_args, current_messages)
+                # ===== P2 SSE：先发 tool_call，再决定是否走流式分支 =====
+                yield emit_tool_call(call_id, function_name, function_args)
+
+                # 透传给 on_progress 的回调：流式工具的 partial → SSE tool_progress
+                is_streamable = function_name in STREAMABLE_TOOLS
+
+                def _on_progress(partial: dict, _cid=call_id) -> None:
+                    # 这里不能 yield（回调不是 async gen），改用 push 到一个 list
+                    progress_queue.append((_cid, partial))
+
+                progress_queue: list = []
+
+                try:
+                    tool_result = await tool_executor.execute(
+                        function_name,
+                        function_args,
+                        current_messages,
+                        on_progress=_on_progress,
+                        _request=_request,
+                    )
+                except Exception as e:
+                    err_msg = f"工具执行异常: {e}"
+                    logger.error(f"[Agent Core] {err_msg}")
+                    yield emit_error(err_msg, error_type="tool_execution_error", call_id=call_id)
+                    yield emit_done()
+                    return
+
+                # 把 progress_queue 里的 partial 全 yield 出去
+                for _cid, partial in progress_queue:
+                    yield emit_tool_progress(_cid, partial)
+
+                # 解析 tool_result → 拆 success/data/ui/error
+                try:
+                    parsed = json.loads(tool_result)
+                except Exception:
+                    parsed = {"success": False, "data": None, "error": "工具返回非 JSON", "error_type": "tool_format_error"}
+
+                # 触发 trigger_scan / trigger_background_crawl 走特殊路径：立即发文本
+                if function_name in ("trigger_scan", "trigger_background_crawl"):
                     current_messages.append({
-                        "tool_call_id": tool_call.id,
-                        "role": "tool",
-                        "name": function_name,
+                        "tool_call_id": call_id, "role": "tool", "name": function_name,
                         "content": tool_result,
                     })
-                    # 特殊处理：立即停止，直接告诉用户任务已启动
+                    yield emit_tool_result(
+                        call_id=call_id,
+                        success=parsed.get("success", False),
+                        data=parsed.get("data"),
+                        ui=parsed.get("ui") or {"type": "scan_progress", "data": {"status": "started"}},
+                        error=parsed.get("error", ""),
+                        error_type=parsed.get("error_type", ""),
+                    )
                     for chunk in _stream_response(current_messages):
                         yield chunk
-                    yield "data: [DONE]\n\n"
-
-                    # 异步写入记忆
+                    yield emit_done()
                     asyncio.create_task(_write_memory_async(session_id, messages))
                     return
 
-                # 其他工具：执行 + Reflection
-                tool_result = await tool_executor.execute(function_name, function_args, current_messages)
+                # 其他工具：tool_result 事件 + Reflection 分支
+                yield emit_tool_result(
+                    call_id=call_id,
+                    success=parsed.get("success", False),
+                    data=parsed.get("data"),
+                    ui=parsed.get("ui") or {},
+                    error=parsed.get("error", ""),
+                    error_type=parsed.get("error_type", ""),
+                )
 
-                # Reflection 评估
+                current_messages.append({
+                    "tool_call_id": call_id, "role": "tool", "name": function_name,
+                    "content": tool_result,
+                })
+
+                # Reflection
                 try:
-                    parsed_result = json.loads(tool_result) if isinstance(tool_result, str) else tool_result
                     user_q = messages[-1]["content"] if messages else ""
                     eval_result = reflection_engine.evaluate(user_q, tool_result)
-
                     confidence = eval_result.get("confidence", "high")
 
                     if confidence == "low":
-                        # 降级回答
                         degrade_answer = reflection_engine.get_degrade_answer(tool_result)
                         current_messages.append({
-                            "tool_call_id": tool_call.id,
-                            "role": "tool",
-                            "name": function_name,
-                            "content": tool_result,
-                        })
-                        current_messages.append({
-                            "role": "assistant",
-                            "content": degrade_answer
+                            "role": "assistant", "content": degrade_answer
                         })
                         for chunk in _stream_response(current_messages):
                             yield chunk
-                        yield "data: [DONE]\n\n"
+                        yield emit_done()
                         asyncio.create_task(_write_memory_async(session_id, messages))
                         return
 
                     elif confidence == "medi":
-                        # 修复 #5.1：medi 追问上限 — 第二次 medi 触发时强制降级
-                        # 1. 先看是否还能 follow_up
                         medi_action = reflection_engine.handle_medi(
                             user_q, tool_result, eval_result.get("missing_info", "")
                         )
                         can_follow_up = (
                             medi_action.get("action") == "follow_up"
-                            and medi_count < 1   # 守卫：每 session 最多 1 次 follow_up
+                            and medi_count < 1
                         )
                         if not can_follow_up:
-                            # 走降级（无论是第二次 medi 还是 reflection 判定不可 follow_up）
                             degrade_answer = (
                                 medi_action.get("degrade_answer", "")
                                 if "degrade_answer" in medi_action
                                 else reflection_engine.get_degrade_answer(tool_result)
                             )
                             current_messages.append({
-                                "tool_call_id": tool_call.id,
-                                "role": "tool",
-                                "name": function_name,
-                                "content": tool_result,
-                            })
-                            current_messages.append({
-                                "role": "assistant",
-                                "content": degrade_answer
+                                "role": "assistant", "content": degrade_answer
                             })
                             for chunk in _stream_response(current_messages):
                                 yield chunk
-                            yield "data: [DONE]\n\n"
+                            yield emit_done()
                             asyncio.create_task(_write_memory_async(session_id, messages))
                             return
 
-                        # 第一次 follow_up：追加追问，继续循环
+                        # 第一次 follow_up
                         medi_count += 1
-                        current_messages.append({
-                            "tool_call_id": tool_call.id,
-                            "role": "tool",
-                            "name": function_name,
-                            "content": tool_result,
-                        })
                         follow_up_q = medi_action.get("follow_up_question", "")
                         current_messages.append({
-                            "role": "user",
-                            "content": f"【系统追问】{follow_up_q}"
+                            "role": "user", "content": f"【系统追问】{follow_up_q}"
                         })
                         continue
 
-                    else:
-                        # high: 正常处理
-                        current_messages.append({
-                            "tool_call_id": tool_call.id,
-                            "role": "tool",
-                            "name": function_name,
-                            "content": tool_result,
-                        })
-
+                    # high: 继续循环（下一轮 LLM 决策）
                 except Exception as e:
                     logger.error(f"Reflection 处理异常: {e}")
-                    # 不影响主流程，继续
-                    current_messages.append({
-                        "tool_call_id": tool_call.id,
-                        "role": "tool",
-                        "name": function_name,
-                        "content": tool_result,
-                    })
+                    # 异常不阻塞主流程，继续
 
             # Token 预算检查
             if token_budget_manager.should_summarize(current_messages):
@@ -408,15 +462,14 @@ async def chat_with_agent_stream(messages: list, session_id: str = None):
 
             for chunk in _stream_response(current_messages):
                 yield chunk
-            yield "data: [DONE]\n\n"
+            yield emit_done()
 
-            # 异步写入记忆
             asyncio.create_task(_write_memory_async(session_id, messages))
             return
 
     # 超过最大迭代次数
-    yield "data: 抱歉，处理该指令时逻辑过于复杂，已自动中止。请换个问法。\n\n"
-    yield "data: [DONE]\n\n"
+    yield emit_text("抱歉，处理该指令时逻辑过于复杂，已自动中止。请换个问法。")
+    yield emit_done()
     asyncio.create_task(_write_memory_async(session_id, messages))
 
 

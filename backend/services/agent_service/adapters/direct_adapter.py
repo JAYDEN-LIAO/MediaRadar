@@ -1,11 +1,29 @@
 """
 Direct tool adapter - 直接调用 tools.py 中的函数（无协议开销）。
+
+v2.2 P2：新增 on_progress 回调和 _request 上下文注入。
+- 工具函数如果声明 `on_progress=None` 参数，可调用它推 partial
+- 工具函数如果声明 `_request=None` 参数，可拿到 {owner_id, session_id, ...}
+- 未声明的参数会被 inspect 过滤掉，向后兼容
 """
 import asyncio
+import inspect
 import json
-from typing import Any, Dict
+from typing import Any, Callable, Dict, Optional
+
 from .base import AbstractToolAdapter
 from ..tools import AVAILABLE_TOOLS
+
+
+def _accepted_kwargs(func, explicit: dict) -> dict:
+    """只把函数签名里有的 kwargs 传进去；其余丢弃。"""
+    try:
+        sig = inspect.signature(func)
+    except (TypeError, ValueError):
+        return explicit
+    params = sig.parameters
+    return {k: v for k, v in explicit.items() if k in params}
+
 
 class DirectAdapter(AbstractToolAdapter):
     """直调 tools.py 的适配器（同时支持 sync / async 工具）"""
@@ -13,7 +31,13 @@ class DirectAdapter(AbstractToolAdapter):
     def supports(self, tool_name: str) -> bool:
         return tool_name in AVAILABLE_TOOLS
 
-    async def execute(self, tool_name: str, args: Dict[str, Any]) -> str:
+    async def execute(
+        self,
+        tool_name: str,
+        args: Dict[str, Any],
+        on_progress: Optional[Callable[[dict], None]] = None,
+        _request: Optional[dict] = None,
+    ) -> str:
         """
         异步执行 tools.py 中对应的函数。
         返回格式统一为：{"success": bool, "data": Any, "error": str, "error_type": str}
@@ -27,28 +51,41 @@ class DirectAdapter(AbstractToolAdapter):
                 "error_type": "unknown"
             }, ensure_ascii=False)
 
+        # 注入上下文 kwargs（仅当函数接受时）
+        ctx_kwargs = _accepted_kwargs(func, {
+            "on_progress": on_progress,
+            "_request": _request,
+        })
+        # 合并：args 在前，ctx 在后（args 不会覆盖 ctx，避免 LLM 伪造 _owner_id）
+        merged = {**args, **ctx_kwargs}
+
         try:
-            # 修复 #1.1：同时支持 sync 和 async 工具
+            # 同时支持 sync / async / async generator
             if asyncio.iscoroutinefunction(func):
-                result = await func(**args)
+                result = await func(**merged)
+            elif inspect.isasyncgenfunction(func):
+                # 流式工具：async generator 逐 partial yield，最终 yield 字符串
+                parts = []
+                async for partial in func(**merged):
+                    if on_progress is not None:
+                        on_progress(partial)
+                    parts.append(partial)
+                result = parts[-1] if parts else ""
             else:
-                result = func(**args)
-            # tools.py 目前返回的是 json.dumps 后的字符串
+                result = func(**merged)
+
             # 解析后重新包装为统一格式
             try:
                 parsed = json.loads(result)
-                # 如果已经是 dict 且包含 success 字段，保持原样
                 if isinstance(parsed, dict) and "success" in parsed:
                     return result
-                # 否则包装
                 return json.dumps({
                     "success": True,
                     "data": parsed,
                     "error": "",
                     "error_type": ""
                 }, ensure_ascii=False)
-            except json.JSONDecodeError:
-                # 原始返回非 JSON 字符串
+            except (json.JSONDecodeError, TypeError):
                 return json.dumps({
                     "success": True,
                     "data": result,

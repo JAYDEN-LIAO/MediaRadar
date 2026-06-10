@@ -34,7 +34,8 @@ class NotifierRegistry:
         """从外部配置加载通道（供外部调用者传入配置 dict）"""
         if configs is None:
             from ..db_manager import get_all_push_configs
-            configs = get_all_push_configs()
+            # v2.2：owner_id=None 时返回所有用户的全部配置（仅用于启动期/管理视图）
+            configs = get_all_push_configs(owner_id=None)
 
         self._channels.clear()
 

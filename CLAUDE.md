@@ -2,13 +2,20 @@
 
 ## 项目概述
 
-舆情监控系统，基于 FastAPI + uni-app 构建。核心功能：多平台爬虫抓取 -> Multi-Agent AI 分析 -> 风险预警 + 多通道推送。
+舆情监控系统，基于 FastAPI + 双前端（Web + 小程序）构建。核心功能：多平台爬虫抓取 -> Multi-Agent AI 分析 -> 风险预警 + 多通道推送。
 
 ## 技术栈
 
 - **后端**: FastAPI, SQLite, LangGraph, OpenAI SDK
 - **爬虫**: Playwright/Selenium（crawler_service 子模块）
-- **前端**: uni-app (Vue 3)
+- **Web 前端**: Next.js 15 (App Router) + React 18 + TypeScript + Tailwind v4 + shadcn/ui (Radix + @base-ui/react)
+  - 状态/数据: Zustand 5 + TanStack Query 5
+  - 表格/虚拟化: TanStack Table + TanStack Virtual
+  - 表单/校验: React Hook Form + Zod 4
+  - 图表: Recharts 3 / 动画: framer-motion 12
+  - 认证: NextAuth 5 (beta) + @auth/core（OAuth）
+  - Mock: MSW 2 / 通知: sonner / 主题: next-themes / 图标: lucide-react / 命令面板: cmdk
+- **小程序前端**: uni-app (Vue 3) — 旧版形态保留
 - **AI**: DeepSeek（分析）、Kimi/Moonshot（复核）、Qwen-VL（视觉）、BGE-M3（聚类）
 
 ## 目录结构
@@ -40,18 +47,35 @@ backend/
 │       ├── tools.py          # 三个工具：状态查询/触发爬虫/查历史预警
 │       └── api.py            # /api/agent/chat
 │   └── crawler_service/       # 爬虫子模块（独立完整，暂不深入）
-frontend/MiniApp/
-├── src/
-│   ├── pages/
-│   │   ├── index/index.vue   # 首页仪表盘
-│   │   ├── chat/agentChat.vue # AI 助手聊天
-│   │   ├── list/list.vue     # 舆情列表
-│   │   ├── profile/profile.vue # 个人中心 V1.0.1
-│   │   └── settings/
-│   │       ├── settings.vue   # 监控设置
-│   │       ├── pushSettings.vue # 推送设置（企业微信/飞书/邮箱）
-│   │       └── apiSettings.vue  # 模型设置（默认+5个Agent角色）
-│   └── utils/api.js          # API 调用封装（含 push / llm 相关）
+frontend/
+├── web/                          # Next.js 15 Web 端（主推形态）
+│   ├── app/
+│   │   ├── (app)/                # 已登录路由组（含 sidebar 布局）
+│   │   │   ├── dashboard/        # 仪表盘
+│   │   │   ├── agent/            # AI 助手
+│   │   │   ├── yq-list/          # 舆情列表
+│   │   │   └── settings/         # 设置：account / llm / push / system
+│   │   ├── (auth)/login/         # 登录页
+│   │   ├── api/auth/[...nextauth]/  # NextAuth 路由
+│   │   └── auth/callback/        # OAuth 回调
+│   ├── components/
+│   │   ├── layout/               # sidebar / topbar / page-header
+│   │   ├── ui/                   # shadcn 组件
+│   │   ├── charts/               # 图表封装
+│   │   └── animated-number.tsx
+│   ├── hooks/   lib/   stores/   types/
+│   └── public/
+└── MiniApp/                      # uni-app 小程序（旧版形态）
+    ├── src/pages/
+    │   ├── index/index.vue       # 首页仪表盘
+    │   ├── chat/agentChat.vue    # AI 助手聊天
+    │   ├── list/list.vue         # 舆情列表
+    │   ├── profile/profile.vue   # 个人中心 V1.0.1
+    │   └── settings/
+    │       ├── settings.vue      # 监控设置
+    │       ├── pushSettings.vue  # 推送设置（企业微信/飞书/邮箱）
+    │       └── apiSettings.vue   # 模型设置（默认+5个Agent角色）
+    └── src/utils/api.js          # API 调用封装（含 push / llm 相关）
 ```
 
 ## 核心架构：Pipeline 调度器 + LangGraph 分析子图
@@ -109,6 +133,14 @@ AI 助手通过 Function Calling 拥有三个工具：
 
 ## 前端关键页面
 
+### Web 端（Next.js，主推形态）
+- **登录** (`/login`): NextAuth OAuth 登录
+- **仪表盘** (`/dashboard`): 数据统计 + 图表（Recharts）
+- **AI 助手** (`/agent`): 与 Agent 流式对话
+- **舆情列表** (`/yq-list`): TanStack Table + Virtual 虚拟滚动
+- **设置中心** (`/settings/{account|llm|push|system}`): 账号 / 模型 / 推送通道 / 系统配置
+
+### 小程序端（uni-app，旧版保留）
 - **首页** (`/pages/index/index`): 仪表盘，展示今日舆情统计、AI 摘要、启动扫描按钮
 - **AI 助手** (`/pages/chat/agentChat`): 与 Agent 流式对话
 - **舆情列表** (`/pages/list/list`): 查看历史舆情
@@ -139,12 +171,15 @@ AI 助手通过 Function Calling 拥有三个工具：
 ## 开发注意事项
 
 1. **启动后端**: `python backend/gateway/main.py`（端口 8000）
-2. **环境变量**: 项目根目录 `.env`，Qdrant 配置在 `Settings` 类中有默认值
-3. **爬虫目录**: `backend/services/crawler_service/` 启动命令 `python main.py`
-4. **Pipeline**: `pipeline.py` 包含 RadarPipeline 调度器，`run_analysis_pipeline()` 是 asyncio 入口
-5. **LangGraph**: 状态机定义在 `llm_pipeline.py`，`radar_app` 仅封装 analyst→reviewer→director 子图
-6. **轮询间隔**: 前端首页 3 秒轮询一次后端状态
-7. **推送通道**: 企业微信/飞书/邮箱，`notifier/` 包使用相对导入，通过 `send_alert()` / `send_batch_alert()` 触发
+2. **启动 Web 前端**: `cd frontend/web && npm run dev`（端口 3000，Next.js 15 App Router）
+   - ⚠️ Next.js 15 与 14/13 有破坏性变更，写代码前优先查 `node_modules/next/dist/docs/`
+   - API 契约见 `docs/API_CONTRACT.md`，开发期可用 MSW mock
+3. **环境变量**: 项目根目录 `.env`，Web 端 `frontend/web/.env`，Qdrant 配置在 `Settings` 类中有默认值
+4. **爬虫目录**: `backend/services/crawler_service/` 启动命令 `python main.py`
+5. **Pipeline**: `pipeline.py` 包含 RadarPipeline 调度器，`run_analysis_pipeline()` 是 asyncio 入口
+6. **LangGraph**: 状态机定义在 `llm_pipeline.py`，`radar_app` 仅封装 analyst→reviewer→director 子图
+7. **轮询间隔**: 前端首页 3 秒轮询一次后端状态
+8. **推送通道**: 企业微信/飞书/邮箱，`notifier/` 包使用相对导入，通过 `send_alert()` / `send_batch_alert()` 触发
 9. **模型配置**: `update_llm_config()` 写入 `.env` 并立即更新内存 `settings`，避免重复 key
 10. **调度器**: `scheduler.py` 使用 APScheduler，扫描任务（IntervalTrigger）+ 每日简报任务（CronTrigger），配置变更时热重载
 11. **邮件模板**: `push_generator.py` 中三个 HTML 模板，BATCH_PUSH_HTML_TEMPLATE（批量预警）/ PUSH_HTML_TEMPLATE（单条预警）/ DAILY_SUMMARY_TEMPLATE（每日简报），均支持 `<details>` 可折叠

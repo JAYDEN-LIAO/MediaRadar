@@ -6,7 +6,7 @@ MCP Adapter - 通过 HTTP transport 调用 FastMCP Server。
 """
 import json
 import httpx
-from typing import Any, Dict
+from typing import Any, Callable, Dict, Optional
 from .base import AbstractToolAdapter
 
 class MCPAdapter(AbstractToolAdapter):
@@ -27,10 +27,18 @@ class MCPAdapter(AbstractToolAdapter):
         # 此处返回 True，由 MCP Server 实际判断
         return True
 
-    async def execute(self, tool_name: str, args: Dict[str, Any]) -> str:
+    async def execute(
+        self,
+        tool_name: str,
+        args: Dict[str, Any],
+        on_progress: Optional[Callable[[dict], None]] = None,
+        _request: Optional[dict] = None,
+    ) -> str:
         """
         通过 HTTP 调用 MCP Server 的 /tools/call 接口。
         返回标准化 ToolResult 格式。
+
+        on_progress / _request：P2 透传钩子，MCP HTTP 协议侧不消费，仅占位以保持接口一致
         """
         payload = {
             "name": tool_name,
