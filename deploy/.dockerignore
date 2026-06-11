@@ -1,0 +1,78 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+.installed.cfg
+pip-log.txt
+
+# Virtual envs
+venv/
+.venv/
+env/
+ENV/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+tests/
+TEST_*
+
+# IDEs / editor
+.idea/
+.vscode/
+.DS_Store
+
+# Git
+.git/
+.gitignore
+.gitattributes
+.github/
+
+# Project data (use volume mounts in compose)
+data/
+backend/data/
+backend/services/crawler_service/data/
+backend/services/crawler_service/media_platform/*/test_data/
+backend/services/crawler_service/media_platform/*/**/test_data/
+logs/
+cookies/
+browser_data/
+temp_image/
+
+# Documents / plans
+docs/
+*.md
+plans/
+agent_zone/
+debug_tools/
+.refer/
+debug_test.py
+update.md
+
+# Frontend (built separately)
+frontend/
+node_modules/
+dist/
+
+# MCP service standalone Dockerfile is in a different path, not built here
+# (this is only for backend image build)
+
+# Docker artifacts
+Dockerfile*
+docker-compose*.yml
+deploy/
+
+# Env files (mounted via compose instead)
+.env
+.env.*
+!.env.production.example

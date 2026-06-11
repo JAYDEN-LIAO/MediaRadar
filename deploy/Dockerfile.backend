@@ -1,0 +1,127 @@
+# =============================================================================
+# MediaRadar Backend Dockerfile (Multi-stage)
+# =============================================================================
+# Stage 1: Build deps & Playwright browser
+# Stage 2: Runtime image (slim, non-root)
+# =============================================================================
+
+# ---------- Stage 1: builder ----------
+FROM python:3.11-slim AS builder
+
+# Install system dependencies required for Python wheels & Playwright Chromium
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        gcc \
+        libffi-dev \
+        libssl-dev \
+        libxml2-dev \
+        libxslt1-dev \
+        libjpeg-dev \
+        libpng-dev \
+        libpq-dev \
+        zlib1g-dev \
+        curl \
+        wget \
+        git \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Copy requirements first to leverage layer cache
+COPY requirements.txt /build/requirements.txt
+
+# Install Python deps into a prefix we can copy cleanly
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir --prefix=/install -r /build/requirements.txt
+
+# Install Playwright CLI + Chromium browser (we'll copy /root/.cache/ms-playwright later)
+RUN pip install --no-cache-dir --prefix=/install playwright \
+    && /install/bin/playwright install --with-deps chromium
+
+# ---------- Stage 2: runtime ----------
+FROM python:3.11-slim AS runtime
+
+LABEL maintainer="MediaRadar Team <dev@mediaradar.local>"
+LABEL description="MediaRadar backend (FastAPI + LangGraph + Playwright)"
+
+# Runtime system dependencies for Playwright Chromium
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        # Playwright Chromium runtime libs
+        libnss3 \
+        libnspr4 \
+        libatk1.0-0 \
+        libatk-bridge2.0-0 \
+        libcups2 \
+        libdrm2 \
+        libdbus-1-3 \
+        libxkbcommon0 \
+        libxcomposite1 \
+        libxdamage1 \
+        libxfixes3 \
+        libxrandr2 \
+        libgbm1 \
+        libpango-1.0-0 \
+        libcairo2 \
+        libasound2 \
+        libatspi2.0-0 \
+        # Utilities
+        curl \
+        sqlite3 \
+        tini \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd -r -g 1000 mediaradar \
+    && useradd -r -u 1000 -g mediaradar -m -s /bin/bash mediaradar
+
+# Copy installed Python packages from builder
+COPY --from=builder /install /usr/local
+
+# Copy Playwright browser cache (Chromium binaries downloaded in builder)
+COPY --from=builder /root/.cache/ms-playwright /home/mediaradar/.cache/ms-playwright
+RUN chown -R mediaradar:mediaradar /home/mediaradar/.cache
+
+# Set working directory
+ENV APP_HOME=/app
+WORKDIR ${APP_HOME}
+
+# Copy backend source
+COPY backend/ ${APP_HOME}/backend/
+
+# Pre-create writable dirs (data, logs, cookies) owned by the app user
+RUN mkdir -p \
+        ${APP_HOME}/backend/data \
+        ${APP_HOME}/backend/services/crawler_service/data \
+        ${APP_HOME}/logs \
+    && chown -R mediaradar:mediaradar ${APP_HOME}
+
+# Set Python path so `gateway.main:app` resolves
+ENV PYTHONPATH=/app/backend \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    # Default to INFO; override in .env / compose
+    LOG_LEVEL=INFO
+
+# Switch to non-root
+USER mediaradar
+
+EXPOSE 8000
+
+# Healthcheck: hit the FastAPI OpenAPI doc endpoint (lightweight)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:8000/openapi.json >/dev/null || exit 1
+
+# Use tini for proper signal handling (PID 1 reaping)
+ENTRYPOINT ["/usr/bin/tini", "--"]
+
+# Start the FastAPI gateway (uvicorn)
+# NOTE: The dev source uses port 8008; the production entry point is set
+#       to 8000 in this Dockerfile as the agreed container port.
+CMD ["uvicorn", "gateway.main:app", \
+     "--host", "0.0.0.0", \
+     "--port", "8000", \
+     "--proxy-headers", \
+     "--forwarded-allow-ips", "*"]
