@@ -23,12 +23,29 @@
 ```
 backend/
 ├── gateway/main.py           # FastAPI 统一网关
-├── core/                     # 核心组件（logger, config, database）
+├── core/                     # 核心组件（logger, config, database, auth, circuit_breaker）
+│   ├── config.py             # Settings（环境变量 + 三层回退 DEFAULT→LLM→硬编码）
+│   ├── logger.py             # 结构化日志
+│   ├── database.py           # 数据库连接
+│   ├── auth.py               # API Key 验证（get_valid_api_keys, API_KEY_HEADER）
+│   ├── auth_db.py            # 用户表 CRUD（create_user, get_user_by_id 等）
+│   ├── auth_jwt.py           # JWT 签发/解码
+│   ├── auth_deps.py          # FastAPI 依赖注入（get_current_user, get_current_user_or_api_key, require_admin）
+│   ├── login_lockout.py      # 登录锁定（失败次数 + 冷却时间）
+│   ├── subscription_db.py    # 订阅表 CRUD（per-owner）
+│   ├── quota_db.py           # 配额管理（订阅数/API 调用次数的 per-user 限制）
+│   ├── model_config_db.py    # 模型配置表 CRUD + 回退逻辑
+│   ├── agent_memory_db.py    # Agent 会话记忆持久化
+│   ├── circuit_breaker.py    # LLM 熔断器
+│   ├── metrics.py            # Prometheus 指标
+│   ├── sanitize.py           # HTML/URL 净化
+│   ├── security_middleware.py # 安全头 + 请求体大小限制
+│   └── rate_limiter.py       # 请求限流（未认证非 auth 路径跳过）
 ├── services/
 │   ├── radar_service/        # 舆情分析核心（重点）
 │   │   ├── main.py           # 雷达调度入口（调用 Pipeline）
 │   │   ├── pipeline.py       # Pipeline 调度器
-│   │   ├── llm_pipeline.py   # LangGraph 分析子图 + LLM 调用
+│   │   ├── llm_gateway.py    # LangGraph 分析子图 + LLM 调用（含熔断器）
 │   │   ├── prompt_templates.py
 │   │   ├── api.py            # /api/radar_status, /api/start_task 等
 │   │   ├── db_manager.py     # SQLite 操作
@@ -41,11 +58,22 @@ backend/
 │   │       ├── models.py     # AlertPayload, PushChannel, EmailConfig 等
 │   │       ├── channel_email.py
 │   │       ├── channel_wecom.py
-│   │       └── channel_feishu.py
-│   └── agent_service/        # AI 助手对话（重点）
-│       ├── agent_core.py     # 流式对话引擎，Function Calling
-│       ├── tools.py          # 三个工具：状态查询/触发爬虫/查历史预警
-│       └── api.py            # /api/agent/chat
+│   │       ├── channel_feishu.py
+│   │       └── channel_rss.py   # RSS 2.0 XML 生成（拉取模式）
+│   ├── agent_service/        # AI 助手对话（重点）
+│   │   ├── agent_core.py     # 流式对话引擎，Function Calling（26 工具）
+│   │   ├── sse.py            # SSE 事件工厂
+│   │   ├── tools/            # 工具集（按组分文件）
+│   │   │   ├── subscription.py  # A 组：订阅管理 + parse_intent
+│   │   │   ├── scan.py          # B 组：扫描/调度
+│   │   │   ├── query.py         # C 组：数据查询 + web_search
+│   │   │   ├── push.py          # D 组：推送通道管理
+│   │   │   ├── model.py         # E 组：模型管理
+│   │   │   └── system.py        # G 组：系统状态
+│   │   └── memory/           # 记忆管理（jieba 分词 + TTL 缓存）
+│   ├── subscription_service/ # 订阅/配额/Admin API（v2.2）
+│   │   └── api.py
+│   ├── search_lib/           # 搜索库（从 search_service 重命名）
 │   └── crawler_service/       # 爬虫子模块（独立完整，暂不深入）
 frontend/
 ├── web/                          # Next.js 15 Web 端（主推形态）
@@ -105,29 +133,95 @@ RadarPipeline (Pipeline 调度器)
 
 ## 关键 API
 
+### 网关
 | 端点 | 方法 | 描述 |
 |------|------|------|
-| `/api/radar_status` | GET | 获取雷达运行状态 |
+| `/metrics` | GET | Prometheus 指标 |
+| `/health` | GET | 健康检查（含 scheduler 状态） |
+
+### 用户认证（auth_service）
+| 端点 | 方法 | 描述 |
+|------|------|------|
+| `/api/auth/register` | POST | 用户注册 |
+| `/api/auth/login` | POST | 登录（返回 JWT） |
+| `/api/auth/refresh` | POST | Token 刷新 |
+| `/api/auth/me` | GET | 当前用户信息 |
+| `/api/auth/logout` | POST | 登出 |
+| `/api/auth/change-password` | POST | 修改密码 |
+| `/api/auth/set-password` | POST | 设置密码 |
+| `/api/auth/oauth/{provider}/login` | GET | OAuth 登录（微信/Google） |
+| `/api/auth/oauth/{provider}/callback` | GET | OAuth 回调 |
+| `/api/admin/users` | GET | 用户列表（admin） |
+| `/api/admin/users/{user_id}` | DELETE | 删除用户（admin） |
+| `/api/admin/users/{user_id}/reactivate` | POST | 恢复用户（admin） |
+
+### 舆情雷达（radar_service）
+| 端点 | 方法 | 描述 |
+|------|------|------|
+| `/api/radar_status` | GET | 雷达运行状态 |
 | `/api/start_task` | POST | 触发全网扫描 |
-| `/api/yq_list` | GET | 获取舆情列表 |
-| `/api/settings` | GET | 获取系统配置（关键词等） |
-| `/api/agent/chat` | POST | AI 助手对话（SSE 流式） |
-| `/api/push/configs` | GET | 获取所有推送配置 |
-| `/api/push/config/{channel}` | GET/POST | 获取/保存推送配置 |
-| `/api/push/test` | POST | 测试推送通道 |
-| `/api/llm/configs` | GET | 获取所有模型配置（含 DEFAULT 回退信息） |
-| `/api/llm/config/{agent}` | POST | 更新指定 Agent 模型配置 |
-| `/api/llm/test/{agent}` | POST | 测试指定 Agent 连通性 |
-| `/api/scheduler/start` | POST | 启动 APScheduler 调度器 |
+| `/api/yq_list` | GET | 舆情列表 |
+| `/api/settings` | GET/POST | 系统配置（关键词/平台等） |
+| `/api/circuit/states` | GET | 熔断器状态 |
+| `/api/mcp/health` | GET | MCP 健康 |
+| `/api/scheduler/start` | POST | 启动 APScheduler |
 | `/api/scheduler/stop` | POST | 停止调度器 |
-| `/api/scheduler/status` | GET | 查询调度器状态（active/next_run/interval/scan_in_progress） |
+| `/api/scheduler/status` | GET | 调度器状态 |
+| `/api/topic_list` | GET | 话题列表 |
+| `/api/topic/{topic_id}` | GET | 话题详情 |
+| `/api/topic/{topic_id}/process` | POST | 处理话题 |
+| `/api/topic_evolution` | GET | 话题演变 |
+| `/api/topic_evolution/migrate_clusters` | POST | 迁移聚类 |
+| `/api/topic_stats` | GET | 话题统计 |
+| `/api/volume_stats` | GET | 声量统计 |
+| `/api/today_summary` | GET | 今日摘要 |
+| `/rss/{token}.xml` | GET | RSS 订阅 |
+
+### 推送配置
+| 端点 | 方法 | 描述 |
+|------|------|------|
+| `/api/push/configs` | GET | 所有推送配置 |
+| `/api/push/config/{channel}` | GET/POST | 获取/保存通道配置 |
+| `/api/push/test` | POST | 测试推送通道 |
+
+### 模型配置
+| 端点 | 方法 | 描述 |
+|------|------|------|
+| `/api/llm/configs` | GET | 所有模型配置（含默认回退） |
+| `/api/llm/config/{agent}` | POST | 更新 Agent 模型配置 |
+| `/api/llm/test/{agent}` | POST | 测试 Agent 连通性 |
+
+### AI 助手（agent_service）
+| 端点 | 方法 | 描述 |
+|------|------|------|
+| `/api/agent/chat` | POST | AI 助手对话（SSE 流式） |
+| `/api/agent/memory` | GET | 记忆列表 |
+| `/api/agent/memory/{session_id}` | GET/DELETE | 记忆详情/删除 |
+
+### 订阅管理（subscription_service）
+| 端点 | 方法 | 描述 |
+|------|------|------|
+| `/api/subscriptions` | GET/POST | 订阅列表/创建 |
+| `/api/subscriptions/{sub_id}` | GET/DELETE | 订阅详情/删除 |
+| `/api/model-configs` | GET | 模型配置 |
+| `/api/model-configs/{agent_role}` | PUT/DELETE | 更新/删除模型配置 |
+| `/api/quota` | GET | 配额查询 |
+| `/api/admin/stats` | GET | Admin 统计 |
+| `/api/admin/users/{user_id}` | GET | 用户详情（admin） |
+| `/api/admin/users/{user_id}/quota` | GET/PUT | 用户配额（admin） |
+| `/api/admin/users/{user_id}/deactivate` | POST | 停用用户（admin） |
+| `/api/admin/users/{user_id}/role` | POST | 修改角色（admin） |
 
 ## AI 助手（Agent Service）
 
-AI 助手通过 Function Calling 拥有三个工具：
-- `get_system_status` - 查询雷达状态
-- `trigger_background_crawl` - 触发后台爬虫任务
-- `get_recent_alerts` - 查询高危预警历史
+AI 助手通过 Function Calling 拥有 26 个工具，分 7 组：
+- **A 组（订阅管理）**: list_subscriptions / add_subscription / update_subscription / remove_subscription / parse_intent
+- **B 组（扫描/调度）**: trigger_scan / pause_scan / resume_scan / get_schedule / set_schedule / get_crawl_status
+- **C 组（数据查询）**: search_alerts / get_topic_detail / web_search
+- **D 组（推送管理）**: list_push_channels / toggle_channel / configure_channel / test_channel
+- **E 组（模型管理）**: list_models / switch_model / test_model
+- **F 组（系统工具）**: 预留
+- **G 组（系统状态）**: get_system_status
 
 对话风格：公关总监口吻，专业简洁。
 
@@ -170,16 +264,16 @@ AI 助手通过 Function Calling 拥有三个工具：
 
 ## 开发注意事项
 
-1. **启动后端**: `python backend/gateway/main.py`（端口 8000）
-2. **启动 Web 前端**: `cd frontend/web && npm run dev`（端口 3000，Next.js 15 App Router）
+1. **启动后端**: `python backend/gateway/main.py`（端口 8008）
+2. **启动 Web 前端**: `cd frontend/web && npm run dev`（端口 3003，Next.js 15 App Router）
    - ⚠️ Next.js 15 与 14/13 有破坏性变更，写代码前优先查 `node_modules/next/dist/docs/`
    - API 契约见 `docs/API_CONTRACT.md`，开发期可用 MSW mock
 3. **环境变量**: 项目根目录 `.env`，Web 端 `frontend/web/.env`，Qdrant 配置在 `Settings` 类中有默认值
 4. **爬虫目录**: `backend/services/crawler_service/` 启动命令 `python main.py`
 5. **Pipeline**: `pipeline.py` 包含 RadarPipeline 调度器，`run_analysis_pipeline()` 是 asyncio 入口
-6. **LangGraph**: 状态机定义在 `llm_pipeline.py`，`radar_app` 仅封装 analyst→reviewer→director 子图
+6. **LangGraph**: 状态机定义在 `llm_gateway.py`，`radar_app` 仅封装 analyst→reviewer→director 子图
 7. **轮询间隔**: 前端首页 3 秒轮询一次后端状态
-8. **推送通道**: 企业微信/飞书/邮箱，`notifier/` 包使用相对导入，通过 `send_alert()` / `send_batch_alert()` 触发
+8. **推送通道**: 企业微信/飞书/邮箱/RSS，`notifier/` 包使用相对导入，通过 `send_alert()` / `send_batch_alert()` 触发
 9. **模型配置**: `update_llm_config()` 写入 `.env` 并立即更新内存 `settings`，避免重复 key
 10. **调度器**: `scheduler.py` 使用 APScheduler，扫描任务（IntervalTrigger）+ 每日简报任务（CronTrigger），配置变更时热重载
 11. **邮件模板**: `push_generator.py` 中三个 HTML 模板，BATCH_PUSH_HTML_TEMPLATE（批量预警）/ PUSH_HTML_TEMPLATE（单条预警）/ DAILY_SUMMARY_TEMPLATE（每日简报），均支持 `<details>` 可折叠

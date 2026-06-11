@@ -1,4 +1,12 @@
 # backend/gateway/main.py
+
+# ── Windows: 强制 ProactorEventLoop，否则子进程无法启动 ──
+import asyncio as _asyncio_init
+import sys as _sys_init
+if _sys_init.platform == "win32":
+    _asyncio_init.set_event_loop_policy(_asyncio_init.WindowsProactorEventLoopPolicy())
+
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -34,10 +42,49 @@ from core.security_middleware import (
 import services.radar_service.db_manager  # noqa: F401  触发 init_radar_db
 logger = get_logger("gateway")
 
+
+# v2.2 P1#17：迁移 @app.on_event 到 lifespan 上下文管理器
+# 原 @app.on_event("startup")/("shutdown") 已被 FastAPI 弃用
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """FastAPI 生命周期：启动调度器（P0#5 失败时升级日志 + 暴露 /health）+ 关闭时停止。"""
+    # ── startup ──
+    app.state.scheduler_healthy = False
+    app.state.scheduler_start_msg = "未启动"
+    try:
+        from services.radar_service.scheduler import scheduler_start
+        success, msg = scheduler_start()
+        app.state.scheduler_healthy = bool(success)
+        app.state.scheduler_start_msg = msg
+        if success:
+            logger.info(f"[Gateway] {msg}")
+        else:
+            # P0#5：启动返回 False 视为失败，升级到 error 级别
+            logger.error(f"[Gateway] 调度器启动失败: {msg}")
+    except Exception as e:
+        # P0#5：原 logger.warning 升级为 logger.error，且标记状态
+        logger.error(f"[Gateway] 调度器启动异常: {e}", exc_info=True)
+        app.state.scheduler_start_msg = f"启动异常: {e}"
+
+    yield  # ── 应用运行中 ──
+
+    # ── shutdown ──
+    try:
+        from services.radar_service.scheduler import scheduler_stop
+        success, msg = scheduler_stop()
+        if success:
+            logger.info(f"[Gateway] {msg}")
+        else:
+            logger.error(f"[Gateway] 调度器关闭失败: {msg}")
+    except Exception as e:
+        logger.error(f"[Gateway] 调度器关闭异常: {e}", exc_info=True)
+
+
 app = FastAPI(
     title="MediaRadar 统一接口网关",
     version="2.0",
-    description="基于微服务架构的全局 API 网关"
+    description="基于微服务架构的全局 API 网关",
+    lifespan=lifespan,
 )
 
 # 8.1 trace_id 中间件：每个请求生成/沿用 trace_id，注入 ContextVar，回写响应头
@@ -112,26 +159,43 @@ async def metrics():
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
-@app.on_event("startup")
-async def on_startup():
-    """FastAPI 启动时自动启动定时调度器"""
-    try:
-        from services.radar_service.scheduler import scheduler_start
-        success, msg = scheduler_start()
-        logger.info(f"[Gateway] {msg}")
-    except Exception as e:
-        logger.warning(f"[Gateway] 调度器启动失败（不影响主服务）: {e}")
-
-
-@app.on_event("shutdown")
-async def on_shutdown():
-    """FastAPI 关闭时停止调度器"""
-    try:
-        from services.radar_service.scheduler import scheduler_stop
-        success, msg = scheduler_stop()
-        logger.info(f"[Gateway] {msg}")
-    except Exception as e:
-        logger.warning(f"[Gateway] 调度器关闭失败: {e}")
+# ===============================================================
+# P0#5：Gateway 健康检查端点
+# 用于外部探活 / 监控告警 / 部署平台 liveness probe
+# 仅反映 scheduler 启动状态，详细信息见 /api/scheduler/status
+# ===============================================================
+@app.get("/health", tags=["可观测性"])
+async def health_check():
+    """
+    Gateway 健康检查（v2.2 P0#5）：
+      - 200 + {"scheduler": "ok"} 调度器正常
+      - 503 + {"scheduler": "failed", "msg": "..."} 调度器启动失败
+    监控 / k8s readiness probe 可据此判断是否就绪。
+    """
+    healthy = getattr(app.state, "scheduler_healthy", False)
+    msg = getattr(app.state, "scheduler_start_msg", "未启动")
+    payload = {
+        "scheduler": "ok" if healthy else "failed",
+    }
+    if not healthy:
+        payload["msg"] = msg
+    return JSONResponse(
+        status_code=200 if healthy else 503,
+        content=payload,
+    )
 if __name__ == "__main__":
-    # 启动命令说明：请在 backend 目录下执行 python gateway/main.py
+    # ── v2.2 安全检查 ─────────────────────────────────────
+    from core.config import settings
+    import sys as _sys_check
+    if not settings.JWT_SECRET or settings.JWT_SECRET in (
+        "dev-secret-change-me-in-prod-please-32bytes", "your-secret-key", "changeme", ""):
+        _sys_check.stderr.write(
+            "\n" + "="*60 + "\n"
+            "!!! 安全警告: JWT_SECRET 未设置或使用默认值 !!!\n"
+            "上线前必须设置环境变量 JWT_SECRET=<强随机密钥>\n"
+            "生成方式: python -c \"import secrets; print(secrets.token_hex(32))\"\n"
+            + "="*60 + "\n\n"
+        )
+    # ─────────────────────────────────────────────────────
+
     uvicorn.run("gateway.main:app", host="0.0.0.0", port=8008, reload=True)

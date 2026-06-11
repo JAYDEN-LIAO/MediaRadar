@@ -24,8 +24,11 @@ from core.auth_db import (
     create_local_user,
     authenticate_local,
     update_last_login,
+    change_password,
+    set_password_for_oauth_user,
+    reactivate_user,
 )
-from core.auth_jwt import encode_token, decode_token, revoke_token
+from core.auth_jwt import encode_token, encode_access_token, encode_refresh_token, decode_token, revoke_token
 from core.auth_deps import get_current_user, require_admin
 
 logger = get_logger("auth.api")
@@ -60,6 +63,20 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+
+
+# v2.2 P1#14：refresh token 请求体
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class SetPasswordRequest(BaseModel):
+    new_password: str
 
 
 class UpdateRoleRequest(BaseModel):
@@ -99,6 +116,38 @@ async def logout(
     return {"code": 200, "msg": "已登出", "data": None}
 
 
+# L3 v2.2: 修改密码（需已设置过本地密码）
+@router.post("/api/auth/change-password")
+async def change_password_endpoint(
+    req: ChangePasswordRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """修改当前用户的密码。需提供旧密码。"""
+    try:
+        ok = change_password(current_user["id"], req.old_password, req.new_password)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"code": 400, "msg": str(e), "data": None})
+    if not ok:
+        raise HTTPException(status_code=400, detail={"code": 400, "msg": "旧密码错误或账号无本地密码", "data": None})
+    return {"code": 200, "msg": "密码已更新", "data": None}
+
+
+# L3 v2.2: OAuth 用户首次设置本地密码
+@router.post("/api/auth/set-password")
+async def set_password_endpoint(
+    req: SetPasswordRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """为 OAuth-only 用户首次设置本地密码（已设过密码的用户应走 change-password）。"""
+    try:
+        ok = set_password_for_oauth_user(current_user["id"], req.new_password)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"code": 400, "msg": str(e), "data": None})
+    if not ok:
+        raise HTTPException(status_code=400, detail={"code": 400, "msg": "用户已存在本地密码，请使用 change-password", "data": None})
+    return {"code": 200, "msg": "密码已设置", "data": None}
+
+
 # ==================== 邮箱密码注册/登录 ====================
 
 @router.post("/api/auth/register")
@@ -115,12 +164,15 @@ async def register(req: RegisterRequest):
         raise HTTPException(status_code=409, detail={"code": 409, "msg": "该邮箱已注册", "data": None})
 
     update_last_login(user["id"])
-    token = encode_token(user["id"], user["role"])
+    access = encode_access_token(user["id"], user["role"])
+    refresh = encode_refresh_token(user["id"], user["role"])
     return {
         "code": 200,
         "msg": "注册成功",
         "data": {
-            "token": token,
+            "token": access,                # 向后兼容旧字段名
+            "access_token": access,         # v2.2 P1#14：新标准字段
+            "refresh_token": refresh,       # v2.2 P1#14：用于换 access
             "user": {"user_id": user["id"], "nickname": user["nickname"], "role": user["role"]},
         },
     }
@@ -129,18 +181,105 @@ async def register(req: RegisterRequest):
 @router.post("/api/auth/login")
 async def login(req: LoginRequest):
     """邮箱密码登录"""
-    user = authenticate_local(email=req.email.strip(), password=req.password)
+    email = req.email.strip()
+    password = req.password
+
+    # WS6-C4 v2.2: 失败锁定检查
+    from core.login_lockout import is_locked, record_failure, record_success
+    locked, retry_after = is_locked(email)
+    if locked:
+        raise HTTPException(
+            status_code=429,
+            detail={"code": 429, "msg": f"登录失败次数过多，请 {retry_after}s 后再试", "data": None},
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    user = authenticate_local(email=email, password=password)
     if not user:
+        count = record_failure(email)
+        if count >= 5:
+            raise HTTPException(
+                status_code=429,
+                detail={"code": 429, "msg": "登录失败次数过多，已临时锁定 5 分钟", "data": None},
+                headers={"Retry-After": "300"},
+            )
         raise HTTPException(status_code=401, detail={"code": 401, "msg": "邮箱或密码错误", "data": None})
 
+    record_success(email)
     update_last_login(user["id"])
-    token = encode_token(user["id"], user["role"])
+    access = encode_access_token(user["id"], user["role"])
+    refresh = encode_refresh_token(user["id"], user["role"])
     return {
         "code": 200,
         "msg": "登录成功",
         "data": {
-            "token": token,
+            "token": access,                # 向后兼容旧字段名
+            "access_token": access,         # v2.2 P1#14：新标准字段
+            "refresh_token": refresh,       # v2.2 P1#14：用于换 access
             "user": {"user_id": user["id"], "nickname": user["nickname"], "role": user["role"]},
+        },
+    }
+
+
+# v2.2 P1#14：/api/auth/refresh 端点（用 refresh_token 换新的 access_token）
+@router.post("/api/auth/refresh")
+async def refresh_access_token(req: RefreshRequest):
+    """
+    用 refresh_token 换取新的 access_token。
+
+    安全约束：
+    - 必须是 type=refresh 的 token（access token 调这里会被拒）
+    - 必须未过期、未在黑名单
+    - 对应用户必须仍是 active 状态（deactivated 用户的 token 一律拒绝）
+    - 用户 iat 必须晚于 tokens_invalid_after（账号被踢下线后旧 refresh 无效）
+
+    返回：新 access_token（不旋转 refresh_token，保持简单；refresh 用完才重发）
+    """
+    if not req.refresh_token or not req.refresh_token.strip():
+        raise HTTPException(
+            status_code=400,
+            detail={"code": 400, "msg": "refresh_token 不能为空", "data": None},
+        )
+
+    payload = decode_token(req.refresh_token, expected_type="refresh")
+    if not payload:
+        # 区分错误原因便于客户端处理
+        raise HTTPException(
+            status_code=401,
+            detail={"code": 401, "msg": "refresh_token 无效、过期或类型不匹配", "data": None},
+        )
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(
+            status_code=401,
+            detail={"code": 401, "msg": "refresh_token 缺少 sub 字段", "data": None},
+        )
+
+    # 检查用户仍 active（防止 deactivated 用户的旧 refresh token 仍能换 access）
+    user = get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail={"code": 401, "msg": "用户不存在", "data": None},
+        )
+    if user.get("is_active") == 0 or user.get("is_active") is False:
+        logger.warning(f"[AuthAPI] refresh 被拒：user={user_id} 已停用")
+        raise HTTPException(
+            status_code=403,
+            detail={"code": 403, "msg": "账号已停用", "data": None},
+        )
+
+    # 用 refresh payload 里的 role 签发新 access（用户当前 role 由 get_user_by_id 重新取更准）
+    new_access = encode_access_token(user["id"], user["role"])
+    logger.info(f"[AuthAPI] refresh 换新 access: user={user_id}")
+    return {
+        "code": 200,
+        "msg": "OK",
+        "data": {
+            "access_token": new_access,
+            "token": new_access,  # 向后兼容旧字段
+            "user": {"user_id": user["id"], "nickname": user.get("nickname", ""), "role": user["role"]},
         },
     }
 
@@ -174,8 +313,10 @@ async def oauth_callback(provider: str, code: str, state: str = ""):
     if provider != "google":
         raise HTTPException(status_code=400, detail={"code": 400, "msg": "不支持的 provider", "data": None})
 
-    # ── dev mock（ENV=dev + mock code → 无需真实 Google 凭证） ──
-    if settings.ENV == "dev" and code in ("PLACEHOLDER", "xxx", "mock", "dev"):
+    # ── dev mock（仅 ENV=dev 时允许，生产环境直接拒绝） ──
+    if settings.ENV != "dev":
+        raise HTTPException(status_code=403, detail={"code": 403, "msg": "mock 登录仅开发环境可用", "data": None})
+    if code in ("PLACEHOLDER", "xxx", "mock", "dev"):
         import uuid
         mock_oauth_id = f"mock-google-{code}-{uuid.uuid4().hex[:8]}"
         mock_email = f"dev-google-{uuid.uuid4().hex[:4]}@dev.local"
@@ -188,8 +329,18 @@ async def oauth_callback(provider: str, code: str, state: str = ""):
             role="user",
         )
         update_last_login(user["id"])
-        token = encode_token(user["id"], user["role"])
-        return {"code": 200, "msg": "Google 登录成功（dev mock）", "data": {"token": token, "user": {"user_id": user["id"], "nickname": user["nickname"], "role": user["role"]}}}
+        access = encode_access_token(user["id"], user["role"])
+        refresh = encode_refresh_token(user["id"], user["role"])
+        return {
+            "code": 200,
+            "msg": "Google 登录成功（dev mock）",
+            "data": {
+                "token": access,
+                "access_token": access,
+                "refresh_token": refresh,
+                "user": {"user_id": user["id"], "nickname": user["nickname"], "role": user["role"]},
+            },
+        }
 
     # ── 真实 Google OAuth ──
     from .oauth_providers import google as google_oauth
@@ -217,14 +368,17 @@ async def oauth_callback(provider: str, code: str, state: str = ""):
         oauth_provider="google", oauth_id=google_sub, role="user",
     )
     update_last_login(user["id"])
-    token = encode_token(user["id"], user["role"])
+    access = encode_access_token(user["id"], user["role"])
+    refresh = encode_refresh_token(user["id"], user["role"])
     logger.info(f"[AuthAPI] Google 登录成功 user_id={user['id']} email={email}")
     return {
         "code": 200, "msg": "Google 登录成功",
         "data": {
-            "token": token,
+            "token": access,
+            "access_token": access,
+            "refresh_token": refresh,
             "user": {"user_id": user["id"], "nickname": user["nickname"], "avatar_url": user.get("avatar_url"), "role": user["role"]},
-            "redirect_to": f"/auth/callback?token={token}",
+            "redirect_to": f"/auth/callback?token={access}",
         },
     }
 
@@ -270,12 +424,27 @@ async def admin_deactivate_user(
     user_id: str,
     admin_user: dict = Depends(require_admin),
 ):
-    """禁用用户（admin only）"""
+    """禁用用户（admin only）。L2 v2.2: 同时撤销该用户全部已签发 token。"""
     if user_id == admin_user["id"]:
         raise HTTPException(status_code=400, detail={"code": 400, "msg": "不能禁用自己", "data": None})
     target = get_user_by_id(user_id)
     if not target:
         raise HTTPException(status_code=404, detail={"code": 404, "msg": "用户不存在", "data": None})
     deactivate_user(user_id)
-    logger.info(f"[AuthAPI] admin {admin_user['id']} 禁用用户 {user_id}")
+    logger.info(f"[AuthAPI] admin {admin_user['id']} 禁用用户 {user_id}（含 token 撤销）")
     return {"code": 200, "msg": "已禁用", "data": {"user_id": user_id}}
+
+
+# L2 v2.2: 重新激活用户
+@router.post("/api/admin/users/{user_id}/reactivate")
+async def admin_reactivate_user(
+    user_id: str,
+    admin_user: dict = Depends(require_admin),
+):
+    """重新激活用户（admin only）。清空 tokens_invalid_after。"""
+    target = get_user_by_id(user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail={"code": 404, "msg": "用户不存在", "data": None})
+    reactivate_user(user_id)
+    logger.info(f"[AuthAPI] admin {admin_user['id']} 重新激活用户 {user_id}")
+    return {"code": 200, "msg": "已重新激活", "data": {"user_id": user_id}}

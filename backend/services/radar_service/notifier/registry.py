@@ -6,7 +6,6 @@ from .models import (
     AlertPayload,
     BatchAlertPayload,
     PushChannel,
-    AllPushConfigs,
     EmailConfig,
     WeComConfig,
     FeishuConfig,
@@ -14,7 +13,6 @@ from .models import (
 from .channel_email import EmailNotifier
 from .channel_wecom import WeComNotifier
 from .channel_feishu import FeishuNotifier
-
 logger = get_logger("notifier.registry")
 
 
@@ -31,11 +29,18 @@ class NotifierRegistry:
         logger.info(f"[Registry] 已注册通道: {channel.channel.value}")
 
     def load_configs(self, configs: Optional[dict[str, dict]] = None) -> None:
-        """从外部配置加载通道（供外部调用者传入配置 dict）"""
+        """从外部配置加载通道。
+
+        v2.2：必须由调用方传入 per-user 配置 dict（通常由 notifier.__init__._get_registry
+        从 db_manager.get_all_push_configs(owner_id=X) 装载）。
+        未传 configs 时直接清空通道，绝不退化为加载所有用户配置。
+        """
         if configs is None:
-            from ..db_manager import get_all_push_configs
-            # v2.2：owner_id=None 时返回所有用户的全部配置（仅用于启动期/管理视图）
-            configs = get_all_push_configs(owner_id=None)
+            logger.warning(
+                "[Registry] load_configs 未提供 configs，已清空通道（拒绝退化为全局加载）"
+            )
+            self._channels.clear()
+            return
 
         self._channels.clear()
 
@@ -48,10 +53,16 @@ class NotifierRegistry:
 
         logger.info(f"[Registry] 配置加载完成，共注册 {len(self._channels)} 个通道")
 
+    def _skip_rss(self, ch: PushChannel) -> bool:
+        """RSS 通道无 send/send_batch 能力（只提供拉取 URL）"""
+        return ch == PushChannel.RSS
+
     def send_alert(self, payload: AlertPayload) -> dict[PushChannel, bool]:
         """向所有已启用且满足风险等级的通道发送预警"""
         results: dict[PushChannel, bool] = {}
         for ch in PushChannel:
+            if self._skip_rss(ch):
+                continue
             notifier = self._channels.get(ch)
             if not notifier or not notifier.should_send(payload.risk_level):
                 continue
@@ -69,6 +80,8 @@ class NotifierRegistry:
         if not batch.alerts:
             return results
         for ch in PushChannel:
+            if self._skip_rss(ch):
+                continue
             notifier = self._channels.get(ch)
             if not notifier:
                 continue
@@ -85,6 +98,9 @@ class NotifierRegistry:
 
     def test_channel(self, channel: PushChannel, config: dict) -> bool:
         """用指定配置发送测试消息到指定通道"""
+        if self._skip_rss(channel):
+            # RSS 测试：检查 token 是否已生成
+            return bool(config and config.get("access_token"))
         test_payload = AlertPayload(
             keyword="测试关键词",
             platform="wb",
@@ -96,7 +112,6 @@ class NotifierRegistry:
             post_count=1,
             email_html="<p>这是一封<strong>测试邮件</strong>，用于验证推送通道是否正常配置。</p>",
         )
-        # 临时创建一个 notifier 实例用于测试
         cls_map = {
             PushChannel.EMAIL: EmailNotifier,
             PushChannel.WECOM: WeComNotifier,

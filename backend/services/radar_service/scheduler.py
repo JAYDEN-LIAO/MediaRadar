@@ -1,10 +1,17 @@
 # backend/services/radar_service/scheduler.py
 """
-APScheduler 定时调度模块
+APScheduler 定时调度模块（v2.2 per-user 版本）
 
-- 每天从 start_time 开始，按 monitor_frequency 间隔执行雷达扫描
-- 全局锁防止并发扫描
-- FastAPI on_event 启动/停止调度器
+架构：
+  - 全局 BackgroundScheduler 管理所有 job
+  - 一个全局扫描任务（每 monitor_frequency 小时执行），但会遍历所有有订阅的用户
+  - 一个全局每日简报任务
+  - 底层合并关键词：从所有用户的 subscription 表收集关键词，全局爬 1 轮，
+    然后按 owner 拆分跑 Pipeline
+
+全局锁：
+  - _scan_lock: 全局唯一扫描锁，防止多用户并发扫描（爬虫会抢资源）
+  - 锁被持有时，新触发的任务直接跳过
 """
 import asyncio
 import datetime
@@ -24,6 +31,27 @@ _scheduler: Optional[BackgroundScheduler] = None
 _scan_lock: asyncio.Lock = asyncio.Lock()
 _is_running: bool = False
 
+# v2.2: per-user 最后扫描时间，用于决定本轮是否需要为某用户跑扫描
+_user_last_scan_at: dict[str, datetime.datetime] = {}
+_user_last_scan_lock: threading.Lock = threading.Lock()
+
+
+def _should_user_scan_now(owner_id: str, interval_min: float) -> bool:
+    """根据 per-user 间隔判断是否该执行扫描。interval_min<=0 视为已暂停。"""
+    if interval_min <= 0:
+        return False
+    with _user_last_scan_lock:
+        last = _user_last_scan_at.get(owner_id)
+    if last is None:
+        return True  # 首次必跑
+    delta_min = (datetime.datetime.now() - last).total_seconds() / 60.0
+    return delta_min >= interval_min
+
+
+def _mark_user_scanned(owner_id: str) -> None:
+    with _user_last_scan_lock:
+        _user_last_scan_at[owner_id] = datetime.datetime.now()
+
 
 def _get_scan_job_id() -> str:
     return "radar_scheduled_scan"
@@ -34,13 +62,10 @@ def _build_trigger(start_time: str, monitor_frequency: float):
     构建 APScheduler trigger：
     - 每天在 start_time 执行第一次
     - 之后按 monitor_frequency 小时间隔重复
-    - IntervalTrigger 支持所有频率（< 1h / >= 1h / 24h 全部适用）
-    - monitor_frequency < 0 时不应被调用（调用方已做保护）
     """
     hour, minute = map(int, start_time.split(":"))
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
     start_date = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-    # 如果设定时间已过，从明天开始算，避免 start_date 在过去导致的 Invalid argument
     if start_date <= now:
         start_date += datetime.timedelta(days=1)
     return IntervalTrigger(
@@ -50,20 +75,107 @@ def _build_trigger(start_time: str, monitor_frequency: float):
     )
 
 
+def _collect_users_and_keywords():
+    """
+    从 subscription 表收集所有非暂停用户的订阅关键词。
+
+    Returns:
+        dict[str, list[str]]: {owner_id: [keyword1, keyword2, ...]}
+    """
+    try:
+        import sqlite3
+        from core.database import get_db_connection
+        with get_db_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT owner_id, name FROM subscription WHERE is_active = 1"
+            )
+            rows = cursor.fetchall()
+        result: dict[str, list[str]] = {}
+        for r in rows:
+            oid = r["owner_id"]
+            name = r["name"]
+            result.setdefault(oid, []).append(name)
+        return result
+    except Exception as e:
+        logger.warning(f"[Scheduler] 读取 subscriptions 失败: {e}")
+        return {}
+
+
 def _run_scan():
-    """定时任务执行函数（运行在线程中，需创建独立事件循环）"""
+    """
+    定时扫描任务（v2.2 per-user 版本）。
+
+    流程（v2.2 修订）：
+      1. 收集所有活跃用户订阅
+      2. 对每个用户读取 quota.scan_interval_min / scan_paused
+      3. 若用户已暂停或距上次扫描未到间隔，跳过
+      4. 否则为该用户跑 Pipeline（owner-scoped）
+    """
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
             if not _scan_lock.locked():
-                # 用临时事件循环运行异步任务
                 async def _run():
                     async with _scan_lock:
                         logger.info("[Scheduler] 开始执行定时雷达扫描...")
                         try:
+                            # 1. 收集所有活跃订阅
+                            user_keywords = _collect_users_and_keywords()
+                            if not user_keywords:
+                                logger.info("[Scheduler] 无活跃订阅，跳过扫描")
+                                return
+
+                            # 2. 读取 per-user 扫描配置
+                            from core.quota_db import get_scan_config
                             from .main import job_async
-                            await job_async()
+
+                            ready_users: list[tuple[str, list[str]]] = []
+                            skipped_paused = 0
+                            skipped_interval = 0
+
+                            for oid, kws in user_keywords.items():
+                                try:
+                                    cfg = get_scan_config(oid)
+                                except Exception as e:
+                                    logger.warning(
+                                        f"[Scheduler] 读取 user={oid[:8]}... scan config 失败: {e}"
+                                    )
+                                    cfg = {"interval_min": 60, "paused": False}
+                                if cfg.get("paused"):
+                                    skipped_paused += 1
+                                    continue
+                                interval_min = float(cfg.get("interval_min") or 60)
+                                if not _should_user_scan_now(oid, interval_min):
+                                    skipped_interval += 1
+                                    continue
+                                ready_users.append((oid, kws))
+
+                            logger.info(
+                                f"[Scheduler] 候选用户 {len(user_keywords)} 个 → "
+                                f"本轮触发 {len(ready_users)}，"
+                                f"暂停 {skipped_paused}，未到间隔 {skipped_interval}"
+                            )
+
+                            if not ready_users:
+                                return
+
+                            # 3. 逐用户跑扫描
+                            for oid, kws in ready_users:
+                                logger.info(
+                                    f"[Scheduler] 为用户 {oid[:8]}... 执行扫描"
+                                    f"（{len(kws)} 关键词）"
+                                )
+                                try:
+                                    await job_async(owner_id=oid)
+                                    _mark_user_scanned(oid)
+                                except Exception as e:
+                                    logger.error(
+                                        f"[Scheduler] user={oid[:8]}... 扫描异常: {e}"
+                                    )
+
                             logger.info("[Scheduler] 定时雷达扫描完成")
                         except Exception as e:
                             logger.error(f"[Scheduler] 定时雷达扫描异常: {e}")
@@ -95,7 +207,6 @@ def scheduler_start() -> tuple[bool, str]:
 
     _scheduler = BackgroundScheduler(timezone="Asia/Shanghai")
 
-    # monitor_frequency < 0 时仅暂停扫描任务，不注册扫描 job（但调度器本身保持运行）
     if monitor_frequency >= 0:
         trigger = _build_trigger(start_time, monitor_frequency)
         _scheduler.add_job(
@@ -113,10 +224,7 @@ def scheduler_start() -> tuple[bool, str]:
     _scheduler.start()
     _is_running = True
 
-    # 注册每日简报任务
     _schedule_daily_summary()
-
-    # 修复 #4.3：注册每日 03:00 fact_memory 过期清理
     _schedule_memory_cleanup()
 
     logger.info(f"[Scheduler] 调度器已启动: start_time={start_time}, frequency={freq_display}")
@@ -160,6 +268,9 @@ def scheduler_status() -> dict:
     if job and job.next_run_time:
         next_run_time = job.next_run_time.isoformat()
 
+    # 活跃用户数
+    user_count = len(_collect_users_and_keywords())
+
     try:
         from .db_manager import get_system_settings
         conf = get_system_settings()
@@ -175,21 +286,18 @@ def scheduler_status() -> dict:
         "interval_hours": monitor_frequency,
         "start_time": start_time,
         "scan_in_progress": _scan_lock.locked(),
+        "active_users": user_count,
     }
 
 
 def reschedule_if_running(start_time: str, monitor_frequency: float) -> bool:
-    """
-    当系统配置变更时，重新调度已存在的任务。
-    仅当调度器运行时调用。monitor_frequency < 0 时仅暂停扫描任务，不影响每日简报。
-    """
+    """当系统配置变更时，重新调度已存在的任务。"""
     global _scheduler, _is_running
 
     if not _is_running or _scheduler is None:
         return False
 
     if monitor_frequency < 0:
-        # 仅暂停扫描任务，保持调度器继续运行（每日简报不受影响）
         job = _scheduler.get_job(_get_scan_job_id())
         if job:
             _scheduler.remove_job(_get_scan_job_id())
@@ -222,7 +330,7 @@ def _get_summary_job_id() -> str:
 
 
 def _run_daily_summary():
-    """每日简报任务（运行在线程中）"""
+    """每日简报任务（运行在线程中，per-user 分发）"""
     try:
         from .db_manager import get_system_settings
         conf = get_system_settings()
@@ -231,31 +339,48 @@ def _run_daily_summary():
             logger.info("[Scheduler] 每日简报开关未开启，跳过")
             return
 
+        # v2.2: 收集所有活跃订阅用户，逐一为其生成 + 推送简报
+        user_keywords = _collect_users_and_keywords()
+        if not user_keywords:
+            logger.info("[Scheduler] 无活跃订阅用户，跳过每日简报")
+            return
+
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
             async def _run():
-                logger.info("[Scheduler] 开始生成每日简报...")
-                try:
-                    from .push_generator import generate_daily_summary_html
-                    html = await generate_daily_summary_html()
-                    if not html:
-                        logger.info("[Scheduler] 今日无新舆情，简报不发送")
-                        return
-                    from .notifier import send_alert
-                    send_alert(
-                        keyword="舆情监测",
-                        platform="全部平台",
-                        risk_level=2,
-                        risk_class="medium",
-                        core_issue="每日舆情监测简报",
-                        report="今日舆情概况已生成，请查收邮件。",
-                        urls=[],
-                        email_html=html,
-                    )
-                    logger.info("[Scheduler] 每日简报发送成功")
-                except Exception as e:
-                    logger.error(f"[Scheduler] 每日简报异常: {e}")
+                logger.info(
+                    f"[Scheduler] 开始为 {len(user_keywords)} 个用户生成每日简报..."
+                )
+                from .push_generator import generate_daily_summary_html
+                from .notifier import send_alert
+
+                for oid in user_keywords.keys():
+                    try:
+                        html = await generate_daily_summary_html(owner_id=oid)
+                        if not html:
+                            logger.info(
+                                f"[Scheduler] 用户 {oid[:8]}... 今日无新舆情，跳过"
+                            )
+                            continue
+                        send_alert(
+                            owner_id=oid,
+                            keyword="舆情监测",
+                            platform="全部平台",
+                            risk_level=2,
+                            risk_class="medium",
+                            core_issue="每日舆情监测简报",
+                            report="今日舆情概况已生成，请查收邮件。",
+                            urls=[],
+                            email_html=html,
+                        )
+                        logger.info(
+                            f"[Scheduler] 用户 {oid[:8]}... 每日简报发送成功"
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"[Scheduler] 用户 {oid[:8]}... 每日简报异常: {e}"
+                        )
             loop.run_until_complete(_run())
         finally:
             loop.close()
@@ -306,7 +431,7 @@ def reschedule_daily_summary_if_running() -> bool:
     return True
 
 
-# ---- 修复 #4.3：每日 03:00 fact_memory TTL 清理 ----
+# ---- 每日 03:00 fact_memory TTL 清理 ----
 
 def _get_memory_cleanup_job_id() -> str:
     return "agent_memory_cleanup"
@@ -324,7 +449,7 @@ def _run_memory_cleanup():
 
 
 def _schedule_memory_cleanup():
-    """注册每日 03:00 fact_memory 过期清理任务（修复 #4.3）"""
+    """注册每日 03:00 fact_memory 过期清理任务"""
     global _scheduler
     if _scheduler is None:
         return

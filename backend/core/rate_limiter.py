@@ -35,7 +35,7 @@ class SlidingWindowRateLimiter:
         self._default_window: int = 60       # 秒
         self._default_limit: int = 60        # 次/窗口
         self._auth_window: int = 60
-        self._auth_limit: int = 10
+        self._auth_limit: int = 5            # WS6-C4 v2.2: 注册/登录 10→5（防爆破）
         self._sensitive_window: int = 60
         self._sensitive_limit: int = 30
         self._cleanup_interval: int = 300    # 每 5 分钟清理一次过期 key
@@ -43,11 +43,9 @@ class SlidingWindowRateLimiter:
 
     def _make_key(self, request: Request) -> str:
         """生成限流 key：优先 user_id，其次 IP"""
-        # 尝试从 JWT 获取 user_id（如果已认证）
         user_id = getattr(request.state, "user_id", "") or ""
         if user_id:
             return f"user:{user_id}"
-        # 回退到 client IP
         forwarded = request.headers.get("X-Forwarded-For", "")
         if forwarded:
             return f"ip:{forwarded.split(',')[0].strip()}"
@@ -131,6 +129,15 @@ def add_rate_limiting_middleware(app: FastAPI):
 
         # /metrics 不受限流
         if request.url.path == "/metrics":
+            return await call_next(request)
+
+        # v2.2 P1#15：未认证请求只限流 auth 端点（login/register/OAuth），
+        # 其他端点放行（后续 endpoint 的 auth dependency 会拒）。
+        # 这防止攻击者通过大量无认证请求耗尽 IP 级配额，误伤正常用户。
+        _auth_paths = ("/api/auth/", "/api/user/register", "/api/user/login", "/api/auth/refresh")
+        _is_auth_path = any(request.url.path.startswith(p) for p in _auth_paths)
+        _has_auth = bool(getattr(request.state, "user_id", ""))
+        if not _has_auth and not _is_auth_path:
             return await call_next(request)
 
         allowed, remaining, retry_after = _rate_limiter.check(request)

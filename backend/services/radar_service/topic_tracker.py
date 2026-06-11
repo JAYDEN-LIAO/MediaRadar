@@ -292,6 +292,7 @@ def build_evolution_timeline(
             "risk_evolution_path": str,   # 如 "2 → 3 → 4"
             "current_risk_level": int,
             "evolution_signal": str,        # "escalating" / "stable" / "deescalating"
+            "cluster_summary": str,        # 当前话题的 LLM 簇摘要（由 generate_cluster_summary 生成）
             "timeline": [
                 {
                     "scan_time": str,
@@ -322,6 +323,7 @@ def build_evolution_timeline(
             "risk_evolution_path": "",
             "current_risk_level": current_topic.get("risk_level") or 0,
             "evolution_signal": "unknown",
+            "cluster_summary": current_topic.get("cluster_summary", ""),
             "timeline": [],
         }
 
@@ -414,6 +416,7 @@ def build_evolution_timeline(
         "risk_evolution_path": risk_evolution_path,
         "current_risk_level": current_risk,
         "evolution_signal": evolution_signal,
+        "cluster_summary": current_topic.get("cluster_summary", ""),
         "timeline": timeline,
     }
 

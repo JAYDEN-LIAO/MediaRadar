@@ -1,12 +1,11 @@
 """
-F 组 全网搜索（3 个工具，AGENT_REDESIGN.md §4.F 落 P1 版本）
+F 组 全网搜索（3 个工具）
 
 F1. web_search ⭐ streamable
-    P1 占位实现：search_service 模块未上线（P9 接入 Pipeline mode=quick_search），
-    本工具暂返回"功能待上线"提示并写一条 history 占位条。
-    保留 streamable=True 标记，方便 P2 SSE 升级后无缝替换。
-F2. list_search_history：返回当前用户的会话内搜索历史
-F3. clear_search_cache：清空当前用户的搜索缓存
+    P8 实现：async generator 通过 yield 逐条推 partial，
+    DirectAdapter 自动转成 on_progress 发送 tool_progress SSE。
+F2. list_search_history
+F3. clear_search_cache
 """
 from __future__ import annotations
 
@@ -22,14 +21,13 @@ logger = get_logger("agent.tools.search")
 
 
 # ───────────────────────────────────────────────────────────────
-# F1. web_search （streamable=True，P1 占位）
+# F1. web_search （async generator，streamable）
 # ───────────────────────────────────────────────────────────────
 @tool(
     name="web_search",
     description=(
         "跨平台全网搜索（实时拉取，不入库）。"
         "和 search_alerts 区别：本工具是即时搜索；search_alerts 查库历史。"
-        "⚠️ P1 暂未接 search_service，只返回占位结果，P9 上线。"
     ),
     parameters={
         "type": "object",
@@ -38,7 +36,7 @@ logger = get_logger("agent.tools.search")
             "platforms": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "限定平台；空 = 全平台",
+                "description": "限定平台（wb/xhs/bili/zhihu/dy/ks/tieba）；空 = 全平台",
             },
             "max_per_platform": {
                 "type": "integer",
@@ -58,38 +56,78 @@ logger = get_logger("agent.tools.search")
     streamable=True,
 )
 @with_owner
-def web_search_tool(
+async def web_search_tool(
     query: str,
     _owner_id: str,
     platforms: Optional[list] = None,
     max_per_platform: int = 5,
     time_range: str = "7d",
-) -> str:
-    # P1 占位
-    record_search(_owner_id, query, 0)
-    msg = (
-        "web_search 功能待 P9 接入 backend/services/search_service/ 模块。"
-        "P1 阶段请用 search_alerts 查历史数据，或 trigger_scan 重新抓取。"
-    )
+):
+    """
+    async generator：yield 逐条 partial → DirectAdapter 转发为 on_progress → SSE tool_progress。
+    最后一个 yield 是 ToolResult JSON。
+    """
+    total = 0
+    by_platform: dict[str, int] = {}
+    items: list[dict] = []
+
+    yield {"type": "progress", "platform": "_all", "scanned": 0, "query": query}
+
+    try:
+        from services.search_lib.crawler_adapter import quick_crawl_stream
+        from services.search_lib.filter import filter_and_summarize
+
+        async for partial in quick_crawl_stream(
+            query=query,
+            platforms=platforms,
+            max_per_platform=max_per_platform,
+        ):
+            if partial["type"] == "progress":
+                plat = partial["platform"]
+                scanned = partial["scanned"]
+                by_platform[plat] = scanned
+                yield {"type": "progress", "platform": plat, "scanned": scanned}
+            elif partial["type"] == "item":
+                post = partial["item"]
+                try:
+                    filtered = await filter_and_summarize(post, query)
+                    if filtered:
+                        total += 1
+                        items.append(filtered)
+                        yield {"type": "item", "item": filtered}
+                except Exception as e:
+                    logger.error(f"[web_search] filter error: {e}")
+                    # 放行不过滤
+                    total += 1
+                    items.append({
+                        "title": post.get("title", ""),
+                        "snippet": (post.get("content", "") or "")[:120],
+                        "url": post.get("url", ""),
+                        "platform": post.get("platform", ""),
+                        "relevance": 0.5,
+                    })
+                    yield {"type": "item", "item": items[-1]}
+    except Exception as e:
+        logger.error(f"[web_search] crawler error: {e}")
+        # 爬虫失败时返回空结果
+        pass
+
+    record_search(_owner_id, query, total)
+
     data = {
         "query": query,
         "platforms": platforms or [],
         "max_per_platform": max_per_platform,
         "time_range": time_range,
-        "items": [],
-        "total": 0,
-        "by_platform": {},
-        "status": "not_implemented",
-        "message": msg,
+        "items": items,
+        "total": total,
+        "by_platform": by_platform,
     }
-    return ToolResult(
+
+    yield ToolResult(
         success=True,
         data=data,
-        ui={
-            "type": "search_stream",
-            "data": data,
-            "streamable": False,  # P1 关闭流式，等 P2 SSE
-        },
+        ui={"type": "search_stream", "data": data, "streamable": False},
     ).to_json()
 
 

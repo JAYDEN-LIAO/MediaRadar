@@ -5,10 +5,11 @@ Agent Core - 主循环重构
 架构：TokenBudgetManager → AgentMemory → ToolExecutor → ReflectionEngine → SelfHealingExecutor
 """
 import json
+import time
 import uuid
 import asyncio
 from typing import Optional
-from openai import OpenAI
+from openai import OpenAI, AsyncOpenAI
 from core.config import settings, get_agent_config
 from core.logger import get_logger
 from core.metrics import (
@@ -214,25 +215,74 @@ token_budget_manager = TokenBudgetManager()
 tool_executor = ToolExecutor()
 
 
-def _get_agent_client():
-    """返回全新 OpenAI 客户端（修复 #2.1：配置热刷新）
+def _get_agent_config_for(owner_id: str = ""):
+    """v2.2 per-user：优先读用户 model_config，未配置时回退全局"""
+    if owner_id:
+        from core.config import get_agent_config_for_user
+        return get_agent_config_for_user(owner_id)
+    return get_agent_config()
 
-    不再使用模块级 `agent_client` 缓存对象。
-    每次调用都从 settings 重新读取 api_key / base_url，让前端更新配置后立即生效。
-    """
-    key, url, _ = get_agent_config()
+
+def _get_agent_client(owner_id: str = ""):
+    """返回全新 OpenAI 客户端（修复 #2.1：配置热刷新）"""
+    key, url, _ = _get_agent_config_for(owner_id)
     return OpenAI(api_key=key, base_url=url)
 
 
-def _stream_response(messages: list):
-    """统一流式响应生成器（修复 #2.3：DRY 抽取，4 处统一调用）
+# ==================== v2.2 P1#19：每 session 最多 1 次 medi 追问 ====================
+# 原 `medi_count = 0` 在 chat_with_agent_stream 顶部声明，每次新用户消息调用函数时
+# 都重置为 0，注释"每 session 最多 1 次"实际是"每 chat 调用最多 1 次"。
+# 改为 session 级状态：module-level dict + TTL 懒清理，跨 chat 调用共享计数。
+_SESSION_MEDI_TTL_SEC = 3600  # 1 小时不活跃即清空（防止内存膨胀）
+_session_medi_followups: dict[str, tuple[int, float]] = {}  # session_id -> (count, last_used_ts)
 
-    同步生成器（OpenAI SDK 流式模式返回 sync iterator）。
-    在 async 函数中通过 to_thread 包装避免阻塞事件循环。
-    返回值是 SSE "data: {content}\\n\\n" 字符串迭代器。
+
+def _try_acquire_medi_slot(session_id: str) -> bool:
     """
-    client = _get_agent_client()
-    _, _, model = get_agent_config()
+    尝试占用一次 medi 追问配额（每 session 最多 1 次）。
+    返回 True=成功占用（已 +1），False=本 session 已达上限。
+
+    设计：
+    - key=session_id：跨 chat_with_agent_stream 调用共享
+    - TTL=1h：避免内存膨胀（旧 session 自动清理）
+    - 进程重启清空：可接受（session 客户端通常也会重新建立连接）
+    - session_id 空/None 时不限制（防御性，单轮调试场景）
+    """
+    if not session_id:
+        return True
+    now = time.time()
+    cutoff = now - _SESSION_MEDI_TTL_SEC
+    # 懒清理过期项（避免长跑进程内存膨胀）
+    expired_keys = [k for k, (_, ts) in _session_medi_followups.items() if ts < cutoff]
+    for k in expired_keys:
+        _session_medi_followups.pop(k, None)
+
+    count, _ = _session_medi_followups.get(session_id, (0, now))
+    if count >= 1:
+        return False
+    _session_medi_followups[session_id] = (count + 1, now)
+    return True
+
+
+def _get_medi_slot_status(session_id: str) -> dict:
+    """
+    暴露 session 的 medi 配额状态（供调试 / 可观测性）。
+    无记录返回 {"count": 0, "used": False, "last_used_ts": None}。
+    """
+    if not session_id:
+        return {"count": 0, "used": False, "last_used_ts": None}
+    count, ts = _session_medi_followups.get(session_id, (0, 0.0))
+    return {
+        "count": count,
+        "used": count >= 1,
+        "last_used_ts": ts if ts else None,
+    }
+
+
+def _stream_response(messages: list, owner_id: str = ""):
+    """同步流式响应生成器"""
+    client = _get_agent_client(owner_id)
+    _, _, model = _get_agent_config_for(owner_id)
     response = client.chat.completions.create(
         model=model or settings.DEFAULT_MODEL,
         messages=messages,
@@ -241,6 +291,26 @@ def _stream_response(messages: list):
     for chunk in response:
         if chunk.choices and chunk.choices[0].delta.content is not None:
             yield emit_text(chunk.choices[0].delta.content)
+
+
+async def _stream_response_async(messages: list, owner_id: str = ""):
+    """异步流式响应（v2.2：AsyncOpenAI + async for）"""
+    key, url, model = _get_agent_config_for(owner_id)
+    try:
+        client = AsyncOpenAI(api_key=key, base_url=url)
+        response = await client.chat.completions.create(
+            model=model or settings.DEFAULT_MODEL,
+            messages=messages,
+            stream=True,
+        )
+        async for chunk in response:
+            if chunk.choices and chunk.choices[0].delta.content:
+                yield emit_text(chunk.choices[0].delta.content)
+    except Exception as e:
+        logger.error(f"[StreamAsync] 异步流式失败: {e}", exc_info=True)
+        # 回退到同步版本
+        for chunk in _stream_response(messages, owner_id):
+            yield chunk
 
 
 async def chat_with_agent_stream(
@@ -258,21 +328,16 @@ async def chat_with_agent_stream(
               工具函数声明 _request=None 即可接收；与 contextvar 双重保险。
     """
     session_id = session_id or str(uuid.uuid4())
+    owner_id = (_request or {}).get("owner_id", "")
 
     # 构建 system prompt
     system_prompt = {
         "role": "system",
-        "content": (
-            "你是 MediaRadar 媒体信息订阅平台的 AI 管家。"
-            "你拥有 7 组共 30 个工具（A 订阅 / B 扫描 / C 查询 / D 推送 / E 模型 / F 搜索 / G 系统）。\n"
-            "请用专业、简洁、有洞察力的口吻回答用户。\n"
-            "【注意】：所有 per-user 操作都通过 _owner_id 上下文隔离，不要让用户感知内部实现。\n"
-            "【trigger_background_crawl 是 legacy 别名】：核心扫描请用 trigger_scan。"
-        )
+        "content": "你是 MediaRadar 媒体信息订阅平台的 AI 管家。回答专业简洁，用中文。"
     }
 
-    # 检索长期记忆，注入 system prompt
-    working_memory = memory_manager.build_working_memory(session_id)
+    # 检索长期记忆，注入 system prompt（v2.2 P0#2：传 owner_id 实现 per-user 隔离）
+    working_memory = memory_manager.build_working_memory(session_id, owner_id=owner_id)
     if working_memory:
         system_prompt["content"] += f"\n\n【用户记忆】\n{working_memory}"
 
@@ -286,16 +351,15 @@ async def chat_with_agent_stream(
 
     max_iterations = getattr(settings, 'AGENT_MAX_ITERATIONS', 6)
 
-    # 修复 #5.1：medi 追问次数上限（每 session 最多 1 次）
-    medi_count = 0
+    # v2.2 P1#19：medi 追问次数上限改为 session 级（见 _try_acquire_medi_slot）
 
     for i in range(max_iterations):
         logger.info(f"[Agent Core] 正在评估意图 (第 {i+1} 轮思考)...")
         AGENT_TURNS.inc()  # 修复 #2.4
 
-        # 生成回复（每次新建 client，支持热刷新）
-        client = _get_agent_client()
-        _, _, model_name = get_agent_config()
+        # 生成回复（每次新建 client，支持热刷新，v2.2 per-user）
+        client = _get_agent_client(owner_id)
+        _, _, model_name = _get_agent_config_for(owner_id)
         response = client.chat.completions.create(
             model=model_name or settings.DEFAULT_MODEL,
             messages=current_messages,
@@ -357,8 +421,8 @@ async def chat_with_agent_stream(
                 except Exception:
                     parsed = {"success": False, "data": None, "error": "工具返回非 JSON", "error_type": "tool_format_error"}
 
-                # 触发 trigger_scan / trigger_background_crawl 走特殊路径：立即发文本
-                if function_name in ("trigger_scan", "trigger_background_crawl"):
+                # 触发 trigger_scan 走特殊路径：立即发文本（v2.2 P0#6: trigger_background_crawl 已废弃并移除注册）
+                if function_name == "trigger_scan":
                     current_messages.append({
                         "tool_call_id": call_id, "role": "tool", "name": function_name,
                         "content": tool_result,
@@ -371,10 +435,10 @@ async def chat_with_agent_stream(
                         error=parsed.get("error", ""),
                         error_type=parsed.get("error_type", ""),
                     )
-                    for chunk in _stream_response(current_messages):
+                    async for chunk in _stream_response_async(current_messages, owner_id):
                         yield chunk
                     yield emit_done()
-                    asyncio.create_task(_write_memory_async(session_id, messages))
+                    asyncio.create_task(_write_memory_async(session_id, messages, owner_id))
                     return
 
                 # 其他工具：tool_result 事件 + Reflection 分支
@@ -403,19 +467,20 @@ async def chat_with_agent_stream(
                         current_messages.append({
                             "role": "assistant", "content": degrade_answer
                         })
-                        for chunk in _stream_response(current_messages):
+                        async for chunk in _stream_response_async(current_messages, owner_id):
                             yield chunk
                         yield emit_done()
-                        asyncio.create_task(_write_memory_async(session_id, messages))
+                        asyncio.create_task(_write_memory_async(session_id, messages, owner_id))
                         return
 
                     elif confidence == "medi":
                         medi_action = reflection_engine.handle_medi(
                             user_q, tool_result, eval_result.get("missing_info", "")
                         )
+                        # v2.2 P1#19：每 session 最多 1 次 follow_up（跨 chat 调用共享）
                         can_follow_up = (
                             medi_action.get("action") == "follow_up"
-                            and medi_count < 1
+                            and _try_acquire_medi_slot(session_id)
                         )
                         if not can_follow_up:
                             degrade_answer = (
@@ -426,14 +491,13 @@ async def chat_with_agent_stream(
                             current_messages.append({
                                 "role": "assistant", "content": degrade_answer
                             })
-                            for chunk in _stream_response(current_messages):
+                            async for chunk in _stream_response_async(current_messages, owner_id):
                                 yield chunk
                             yield emit_done()
-                            asyncio.create_task(_write_memory_async(session_id, messages))
+                            asyncio.create_task(_write_memory_async(session_id, messages, owner_id))
                             return
 
-                        # 第一次 follow_up
-                        medi_count += 1
+                        # 第一次 follow_up（_try_acquire_medi_slot 已 +1）
                         follow_up_q = medi_action.get("follow_up_question", "")
                         current_messages.append({
                             "role": "user", "content": f"【系统追问】{follow_up_q}"
@@ -446,8 +510,11 @@ async def chat_with_agent_stream(
                     # 异常不阻塞主流程，继续
 
             # Token 预算检查
-            if token_budget_manager.should_summarize(current_messages):
-                current_messages = token_budget_manager.summarize_history(current_messages)
+            try:
+                if token_budget_manager.should_summarize(current_messages):
+                    current_messages = token_budget_manager.summarize_history(current_messages)
+            except Exception as _e:
+                logger.warning(f"[Agent Core] Token 摘要失败: {_e}")
 
             continue
 
@@ -457,26 +524,30 @@ async def chat_with_agent_stream(
 
             current_messages.append({
                 "role": "system",
-                "content": "【系统强制指令】所有数据获取已完毕。现在请用自然语言回答用户。绝对禁止在回答中输出任何包含 <|DSML|>、andowski 或 JSON 格式的内部代码！"
+                "content": "请用自然语言回答用户，不要输出JSON或代码格式。"
             })
 
-            for chunk in _stream_response(current_messages):
-                yield chunk
+            try:
+                async for chunk in _stream_response_async(current_messages, owner_id):
+                    yield chunk
+            except Exception as _e:
+                logger.error(f"[Agent Core] 最终流式生成失败: {_e}", exc_info=True)
+                yield emit_error(f"生成回复失败: {_e}", error_type="stream_error")
             yield emit_done()
 
-            asyncio.create_task(_write_memory_async(session_id, messages))
+            asyncio.create_task(_write_memory_async(session_id, messages, owner_id))
             return
 
     # 超过最大迭代次数
     yield emit_text("抱歉，处理该指令时逻辑过于复杂，已自动中止。请换个问法。")
     yield emit_done()
-    asyncio.create_task(_write_memory_async(session_id, messages))
+    asyncio.create_task(_write_memory_async(session_id, messages, owner_id))
 
 
-async def _write_memory_async(session_id: str, messages: list):
-    """异步写入对话记忆（不影响主流程，记录 AGENT_MEMORY_WRITES 指标）"""
+async def _write_memory_async(session_id: str, messages: list, owner_id: str = ""):
+    """异步写入对话记忆（v2.2 per-user）"""
     try:
-        memory_manager.write_from_conversation(session_id, messages)
+        memory_manager.write_from_conversation(session_id, messages, owner_id=owner_id)
         AGENT_MEMORY_WRITES.labels(status="success").inc()
     except Exception as e:
         AGENT_MEMORY_WRITES.labels(status="error").inc()

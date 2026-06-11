@@ -20,6 +20,11 @@
 MediaCrawler WebUI API Server
 Start command: uvicorn api.main:app --port 8080 --reload
 Or: python -m api.main
+
+注意：此 HTTP 服务是 MediaCrawler 独立 WebUI 管理面板，仅供内网使用。
+- 不经过 gateway（无 auth / 限流 / CORS 统一管理）
+- 主系统通过 subprocess 调用爬虫，不走此 HTTP 端口
+- 生产环境应在防火墙层面限制 8080 端口访问
 """
 import asyncio
 import os

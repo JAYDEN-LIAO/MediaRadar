@@ -107,7 +107,15 @@ export default function SystemSettingsPage() {
   };
 
   return (
-    <form onSubmit={form.handleSubmit((v) => save.mutate(v))} className="space-y-6">
+    <div className="space-y-4">
+      {/* AI 助手提示 */}
+      <div className="rounded-lg border border-primary/20 bg-primary/[0.03] px-4 py-3 text-xs text-muted-foreground">
+        推荐使用{' '}
+        <a href="/agent" className="font-medium text-primary hover:underline">AI 助手</a>
+        {' '}完成日常操作——管理订阅、触发扫描、查看话题、配置推送更便捷。
+      </div>
+
+      <form onSubmit={form.handleSubmit((v) => save.mutate(v))} className="space-y-6">
       {/* Scheduler controls */}
       <Card>
         <CardHeader>
@@ -270,5 +278,6 @@ export default function SystemSettingsPage() {
         </Button>
       </div>
     </form>
+    </div>
   );
 }

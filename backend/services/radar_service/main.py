@@ -1,7 +1,6 @@
 # backend/services/radar_service/main.py
 import subprocess
 import time
-import schedule
 import os
 import sys
 import asyncio
@@ -86,16 +85,19 @@ class RadarStatus:
         }
 
 
-# 全局实例
+# 全局实例（backward compat，owner_id=None）
 radar_status = RadarStatus()
 
-def daily_summary_job():
-    logger.info("Triggering daily summary notification.")
-    current_keyword = "、".join(MONITOR_KEYWORDS) if MONITOR_KEYWORDS else "监控目标"
-    send_alert(
-        keyword=current_keyword, platform="全部平台", risk_level="info",
-        core_issue="每日舆情监测总结", report="今日监测已完成，详情请登录后台查看。", urls=[]
-    )
+# v2.2 per-user radar status
+_user_radar_statuses: dict[str, RadarStatus] = {}
+
+def get_radar_status(owner_id: Optional[str] = None) -> RadarStatus:
+    """返回指定用户的雷达状态，owner_id=None 返回全局实例（backward compat）"""
+    if owner_id is None:
+        return radar_status
+    if owner_id not in _user_radar_statuses:
+        _user_radar_statuses[owner_id] = RadarStatus()
+    return _user_radar_statuses[owner_id]
 
 def reload_config():
     global MONITOR_KEYWORDS, MONITOR_KEYWORD_LEVELS, MONITOR_PLATFORMS, ALERT_NEGATIVE
@@ -227,9 +229,10 @@ async def job_async(target_keyword: str = None, owner_id: Optional[str] = None):
 
     new_risk_count = await run_analysis_pipeline_async(owner_id=owner_id)
 
-    # 更新雷达状态（供前端展示上次扫描时间）
-    radar_status.last_new_count = new_risk_count if new_risk_count else 0
-    radar_status.last_run_time = time.strftime('%Y-%m-%d %H:%M:%S')
+    # 更新雷达状态（per-user）
+    st = get_radar_status(owner_id)
+    st.last_new_count = new_risk_count if new_risk_count else 0
+    st.last_run_time = time.strftime('%Y-%m-%d %H:%M:%S')
 
     return new_risk_count
 
@@ -254,6 +257,7 @@ async def run_analysis_pipeline_async(owner_id: Optional[str] = None):
             platform=platform,
             alert_negative=ALERT_NEGATIVE,
             owner_id=owner_id,
+            mode="full",  # 定时扫描：完整链路（含 LangGraph 分析 + 预警）
         )
         pipeline = RadarPipeline(config)
         results = await pipeline.run(posts)
@@ -318,23 +322,25 @@ def api_start_task(background_tasks, owner_id: Optional[str] = None):
     except Exception:
         pass
 
-    if radar_status.is_running:
+    status = get_radar_status(owner_id)
+    if status.is_running:
         return False, "扫描任务正在运行中，请勿重复启动"
 
     reload_config()
     current_keyword = "、".join(MONITOR_KEYWORDS)
 
     def _run_in_background():
-        radar_status.set_running_sync(f"正在监控: {current_keyword}")
+        nonlocal status
+        status.set_running_sync(f"正在监控: {current_keyword}")
         try:
             new_count = job(owner_id=owner_id)
-            radar_status.last_new_count = new_count if new_count else 0
-            radar_status.last_run_time = time.strftime('%Y-%m-%d %H:%M:%S')
+            status.last_new_count = new_count if new_count else 0
+            status.last_run_time = time.strftime('%Y-%m-%d %H:%M:%S')
         except Exception as e:
             logger.error(f"Background task exception: {e}")
-            radar_status.last_new_count = 0
+            status.last_new_count = 0
         finally:
-            radar_status.set_idle_sync()
+            status.set_idle_sync()
 
     background_tasks.add_task(_run_in_background)
     return True, "扫描任务已启动"
@@ -363,13 +369,3 @@ def job(target_keyword=None, owner_id: Optional[str] = None):
 
     new_risk_count = run_analysis_pipeline(owner_id=owner_id)
     return new_risk_count
-
-if __name__ == "__main__":
-    reload_config()
-    schedule.every().day.at("09:00").do(job)
-    schedule.every().day.at("18:00").do(daily_summary_job)
-    
-    logger.info("Radar service started. Waiting for scheduled tasks...")
-    while True:
-        schedule.run_pending()
-        time.sleep(60)

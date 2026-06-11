@@ -16,9 +16,9 @@ export interface NavItem {
 }
 
 export const mainNav: NavItem[] = [
+  { title: 'AI 助手', href: '/agent', icon: Bot, description: '智能订阅管家' },
   { title: '总览仪表盘', href: '/dashboard', icon: LayoutDashboard, description: '今日舆情速览' },
   { title: '舆情列表', href: '/yq-list', icon: ListChecks, description: '话题与帖子' },
-  { title: 'AI 助手', href: '/agent', icon: Bot, description: '智能对话分析' },
 ];
 
 export const settingsNav: NavItem[] = [

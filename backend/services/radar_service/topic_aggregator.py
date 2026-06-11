@@ -98,14 +98,22 @@ class TopicAggregator:
             else:
                 alert_recommendation = "none"
 
-        # ── sentiment：优先取 LLM 返回值，避免 reviewer 驳回后被错误映射 ──
-        # analyst_result 中有 sentiment，safe 分支的 sentiment 被标准化为 "Neutral"
-        llm_sentiment = analysis_result.get("sentiment", "").lower() if analysis_result.get("sentiment") else ""
+        # ── risk_class：始终从 risk_level 派生（risk_level 是规范信号）──
+        # 修复 v2.2 P0#8：旧版曾被 LLM sentiment 字符串覆盖，导致：
+        #   1) reviewer 降级 risk_level 4→2 后，sentiment 还显示 negative
+        #   2) 语义混淆：风险等级 ≠ 情感倾向
+        # 修复后：risk_class 是 risk_level 的派生标签，与 LLM sentiment 解耦
+        risk_class = self._calculate_risk_class(risk_level)
+
+        # ── sentiment：从 LLM 返回值独立读取（不影响 risk_class）──
+        # DB 中 topic_summary.sentiment 列保留该值，前端如需"负面/正面/中性"
+        # 展示可走 db_manager 现有映射（risk_class → 中文）
+        llm_sentiment_raw = analysis_result.get("sentiment", "") or ""
+        llm_sentiment = llm_sentiment_raw.lower() if llm_sentiment_raw else ""
         if llm_sentiment in ("negative", "positive", "neutral"):
-            sentiment_map = {"negative": "negative", "positive": "positive", "neutral": "neutral"}
-            risk_class = sentiment_map[llm_sentiment]
+            sentiment = llm_sentiment
         else:
-            risk_class = self._calculate_risk_class(risk_level)
+            sentiment = risk_class  # fallback：LLM 没给有效值时与 risk_class 一致
 
         # ── core_issue：取 LLM 原始值，safe 分支会用误导性兜底值，过滤它 ──
         raw_core_issue = analysis_result.get("core_issue", "")
@@ -140,7 +148,7 @@ class TopicAggregator:
             core_issue=core_issue,
             report=report,
             platforms=platforms_cn,
-            sentiment=risk_class,
+            sentiment=sentiment,
             owner_id=owner_id,
         )
 
@@ -148,7 +156,7 @@ class TopicAggregator:
         for p in cluster.posts:
             post_id = p.get("post_id", "")
             if post_id:
-                add_post_to_topic(topic_id, post_id, is_current=1)
+                add_post_to_topic(topic_id, post_id, is_current=1, owner_id=owner_id)
 
         logger.info(
             f"[TopicAggregator] topic_id={topic_id}, "

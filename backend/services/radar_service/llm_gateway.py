@@ -35,13 +35,12 @@ class LLMCallResult:
 
 
 # Circuit Breaker 实例
-screener_circuit = CircuitBreaker("screener", failure_threshold=5)
 analyst_circuit = CircuitBreaker("analyst", failure_threshold=3)
 reviewer_circuit = CircuitBreaker("reviewer", failure_threshold=3)
 
 
 # 修复 #3.1：所有熔断器注册表（供 /api/circuit/states 端点使用）
-ALL_BREAKERS: list = [screener_circuit, analyst_circuit, reviewer_circuit]
+ALL_BREAKERS: list = [analyst_circuit, reviewer_circuit]
 
 
 def get_all_breakers() -> list:
@@ -50,7 +49,8 @@ def get_all_breakers() -> list:
     try:
         from services.agent_service.diagnosis.diagnosis_engine import _circuit_registry
         # diagnosis 引擎按工具名懒加载，先 ping 一下 4 个常见工具名
-        for tool_name in ("get_system_status", "trigger_background_crawl", "get_recent_alerts", "llm_call"):
+        # v2.2 P0#6: trigger_background_crawl 已废弃，替换为 trigger_scan（per-user）
+        for tool_name in ("get_system_status", "trigger_scan", "get_recent_alerts", "llm_call"):
             breakers.append(_circuit_registry.get(tool_name))
     except Exception:
         pass

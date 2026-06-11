@@ -8,7 +8,7 @@ import { isAuthenticated } from '@/lib/auth-client';
 export default function RootIndexPage() {
   const router = useRouter();
   useEffect(() => {
-    router.replace(isAuthenticated() ? '/dashboard' : '/login');
+    router.replace(isAuthenticated() ? '/agent' : '/login');
   }, [router]);
   return (
     <div className="grid min-h-screen place-items-center bg-background">

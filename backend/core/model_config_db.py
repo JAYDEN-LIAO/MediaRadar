@@ -16,6 +16,35 @@ AGENT_ROLES = ("DEFAULT", "ANALYST", "REVIEWER", "EMBEDDING", "VISION", "AGENT")
 PROVIDERS = ("deepseek", "kimi", "qwen", "openai", "custom", "")
 
 
+# v2.2 P1#12：model_config 表 DDL 与 db_manager.init_radar_db 保持一致
+_MODEL_CONFIG_DDL = '''
+    CREATE TABLE IF NOT EXISTS model_config (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        owner_id TEXT NOT NULL,
+        agent_role TEXT NOT NULL,
+        provider TEXT,
+        model TEXT,
+        api_key TEXT,
+        base_url TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(owner_id, agent_role)
+    )
+'''
+_MODEL_CONFIG_INDEXES_DDL = [
+    'CREATE INDEX IF NOT EXISTS idx_model_config_owner ON model_config(owner_id)',
+]
+
+
+def _ensure_model_config_table():
+    """确保 model_config 表 + 索引存在（幂等，模块自包含）"""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(_MODEL_CONFIG_DDL)
+        for ddl in _MODEL_CONFIG_INDEXES_DDL:
+            cursor.execute(ddl)
+        conn.commit()
+
+
 def _row_to_dict(row) -> dict:
     return dict(row)
 
@@ -24,6 +53,7 @@ def get_model_config(owner_id: str, agent_role: str) -> Optional[dict]:
     """查某用户某角色的模型配置"""
     if agent_role not in AGENT_ROLES:
         return None
+    _ensure_model_config_table()
     with get_db_connection() as conn:
         conn.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
         cursor = conn.cursor()
@@ -37,6 +67,7 @@ def get_model_config(owner_id: str, agent_role: str) -> Optional[dict]:
 
 def list_model_configs(owner_id: str) -> list[dict]:
     """列出某用户所有 5 个角色的配置（无配置的角色返回空记录）"""
+    _ensure_model_config_table()
     with get_db_connection() as conn:
         conn.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
         cursor = conn.cursor()
@@ -78,6 +109,7 @@ def upsert_model_config(
         raise ValueError(f"invalid provider: {provider}")
 
     now = datetime.now().isoformat()
+    _ensure_model_config_table()
     with get_db_connection() as conn:
         cursor = conn.cursor()
         # 先读已存在记录
@@ -108,6 +140,7 @@ def upsert_model_config(
 
 def delete_model_config(owner_id: str, agent_role: str) -> bool:
     """删除某角色配置（回退到系统默认）"""
+    _ensure_model_config_table()
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(

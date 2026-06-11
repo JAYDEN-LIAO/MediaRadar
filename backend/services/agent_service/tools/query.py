@@ -1,5 +1,5 @@
 """
-C 组 数据查询（3 个工具，AGENT_REDESIGN.md §4.C 落 P1 版本）
+C 组 数据查询（3 个工具，检索预警/话题详情/搜索）
 
 C1. search_alerts：检索历史预警/动态（ai_results + topic_summary 双表）
 C2. get_topic_detail：话题详情（聚合 + 帖子列表）
@@ -11,6 +11,7 @@ C3 的 push_stats 暂只统计计数，命中率/压制率等 P7 加入。
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
@@ -39,6 +40,27 @@ def _parse_iso(s: Optional[str]) -> Optional[datetime]:
         return datetime.fromisoformat(s.replace("Z", "+00:00"))
     except (ValueError, TypeError):
         return None
+
+
+# L4 v2.2: 搜索关键词清洗
+# - 剥离前后空白
+# - 截断到 64 字符
+# - 移除控制字符（防日志注入 / 终端欺骗）
+# - 移除 SQL/Shell 注入常见元字符（? 已是参数化，再保险一层）
+_KEYWORD_MAX_LEN = 64
+_BAD_CTRL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def _sanitize_keyword(raw: Optional[str]) -> Optional[str]:
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    if not s:
+        return None
+    s = _BAD_CTRL_CHARS.sub("", s)
+    if len(s) > _KEYWORD_MAX_LEN:
+        s = s[:_KEYWORD_MAX_LEN]
+    return s or None
 
 
 # ───────────────────────────────────────────────────────────────
@@ -88,6 +110,11 @@ def search_alerts_tool(
     end_time: Optional[str] = None,
     limit: int = 10,
 ) -> str:
+    # L4 v2.2: 关键词清洗
+    keyword = _sanitize_keyword(keyword)
+    # 限制 limit 上限（即便 schema 限定 50，再加一道程序保护）
+    if limit <= 0 or limit > 50:
+        limit = 10
     start_dt = _parse_iso(start_time)
     end_dt = _parse_iso(end_time)
     # 平台别名归一

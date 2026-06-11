@@ -130,6 +130,14 @@ cython_debug/
 .vscode/
 .DS_Store
 
+# Claude / Codex / Agent working directories
+.agents/
+.claude/
+.codex/
+
+# Project-specific: design mockups
+new_web_design/
+
 # Project-specific: data directories
 /temp_image/
 /browser_data/
@@ -163,6 +171,7 @@ out/
 
 # Log files
 logs/*.log
+logs/**/*.log
 tests/unit/_tmp_memory.db
 
 # SQLite database files

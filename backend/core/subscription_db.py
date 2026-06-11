@@ -1,7 +1,8 @@
 """
 v2.2：订阅表 CRUD（per-owner，替代 system_settings.keywords）
 
-数据模型见 AGENT_REDESIGN.md §3 / update.md §3.3
+订阅包含 name / type / polarity / sensitivity / push_mode / platforms 等字段，
+数据存储在 subscriptions 表中，所有操作强制 owner_id 隔离。
 """
 import json
 import uuid
@@ -18,6 +19,40 @@ VALID_TYPES = ("person", "brand", "event", "industry", "keyword")
 VALID_POLARITY = ("negative", "positive", "neutral", "all")
 VALID_SENSITIVITY = ("conservative", "balanced", "aggressive")
 VALID_PUSH_MODE = ("every", "important", "silent", "off")
+
+
+# v2.2 P1#12：subscription 表 DDL 与 db_manager.init_radar_db 保持一致
+_SUBSCRIPTION_DDL = '''
+    CREATE TABLE IF NOT EXISTS subscription (
+        id TEXT PRIMARY KEY,
+        owner_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL DEFAULT 'keyword',
+        polarity TEXT DEFAULT 'all',
+        sensitivity TEXT DEFAULT 'balanced',
+        frequency_min INTEGER DEFAULT 60,
+        platforms TEXT DEFAULT '[]',
+        push_mode TEXT DEFAULT 'important',
+        show_risk_alert INTEGER DEFAULT 0,
+        is_active INTEGER DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+'''
+_SUBSCRIPTION_INDEXES_DDL = [
+    'CREATE INDEX IF NOT EXISTS idx_subscription_owner ON subscription(owner_id)',
+    'CREATE INDEX IF NOT EXISTS idx_subscription_active ON subscription(is_active)',
+]
+
+
+def _ensure_subscription_table():
+    """确保 subscription 表 + 索引存在（幂等，模块自包含）"""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(_SUBSCRIPTION_DDL)
+        for ddl in _SUBSCRIPTION_INDEXES_DDL:
+            cursor.execute(ddl)
+        conn.commit()
 
 
 def _gen_id() -> str:
@@ -61,6 +96,7 @@ def create_subscription(
     sub_id = _gen_id()
     now = datetime.now().isoformat()
     plat_json = json.dumps(platforms or [], ensure_ascii=False)
+    _ensure_subscription_table()
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute('''
@@ -77,6 +113,7 @@ def create_subscription(
 
 def get_subscription_by_id(owner_id: str, sub_id: str, is_admin: bool = False) -> Optional[dict]:
     """按 id 查订阅（per-owner 隔离）"""
+    _ensure_subscription_table()
     with get_db_connection() as conn:
         conn.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
         cursor = conn.cursor()
@@ -93,6 +130,7 @@ def get_subscription_by_id(owner_id: str, sub_id: str, is_admin: bool = False) -
 
 def list_subscriptions(owner_id: str, is_admin: bool = False, include_inactive: bool = False) -> list:
     """列出某用户的所有订阅"""
+    _ensure_subscription_table()
     with get_db_connection() as conn:
         conn.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
         cursor = conn.cursor()
@@ -115,9 +153,17 @@ def list_subscriptions(owner_id: str, is_admin: bool = False, include_inactive: 
 
 
 def update_subscription(owner_id: str, sub_id: str, **fields) -> Optional[dict]:
-    """更新订阅字段。仅更新传入的字段。"""
+    """更新订阅字段。仅更新传入的字段。
+
+    M8 v2.2：防御深度——显式拒绝 owner_id 注入（白名单已隐式过滤，但
+    即便将来扩展白名单也不允许通过此入口修改 owner_id）。
+    """
     if not fields:
         return get_subscription_by_id(owner_id, sub_id)
+
+    # M8 v2.2: 显式拒绝 owner_id 注入（白名单虽已过滤，这里再加一道保险）
+    if "owner_id" in fields:
+        raise ValueError("owner_id 不可通过 update_subscription 修改")
 
     # 字段白名单 + 值校验
     allowed = {
@@ -153,6 +199,7 @@ def update_subscription(owner_id: str, sub_id: str, **fields) -> Optional[dict]:
     params.extend([sub_id, owner_id])
 
     sql = f"UPDATE subscription SET {', '.join(sets)} WHERE id = ? AND owner_id = ?"
+    _ensure_subscription_table()
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(sql, tuple(params))
@@ -164,6 +211,7 @@ def update_subscription(owner_id: str, sub_id: str, **fields) -> Optional[dict]:
 
 def delete_subscription(owner_id: str, sub_id: str) -> bool:
     """软删除（is_active=0）。返回是否成功。"""
+    _ensure_subscription_table()
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
@@ -176,6 +224,7 @@ def delete_subscription(owner_id: str, sub_id: str) -> bool:
 
 def count_subscriptions(owner_id: str, is_admin: bool = False) -> int:
     """计数（用于配额检查）"""
+    _ensure_subscription_table()
     with get_db_connection() as conn:
         cursor = conn.cursor()
         if is_admin:
@@ -188,37 +237,3 @@ def count_subscriptions(owner_id: str, is_admin: bool = False) -> int:
         return cursor.fetchone()[0]
 
 
-def list_active_keywords_global() -> list[dict]:
-    """
-    调度器专用：列出所有活跃订阅（去重按 keyword）。
-    用于底层合并爬虫（每关键词只跑一次）。
-    返回 [{name, type, platforms, owner_ids[]}, ...]
-    """
-    with get_db_connection() as conn:
-        conn.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT name, type, platforms, owner_id
-            FROM subscription
-            WHERE is_active = 1
-            ORDER BY name
-        ''')
-        rows = cursor.fetchall()
-    # 聚合：同 name 的 owner_id 合到一起
-    by_name: dict[str, dict] = {}
-    for r in rows:
-        name = r["name"]
-        if name not in by_name:
-            try:
-                plats = json.loads(r.get("platforms", "[]") or "[]")
-            except (json.JSONDecodeError, TypeError):
-                plats = []
-            by_name[name] = {
-                "name": name,
-                "type": r["type"],
-                "platforms": plats,
-                "owner_ids": [],
-            }
-        if r["owner_id"] not in by_name[name]["owner_ids"]:
-            by_name[name]["owner_ids"].append(r["owner_id"])
-    return list(by_name.values())

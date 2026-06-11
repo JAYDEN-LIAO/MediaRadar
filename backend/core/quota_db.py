@@ -1,8 +1,10 @@
 """
-v2.2：配额表 CRUD + 检查函数
+v2.2：配额表 + 扫描配置 CRUD
 
 每个用户 1 条 quota 记录（按 owner_id 主键），admin 可在 /admin/quota 调整。
+v2.2 新增：per-user 扫描配置（scan_interval_min / scan_start_time / scan_paused）。
 """
+import json
 from datetime import datetime
 from typing import Optional
 
@@ -15,10 +17,56 @@ logger = get_logger("core.quota")
 DEFAULT_MAX_SUBSCRIPTIONS = 20
 DEFAULT_HISTORY_RETENTION_DAYS = 30
 DEFAULT_MAX_CHAT_PER_MONTH = 200
+DEFAULT_SCAN_INTERVAL_MIN = 60
+DEFAULT_SCAN_START_TIME = "08:00"
+
+
+# v2.2 P1#11+#12：quota 表 DDL 与 db_manager.init_radar_db 保持一致
+# 任何一处变更请同步修改两处
+_QUOTA_DDL = '''
+    CREATE TABLE IF NOT EXISTS quota (
+        owner_id TEXT PRIMARY KEY,
+        max_subscriptions INTEGER DEFAULT 20,
+        history_retention_days INTEGER DEFAULT 30,
+        max_chat_per_month INTEGER DEFAULT 200,
+        used_chat_this_month INTEGER DEFAULT 0,
+        month_reset_at TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        scan_interval_min REAL DEFAULT 60,
+        scan_start_time TEXT DEFAULT '08:00',
+        scan_paused INTEGER DEFAULT 0
+    )
+'''
+# 旧 DB（v2.2 ALTER 之前）可能缺 v2.2 per-user 扫描列；幂等迁移
+_QUOTA_V22_ALTERS = [
+    ("scan_interval_min", "REAL DEFAULT 60"),
+    ("scan_start_time", "TEXT DEFAULT '08:00'"),
+    ("scan_paused", "INTEGER DEFAULT 0"),
+]
+
+
+def _ensure_quota_table():
+    """确保 quota 表存在 + 含 v2.2 per-user 扫描列（幂等）
+
+    设计：
+    - 首次调用 / 表不存在：CREATE TABLE IF NOT EXISTS（含全部列）
+    - 表已存在但缺 v2.2 列（旧 DB）：ALTER ADD COLUMN（幂等：列已存在则 try/except 跳过）
+    - 完整表 + 全列：no-op
+    """
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(_QUOTA_DDL)
+        for col, col_type in _QUOTA_V22_ALTERS:
+            try:
+                cursor.execute(f"ALTER TABLE quota ADD COLUMN {col} {col_type}")
+            except Exception:
+                pass  # 列已存在
+        conn.commit()
 
 
 def _ensure_quota_row(owner_id: str) -> None:
     """确保某用户有 quota 行（首次查询时自动建默认）"""
+    _ensure_quota_table()
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT 1 FROM quota WHERE owner_id = ?", (owner_id,))
@@ -27,11 +75,48 @@ def _ensure_quota_row(owner_id: str) -> None:
             cursor.execute('''
                 INSERT INTO quota
                 (owner_id, max_subscriptions, history_retention_days,
-                 max_chat_per_month, used_chat_this_month, month_reset_at, updated_at)
-                VALUES (?, ?, ?, ?, 0, ?, ?)
+                 max_chat_per_month, used_chat_this_month, month_reset_at, updated_at,
+                 scan_interval_min, scan_start_time, scan_paused)
+                VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, 0)
             ''', (owner_id, DEFAULT_MAX_SUBSCRIPTIONS, DEFAULT_HISTORY_RETENTION_DAYS,
-                  DEFAULT_MAX_CHAT_PER_MONTH, now, now))
+                  DEFAULT_MAX_CHAT_PER_MONTH, now, now,
+                  DEFAULT_SCAN_INTERVAL_MIN, DEFAULT_SCAN_START_TIME))
             conn.commit()
+
+
+# ── v2.2 per-user 扫描配置 ──
+
+def get_scan_config(owner_id: str) -> dict:
+    """获取用户扫描配置（不存在则建默认）"""
+    _ensure_quota_row(owner_id)
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT scan_interval_min, scan_start_time, scan_paused FROM quota WHERE owner_id = ?",
+            (owner_id,),
+        )
+        row = cursor.fetchone()
+    if row:
+        return {"interval_min": row[0], "start_time": row[1], "paused": bool(row[2])}
+    return {"interval_min": DEFAULT_SCAN_INTERVAL_MIN, "start_time": DEFAULT_SCAN_START_TIME, "paused": False}
+
+
+def set_scan_interval(owner_id: str, interval_min: int) -> None:
+    """设置用户扫描间隔"""
+    _ensure_quota_row(owner_id)
+    with get_db_connection() as conn:
+        conn.execute("UPDATE quota SET scan_interval_min = ?, updated_at = ? WHERE owner_id = ?",
+                     (interval_min, datetime.now().isoformat(), owner_id))
+        conn.commit()
+
+
+def set_scan_paused(owner_id: str, paused: bool) -> None:
+    """暂停/恢复用户扫描"""
+    _ensure_quota_row(owner_id)
+    with get_db_connection() as conn:
+        conn.execute("UPDATE quota SET scan_paused = ?, updated_at = ? WHERE owner_id = ?",
+                     (1 if paused else 0, datetime.now().isoformat(), owner_id))
+        conn.commit()
 
 
 def get_quota(owner_id: str) -> dict:

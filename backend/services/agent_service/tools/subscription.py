@@ -1,7 +1,7 @@
 """
 A 组 订阅管理 + 意图解析（5 个工具）
 
-设计见 AGENT_REDESIGN.md §4.A。前 4 个工具是订阅 CRUD，
+前 4 个工具是订阅 CRUD，
 parse_intent 是自然语言入口（解析后渲染 confirm 卡片，
 LLM 不应直接接 add_subscription，由用户点确认触发）。
 

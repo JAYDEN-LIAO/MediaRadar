@@ -4,7 +4,7 @@ SSE 事件工厂（v2.2 P2）
 所有 chat_with_agent_stream 输出的事件都通过本模块构造，
 保证前端 EventSource 解析稳定（event:/data: 双行 + 双换行收尾）。
 
-事件清单（详见 AGENT_REDESIGN.md §6.1）：
+事件清单：
   - text           LLM 流式文本片段
   - tool_call      LLM 决定调工具，开始执行前
   - tool_progress  流式工具的增量 partial

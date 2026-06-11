@@ -5,12 +5,13 @@ WS4: FastAPI 依赖注入
 - require_admin: 仅 admin 通过，否则 403
 - get_optional_user: 有 token 就解析，没有返回 None（公开端点用）
 """
-from fastapi import Header, HTTPException, status, Depends
+from fastapi import Header, HTTPException, status, Depends, Security
 from typing import Optional, Dict, Any
 
 from core.auth_jwt import decode_token
 from core.auth_db import get_user_by_id
 from core.logger import get_logger
+from core.auth import API_KEY_HEADER, get_valid_api_keys
 
 logger = get_logger("auth.deps")
 
@@ -75,6 +76,43 @@ async def get_optional_user(
         return None
     user = get_user_by_id(user_id)
     return user if user and user.get("is_active") else None
+
+
+async def get_current_user_or_api_key(
+    authorization: Optional[str] = Header(default=None),
+    api_key: Optional[str] = Security(API_KEY_HEADER),
+) -> Dict[str, Any]:
+    """
+    v2.2 P1#16：接受 JWT（Bearer token）或 API Key（X-API-Key），任一即可。
+
+    策略：
+      1. 优先尝试 JWT：成功 → 返回完整 user dict
+      2. 回退到 API Key：有效 → 返回最小服务账户 dict（不映射到具体用户）
+      3. 都失败 → 401
+
+    用于同时需要前端（JWT）和外部工具（API Key）访问的端点，
+    比如 /api/start_task 和 /api/radar_status。
+    """
+    # 先试 JWT
+    token = _extract_bearer(authorization)
+    if token:
+        payload = decode_token(token)
+        if payload:
+            user_id = payload.get("sub")
+            if user_id:
+                user = get_user_by_id(user_id)
+                if user and user.get("is_active"):
+                    return user
+
+    # 再试 API Key
+    if api_key and api_key in get_valid_api_keys():
+        return {"id": "api_service", "role": "admin", "is_active": True}
+
+    # 都失败
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail={"code": 401, "msg": "需要有效的 JWT（Bearer token）或 API Key（X-API-Key）", "data": None},
+    )
 
 
 async def require_admin(

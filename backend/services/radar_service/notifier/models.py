@@ -8,6 +8,7 @@ class PushChannel(str, Enum):
     EMAIL = "email"
     WECOM = "wecom"
     FEISHU = "feishu"
+    RSS = "rss"
 
 
 class AlertPayload(BaseModel):
@@ -57,9 +58,3 @@ class FeishuConfig(BaseModel):
     enabled: bool = False
     risk_min_level: int = 2
     webhook_url: str = ""
-
-
-class AllPushConfigs(BaseModel):
-    email: EmailConfig = Field(default_factory=EmailConfig)
-    wecom: WeComConfig = Field(default_factory=WeComConfig)
-    feishu: FeishuConfig = Field(default_factory=FeishuConfig)

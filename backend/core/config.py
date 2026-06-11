@@ -15,9 +15,25 @@ load_dotenv(dotenv_path=ENV_PATH)
 
 class Settings:
     # ======== 默认模型配置（所有 Agent 的兜底配置）=======
-    DEFAULT_API_KEY = os.getenv("DEFAULT_API_KEY", "")
-    DEFAULT_BASE_URL = os.getenv("DEFAULT_BASE_URL", "https://api.deepseek.com/v1").strip()
-    DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "deepseek-chat")
+    # v2.2 P1#24: 优先读 DEFAULT_*，空值时回退到 LLM_*（旧 .env 兼容）
+    _def_api_key = os.getenv("DEFAULT_API_KEY", "")
+    if not _def_api_key:
+        _def_api_key = os.getenv("LLM_API_KEY", "")
+    DEFAULT_API_KEY = _def_api_key
+
+    _def_base_url = os.getenv("DEFAULT_BASE_URL", "").strip()
+    if not _def_base_url:
+        _def_base_url = os.getenv("LLM_BASE_URL", "").strip()
+    if not _def_base_url:
+        _def_base_url = "https://api.deepseek.com/v1"
+    DEFAULT_BASE_URL = _def_base_url
+
+    _def_model = os.getenv("DEFAULT_MODEL", "")
+    if not _def_model:
+        _def_model = os.getenv("LLM_MODEL", "")
+    if not _def_model:
+        _def_model = "deepseek-chat"
+    DEFAULT_MODEL = _def_model
 
     # ======== 配置1: 分析员 Agent ========
     ANALYST_API_KEY = os.getenv("ANALYST_API_KEY", "")
@@ -74,9 +90,12 @@ class Settings:
     API_KEYS = os.getenv("API_KEYS", "")
 
     # ======== WS4: JWT 认证配置 ========
-    JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret-change-me-in-prod-please-32bytes").strip()
+    _raw_jwt_secret = os.getenv("JWT_SECRET", "")
+    JWT_SECRET = _raw_jwt_secret.strip() if _raw_jwt_secret else ""
     JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256").strip()
     JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "24"))
+    # v2.2 P1#14：refresh token 有效期（默认 7 天）。仅用于换 access token，不直接鉴权 API。
+    JWT_REFRESH_EXPIRE_HOURS = int(os.getenv("JWT_REFRESH_EXPIRE_HOURS", "168"))
 
     # ======== WS4: OAuth 配置（v2 上线时填真实值）=======
     GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
@@ -95,6 +114,53 @@ class Settings:
     LOG_USE_UTC = os.getenv("LOG_USE_UTC", "false").lower() == "true"
 
 settings = Settings()
+
+
+# v2.2 P1#13：JWT_SECRET 启动校验（fail-loud，避免空密钥静默签发废 token）
+def _validate_jwt_secret():
+    """启动时检查 JWT_SECRET，prod 模式下空/太短直接 RuntimeError 阻止启动；
+    dev 模式放行但用临时密钥 + RuntimeWarning 告知。
+    """
+    import secrets
+    import warnings
+    secret = settings.JWT_SECRET
+    env = settings.ENV
+    if not secret:
+        if env == "prod":
+            raise RuntimeError(
+                "[CONFIG] JWT_SECRET 未配置或为空。生产环境必须设置 JWT_SECRET"
+                " 环境变量（至少 32 字符随机串），否则所有签发的 JWT 形同废纸，"
+                "无法被任何 worker 验证。生成方式："
+                "python -c 'import secrets; print(secrets.token_urlsafe(48))'"
+            )
+        else:
+            dev_secret = "dev-" + secrets.token_urlsafe(32)
+            settings.JWT_SECRET = dev_secret
+            warnings.warn(
+                f"[CONFIG] JWT_SECRET 未配置，自动生成临时 dev 密钥：{dev_secret[:20]}... "
+                f"多 worker 部署不互通，进程重启后所有 token 失效。"
+                f"生产环境（ENV=prod）必须显式配置 JWT_SECRET。",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            return
+    if len(secret) < 16:
+        if env == "prod":
+            raise RuntimeError(
+                f"[CONFIG] JWT_SECRET 太短（{len(secret)} 字符 < 16）。"
+                f"生产环境 JWT_SECRET 至少 16 字符（推荐 32+）。"
+            )
+        else:
+            warnings.warn(
+                f"[CONFIG] JWT_SECRET 太短（{len(secret)} 字符），"
+                f"dev 模式放行但强烈建议至少 16 字符。",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+
+
+_validate_jwt_secret()
+
 
 from core.agent_memory_db import init_db as _  # Agent 记忆库初始化
 
@@ -165,15 +231,23 @@ def get_agent_config() -> tuple[str, str, str]:
     返回 (api_key, base_url, model)
     """
     def field(name: str) -> str:
-        # AGENT 优先
         v = getattr(settings, f"AGENT_{name.upper()}", "") or ""
-        if v:
-            return v
-        # 回退到 ANALYST
+        if v: return v
         v = getattr(settings, f"ANALYST_{name.upper()}", "") or ""
-        if v:
-            return v
-        # 回退到 DEFAULT
+        if v: return v
         return getattr(settings, f"DEFAULT_{name.upper()}", "") or ""
 
     return field("api_key"), field("base_url"), field("model")
+
+
+def get_agent_config_for_user(owner_id: str) -> tuple[str, str, str]:
+    """
+    v2.2 per-user：优先读 model_config 表 AGENT 角色配置，
+    未配置时回退到全局 settings（AGENT_* → ANALYST_* → DEFAULT_*）。
+    """
+    try:
+        from core.model_config_db import get_effective_config
+        cfg = get_effective_config(owner_id, "AGENT")
+        return (cfg.get("api_key", ""), cfg.get("base_url", ""), cfg.get("model", ""))
+    except Exception:
+        return get_agent_config()

@@ -10,7 +10,7 @@
 ## 1. 总体约定
 
 ### 1.1 基础
-- **Base URL**: `https://<your-domain>/api` (生产) / `http://127.0.0.1:8000/api` (开发)
+- **Base URL**: `https://<your-domain>/api` (生产) / `http://127.0.0.1:8008/api` (开发)
 - **认证方式**: 除 `/api/auth/*` 公开外，所有 `/api/*` 端点必须带 `Authorization: Bearer <token>`
 - **数据格式**: 全部 JSON，`Content-Type: application/json`
 - **字符集**: UTF-8

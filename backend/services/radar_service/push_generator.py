@@ -497,8 +497,10 @@ DAILY_LINK_ITEM_TEMPLATE = """
 """
 
 
-def _build_daily_keyword_block(keyword: str, items: list, index: int) -> str:
-    """构建单个关键词的区块"""
+def _build_daily_keyword_block(keyword: str, items: list, index: int, owner_id: Optional[str] = None) -> str:
+    """构建单个关键词的区块
+    v2.2 P1#18：新增 owner_id 参数，SQL 查询过滤 p.owner_id = ? OR p.owner_id IS NULL
+    """
     if not items:
         return ""
 
@@ -524,18 +526,32 @@ def _build_daily_keyword_block(keyword: str, items: list, index: int) -> str:
         issue_summary = issue_summary[:120] + "..."
 
     # 链接列表 - 从 topic_posts 查实际帖子 URL
+    # 修复 v2.2 P1#18：加 owner_id 过滤避免跨租户读 ai_results
+    # p.owner_id = ?  → 该用户私有数据
+    # p.owner_id IS NULL → 公共/历史数据（兼容 WS4.6 旧数据）
     topic_id = first_item.get("topic_id", "")
     link_items = []
     if topic_id:
         try:
             with get_db_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT p.url FROM topic_posts tp
-                    JOIN ai_results p ON tp.post_id = p.post_id
-                    WHERE tp.topic_id = ? AND tp.is_current = 1
-                    LIMIT 5
-                """, (topic_id,))
+                if owner_id:
+                    cursor.execute("""
+                        SELECT p.url FROM topic_posts tp
+                        JOIN ai_results p ON tp.post_id = p.post_id
+                        WHERE tp.topic_id = ? AND tp.is_current = 1
+                          AND (p.owner_id = ? OR p.owner_id IS NULL)
+                        LIMIT 5
+                    """, (topic_id, owner_id))
+                else:
+                    # 旧路径（无 owner_id 调用方）：保留 NULL-only 过滤，保证公共数据可见
+                    cursor.execute("""
+                        SELECT p.url FROM topic_posts tp
+                        JOIN ai_results p ON tp.post_id = p.post_id
+                        WHERE tp.topic_id = ? AND tp.is_current = 1
+                          AND p.owner_id IS NULL
+                        LIMIT 5
+                    """, (topic_id,))
                 post_rows = cursor.fetchall()
                 for post_row in post_rows:
                     url = post_row[0] if post_row[0] else ""
@@ -557,19 +573,23 @@ def _build_daily_keyword_block(keyword: str, items: list, index: int) -> str:
     )
 
 
-async def generate_daily_summary_html() -> str:
+async def generate_daily_summary_html(owner_id: Optional[str] = None) -> str:
     """
-    生成每日简报 HTML。
-    查询今日入库的 ai_results，汇总后返回 HTML。
-    无数据时返回空字符串。
+    生成每日简报 HTML（per-user 隔离）。
+    查询今日入库的 topic_summary，汇总后返回 HTML。
+    owner_id 必须传入；为空时返回空字符串以避免跨用户数据混合。
     """
+    if not owner_id:
+        logger.warning("[PushGen] generate_daily_summary_html 缺少 owner_id，跳过")
+        return ""
+
     try:
         from .db_manager import get_db_connection
     except Exception as e:
         logger.error(f"[PushGen] 无法导入 db_manager: {e}")
         return ""
 
-    # 查询今日数据（从 topic_summary，取最新的话题聚合结果）
+    # 查询今日数据（从 topic_summary，仅取该 owner 的话题聚合结果）
     today = datetime.datetime.now().strftime("%Y-%m-%d")
     today_start = today + " 00:00:00"
     today_end = today + " 23:59:59"
@@ -581,15 +601,18 @@ async def generate_daily_summary_html() -> str:
                        core_issue, report, last_seen, topic_id, post_count
                 FROM topic_summary
                 WHERE last_seen >= ? AND last_seen <= ?
+                  AND owner_id = ?
                 ORDER BY risk_level DESC, last_seen DESC
-            """, (today_start, today_end))
+            """, (today_start, today_end, owner_id))
             rows = cursor.fetchall()
     except Exception as e:
         logger.error(f"[PushGen] 查询今日舆情失败: {e}")
         return ""
 
     if not rows:
-        logger.info(f"[PushGen] 今日({today})无新舆情，跳过简报")
+        logger.info(
+            f"[PushGen] 用户 {owner_id[:8]}... 今日({today})无新舆情，跳过简报"
+        )
         return ""
 
     # 构建原始数据列表
@@ -629,9 +652,10 @@ async def generate_daily_summary_html() -> str:
     platform_count = len(platform_set)
 
     # 构建关键词区块
+    # 修复 v2.2 P1#18：透传 owner_id 给 _build_daily_keyword_block
     keyword_blocks = ""
     for idx, (kw, items) in enumerate(keyword_groups.items(), 1):
-        keyword_blocks += _build_daily_keyword_block(kw, items, idx)
+        keyword_blocks += _build_daily_keyword_block(kw, items, idx, owner_id=owner_id)
 
     # 调用 LLM 生成 AI 总结
     ai_summary = await _generate_daily_summary_text(raw_items, keyword_groups)
@@ -690,6 +714,253 @@ async def _generate_daily_summary_text(raw_items: list, keyword_groups: dict) ->
     if not result:
         return "今日舆情态势平稳，暂无异常高危信息。"
     return result.strip()
+
+
+# ============================================================
+# 话题级推送模板（v2.2）
+# ============================================================
+
+TOPIC_PUSH_HTML_TEMPLATE = """<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>话题推送 - MediaRadar</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f0f2f5;font-family:Arial,'PingFang SC','Microsoft YaHei',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f0f2f5;padding:16px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" border="0" style="background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+
+          <!-- 话题标题栏 -->
+          <tr>
+            <td style="padding:20px 24px;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="vertical-align:middle;">
+                    <h2 style="margin:0;font-size:18px;font-weight:700;color:#0d1b2a;">{topic_name}</h2>
+                  </td>
+                  <td align="right" style="vertical-align:middle;">
+                    <span style="display:inline-block;padding:3px 10px;background:{risk_bg};color:#fff;
+                                 border-radius:4px;font-size:11px;font-weight:600;">{risk_label}</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- 热度指标 -->
+          <tr>
+            <td style="padding:0 24px 16px;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td width="33%" style="text-align:center;padding:8px 0;background:#f8f9fa;border-radius:6px;">
+                    <div style="font-size:18px;font-weight:700;color:#0d1b2a;">{post_count}</div>
+                    <div style="font-size:11px;color:#7f8c8d;margin-top:2px;">相关讨论</div>
+                  </td>
+                  <td width="6"></td>
+                  <td width="33%" style="text-align:center;padding:8px 0;background:#f8f9fa;border-radius:6px;">
+                    <div style="font-size:18px;font-weight:700;color:#0d1b2a;">{platform_count}</div>
+                    <div style="font-size:11px;color:#7f8c8d;margin-top:2px;">涉及平台</div>
+                  </td>
+                  <td width="6"></td>
+                  <td width="33%" style="text-align:center;padding:8px 0;background:#f8f9fa;border-radius:6px;">
+                    <div style="font-size:18px;font-weight:700;color:{heat_color};">{heat_pct}</div>
+                    <div style="font-size:11px;color:#7f8c8d;margin-top:2px;">热度变化</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- 摘要 -->
+          <tr>
+            <td style="padding:0 24px 16px;">
+              <div style="background:#f4f7fb;border-radius:8px;padding:14px 16px;">
+                <p style="margin:0;font-size:13px;color:#2d3f52;line-height:1.7;">{summary}</p>
+              </div>
+            </td>
+          </tr>
+
+          <!-- 核心问题（折叠） -->
+          <tr>
+            <td style="padding:0 24px;">
+              <details style="display:block;">
+                <summary style="cursor:pointer;user-select:none;padding:10px 0;list-style:none;border-top:1px solid #eee;">
+                  <span style="font-size:12px;font-weight:600;color:#0d1b2a;">核心问题</span>
+                  <span style="float:right;font-size:11px;color:#8a9aaa;">▼</span>
+                </summary>
+                <div style="padding:10px 0 14px;font-size:13px;color:#555;line-height:1.6;">
+                  {core_issue}
+                </div>
+              </details>
+            </td>
+          </tr>
+
+          <!-- 帖子链接 -->
+          <tr>
+            <td style="padding:0 24px 20px;">
+              <details style="display:block;">
+                <summary style="cursor:pointer;user-select:none;padding:10px 0;list-style:none;border-top:1px solid #eee;">
+                  <span style="font-size:12px;font-weight:600;color:#0d1b2a;">溯源链接 ({link_count})</span>
+                  <span style="float:right;font-size:11px;color:#8a9aaa;">▶</span>
+                </summary>
+                <div style="padding:10px 0 0;">
+                  {link_items}
+                </div>
+              </details>
+            </td>
+          </tr>
+
+          <!-- 底部 -->
+          <tr>
+            <td style="padding:16px 24px 20px;border-top:1px solid #eee;">
+              <p style="margin:0;text-align:center;font-size:10px;color:#8a9aaa;letter-spacing:0.5px;">
+                MediaRadar · 媒体信息订阅 · {generated_time}
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
+
+TOPIC_BATCH_HTML_TEMPLATE = """<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>话题推送 - MediaRadar</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f0f2f5;font-family:Arial,'PingFang SC','Microsoft YaHei',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f0f2f5;padding:16px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" border="0" style="background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+
+          <!-- 顶部标题 -->
+          <tr>
+            <td style="background:#0d1b2a;padding:20px 24px;">
+              <h1 style="margin:0;font-size:18px;color:#fff;font-weight:700;">MediaRadar 话题推送</h1>
+              <p style="margin:6px 0 0;font-size:12px;color:rgba(255,255,255,0.6);">
+                共 {topic_count} 个话题更新 · {generated_time}
+              </p>
+            </td>
+          </tr>
+
+          <!-- 话题列表 -->
+          {topic_items}
+
+          <!-- 底部 -->
+          <tr>
+            <td style="padding:16px 24px 20px;border-top:1px solid #eee;">
+              <p style="margin:0;text-align:center;font-size:10px;color:#8a9aaa;letter-spacing:0.5px;">
+                MediaRadar · 媒体信息订阅
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
+
+TOPIC_BATCH_ITEM_TEMPLATE = """
+          <tr>
+            <td style="padding:16px 24px;border-bottom:1px solid #eee;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td>
+                    <h3 style="margin:0;font-size:15px;color:#0d1b2a;font-weight:600;">{topic_name}</h3>
+                  </td>
+                  <td align="right">
+                    <span style="display:inline-block;padding:2px 8px;background:{risk_bg};color:#fff;
+                                 border-radius:3px;font-size:10px;font-weight:600;">{risk_label}</span>
+                  </td>
+                </tr>
+              </table>
+              <div style="margin-top:8px;font-size:11px;color:#7f8c8d;">
+                {post_count} 条讨论 · {platform_count} 个平台 · 热度 {heat_pct}
+              </div>
+              <p style="margin:6px 0 0;font-size:13px;color:#555;line-height:1.6;">{summary}</p>
+            </td>
+          </tr>"""
+
+
+def generate_topic_push_html(topic_data: dict) -> str:
+    """
+    生成话题级推送 HTML（单话题）。
+
+    topic_data 字段:
+        topic_name, summary, core_issue, post_count, platforms,
+        heat_pct, risk_level, risk_class, urls
+    """
+    risk_class = topic_data.get("risk_class", "neutral")
+    risk_level = topic_data.get("risk_level", 0)
+    risk_meta = {
+        "critical": ("#c0392b", "极高风险"),
+        "high": ("#c0392b", "高风险"),
+        "medium": ("#2471a3", "中风险"),
+        "low": ("#1e8449", "低风险"),
+        "neutral": ("#566573", "动态"),
+    }
+    risk_bg, risk_label = risk_meta.get(risk_class, ("#566573", "动态"))
+
+    platforms = topic_data.get("platforms", [])
+    platform_count = len(platforms)
+    post_count = topic_data.get("post_count", 1)
+    heat_pct = topic_data.get("heat_pct", 0)
+    heat_color = "#c0392b" if heat_pct > 0 else "#1e8449"
+
+    urls = topic_data.get("urls", [])
+    link_items = _build_link_items(urls)
+
+    return TOPIC_PUSH_HTML_TEMPLATE.format(
+        topic_name=topic_data.get("topic_name", "未命名话题"),
+        risk_bg=risk_bg,
+        risk_label=risk_label,
+        post_count=post_count,
+        platform_count=platform_count,
+        heat_pct=f'{"▲" if heat_pct >= 0 else "▼"} {abs(heat_pct)}%',
+        heat_color=heat_color,
+        summary=topic_data.get("summary", ""),
+        core_issue=topic_data.get("core_issue", ""),
+        link_count=len(urls),
+        link_items=link_items,
+        generated_time=datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+    )
+
+
+def generate_topic_batch_html(topics: list[dict]) -> str:
+    """
+    生成话题级批量推送 HTML（多条话题合并推送）。
+
+    topics: list of topic_data dicts（与 generate_topic_push_html 同结构）
+    """
+    topic_items = "".join(
+        TOPIC_BATCH_ITEM_TEMPLATE.format(
+            topic_name=t.get("topic_name", "未命名"),
+            risk_bg={"critical": "#c0392b", "high": "#c0392b", "medium": "#2471a3",
+                     "low": "#1e8449"}.get(t.get("risk_class", "neutral"), "#566573"),
+            risk_label={"critical": "极高风险", "high": "高风险", "medium": "中风险",
+                        "low": "低风险", "neutral": "动态"}.get(t.get("risk_class", "neutral"), "动态"),
+            post_count=t.get("post_count", 1),
+            platform_count=len(t.get("platforms", [])),
+            heat_pct=f'{"▲" if t.get("heat_pct", 0) >= 0 else "▼"} {abs(t.get("heat_pct", 0))}%',
+            summary=(t.get("summary") or "")[:200],
+        )
+        for t in topics
+    )
+
+    return TOPIC_BATCH_HTML_TEMPLATE.format(
+        topic_count=len(topics),
+        topic_items=topic_items,
+        generated_time=datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+    )
 
 
 # ============================================================

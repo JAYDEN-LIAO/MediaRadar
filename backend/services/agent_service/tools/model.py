@@ -1,5 +1,5 @@
 """
-E 组 模型管理（3 个工具，AGENT_REDESIGN.md §4.E 落 P1 版本）
+E 组 模型管理（3 个工具，列出/切换/测试模型配置）
 
 E1. list_models：列出 6 个 Agent 角色的当前模型配置（含系统默认回退标记）
 E2. switch_model：切换某角色到指定 provider+model（api_key 可不填，复用旧值）

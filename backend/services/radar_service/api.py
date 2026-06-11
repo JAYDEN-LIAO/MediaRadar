@@ -1,9 +1,9 @@
 # backend/services/radar_service/api.py
-from fastapi import APIRouter, BackgroundTasks, Security, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from fastapi.responses import Response
 from pydantic import BaseModel
 from core.logger import get_logger
-from core.auth import verify_api_key
-from core.auth_deps import get_current_user, get_optional_user
+from core.auth_deps import get_current_user, get_current_user_or_api_key, get_optional_user, require_admin
 
 logger = get_logger("radar.api")
 from .db_manager import (
@@ -12,7 +12,7 @@ from .db_manager import (
     mark_topic_processed,
 )
 from core.database import get_db_connection
-from .main import api_start_task, radar_status, reload_config
+from .main import api_start_task, radar_status, get_radar_status, reload_config
 from typing import List, Optional, Dict, Any
 
 router = APIRouter()
@@ -27,11 +27,12 @@ def mcp_health_check():
     MCP Server 健康检查端点
     用于外部服务（如 MCP Server）探测 radar_service 是否可用
     """
+    from .main import radar_status as _global_status
     return {
         "status": "ok",
         "service": "radar_service",
-        "radar_status": radar_status.status_text,
-        "is_running": radar_status.is_running
+        "radar_status": _global_status.status_text,
+        "is_running": _global_status.is_running
     }
 
 
@@ -40,9 +41,9 @@ def mcp_health_check():
 # ============================================================
 
 @router.get("/api/circuit/states")
-def get_circuit_states():
+def get_circuit_states(current_user: dict = Depends(get_current_user)):
     """
-    返回所有熔断器当前状态（修复 #3.1）
+    返回所有熔断器当前状态（v2.2：需认证）
     """
     from .llm_gateway import get_all_breakers
     breakers = get_all_breakers()
@@ -55,9 +56,9 @@ def get_circuit_states():
     }
     return {"code": 200, "msg": "OK", "data": {"breakers": breaker_dicts, "summary": summary}}
 
-@router.post("/api/start_task", dependencies=[Security(verify_api_key)])
-def start_task(background_tasks: BackgroundTasks, current_user: dict = Depends(get_current_user)):
-    """WS4.6：扫描结果归属到当前用户"""
+@router.post("/api/start_task")
+def start_task(background_tasks: BackgroundTasks, current_user: dict = Depends(get_current_user_or_api_key)):
+    """WS4.6：扫描结果归属到当前用户（接受 JWT 或 API Key）"""
     success, msg = api_start_task(background_tasks, owner_id=current_user["id"])
     if success:
         return {"code": 200, "msg": msg}
@@ -70,36 +71,40 @@ def start_task(background_tasks: BackgroundTasks, current_user: dict = Depends(g
 # ============================================================
 
 @router.post("/api/scheduler/start")
-def start_scheduler():
-    """启动定时调度器"""
+def start_scheduler(current_user: dict = Depends(get_current_user)):
+    """启动定时调度器（v2.2：需认证）"""
     from .scheduler import scheduler_start
     success, msg = scheduler_start()
     return {"code": 200, "msg": msg} if success else {"code": 400, "msg": msg}
 
 
 @router.post("/api/scheduler/stop")
-def stop_scheduler():
-    """停止定时调度器"""
+def stop_scheduler(current_user: dict = Depends(get_current_user)):
+    """停止定时调度器（v2.2：需认证）"""
     from .scheduler import scheduler_stop
     success, msg = scheduler_stop()
     return {"code": 200, "msg": msg}
 
 
 @router.get("/api/scheduler/status")
-def get_scheduler_status():
-    """查询调度器状态"""
+def get_scheduler_status(current_user: dict = Depends(get_current_user)):
+    """查询调度器状态（v2.2：需认证）"""
     from .scheduler import scheduler_status
     status = scheduler_status()
     return {"code": 200, "data": status}
 
-@router.get("/api/radar_status", dependencies=[Security(verify_api_key)])
-def get_radar_status():
-    return {"code": 200, "data": radar_status.get_status_dict()}
+@router.get("/api/radar_status")
+def api_get_radar_status(current_user: dict = Depends(get_current_user_or_api_key)):
+    """v2.2：支持 per-user 雷达状态（接受 JWT 或 API Key）"""
+    from .main import get_radar_status as _get_radar_status
+    owner_id = current_user["id"] if current_user else None
+    status = _get_radar_status(owner_id)
+    return {"code": 200, "data": status.get_status_dict()}
 
 @router.get("/api/yq_list")
-def get_yq_list(current_user: dict = Depends(get_optional_user)):
-    """WS4.6：按 owner 过滤（无 token 视为 admin 看全部）"""
-    is_admin = current_user.get("role") == "admin" if current_user else True
+def get_yq_list(current_user: dict = Depends(get_current_user)):
+    """v2.2：按 owner 过滤（需登录）"""
+    is_admin = current_user.get("role") == "admin"
     owner_id = current_user["id"] if current_user and not is_admin else None
     db_results = get_latest_results(limit=50, owner_id=owner_id, is_admin=is_admin)
     
@@ -161,7 +166,7 @@ class SettingsRequest(BaseModel):
     start_time: str = "08:00"
 
 @router.get("/api/settings")
-def api_get_settings():
+def api_get_settings(current_user: dict = Depends(get_current_user)):
     data = get_system_settings()
     # 兼容旧数据：keywords 可能是 [{"text":"...", "level":"..."}]，转成 ["..."]
     if data and "keywords" in data and isinstance(data["keywords"], list):
@@ -177,7 +182,7 @@ def api_get_settings():
     return {"code": 200, "data": data}
 
 @router.post("/api/settings")
-def api_save_settings(req: SettingsRequest):
+def api_save_settings(req: SettingsRequest, current_user: dict = Depends(get_current_user)):
     save_system_settings(req.model_dump())
     reload_config()
 
@@ -202,14 +207,14 @@ def get_topic_list(
     sentiment: str = None,
     is_processed: int = None,
     limit: int = 50,
-    current_user: dict = Depends(get_optional_user),
+    current_user: dict = Depends(get_current_user),
 ):
     """
     获取话题聚合列表，替换原来的 /api/yq_list 单帖列表。
 
     WS4.6：无 token 视为 admin 看全部数据。
     """
-    is_admin = current_user.get("role") == "admin" if current_user else True
+    is_admin = current_user.get("role") == "admin"
     owner_id = current_user["id"] if current_user and not is_admin else None
     rows = get_topic_summary_list(
         keyword=keyword,
@@ -274,12 +279,12 @@ def get_topic_list(
 
 
 @router.get("/api/topic/{topic_id}")
-def get_topic_detail(topic_id: str, current_user: dict = Depends(get_optional_user)):
+def get_topic_detail(topic_id: str, current_user: dict = Depends(get_current_user)):
     """
     获取话题详情（含关联帖子列表 + 演化时间线）。
     WS4.6：无 token 视为 admin 看全部
     """
-    is_admin = current_user.get("role") == "admin" if current_user else True
+    is_admin = current_user.get("role") == "admin"
     owner_id = current_user["id"] if current_user and not is_admin else None
     # 话题聚合信息
     summary = get_topic_summary_by_id(topic_id, owner_id=owner_id, is_admin=is_admin)
@@ -387,7 +392,7 @@ def api_mark_topic_processed(topic_id: str, current_user: dict = Depends(get_cur
     summary = get_topic_summary_by_id(topic_id, owner_id=current_user["id"], is_admin=is_admin)
     if not summary:
         return {"code": 404, "msg": "话题不存在或无权访问"}
-    success = mark_topic_processed(topic_id)
+    success = mark_topic_processed(topic_id, owner_id=current_user["id"])
     if success:
         return {"code": 200, "msg": "话题已标记处理"}
     return {"code": 404, "msg": "话题不存在"}
@@ -398,7 +403,7 @@ def api_mark_topic_processed(topic_id: str, current_user: dict = Depends(get_cur
 # ============================================================
 
 @router.get("/api/topic_evolution")
-def get_topic_evolution(keyword: str, topic_id: str = ""):
+def get_topic_evolution(keyword: str, topic_id: str = "", current_user: dict = Depends(get_current_user)):
     """
     前端详情页调用此接口，获取指定话题的完整演化时间线。
 
@@ -433,7 +438,7 @@ def get_topic_evolution(keyword: str, topic_id: str = ""):
 
 
 @router.post("/api/topic_evolution/migrate_clusters")
-def migrate_topic_clusters(limit: int = 1000):
+def migrate_topic_clusters(limit: int = 1000, current_user: dict = Depends(get_current_user)):
     """
     将 ai_results 表中的历史数据，按 keyword 聚合后，
     批量生成 cluster_summary 并写入 topic_evolution 集合。
@@ -457,7 +462,7 @@ def migrate_topic_clusters(limit: int = 1000):
 
 
 @router.get("/api/topic_stats")
-def get_topic_stats(keyword: str = ""):
+def get_topic_stats(keyword: str = "", current_user: dict = Depends(get_current_user)):
     """
     获取话题演化库的统计信息（可选，用于管理后台）。
 
@@ -493,7 +498,7 @@ def get_topic_stats(keyword: str = ""):
 # ============================================================
 
 @router.get("/api/volume_stats")
-def get_volume_stats(keyword: str = "", current_user: dict = Depends(get_optional_user)):
+def get_volume_stats(keyword: str = "", current_user: dict = Depends(get_current_user)):
     """
     获取近7日每日声量数据（用于首页趋势图）。
     WS4.6：无 token 视为 admin 看全部
@@ -515,7 +520,7 @@ def get_volume_stats(keyword: str = "", current_user: dict = Depends(get_optiona
 
     today = datetime.date.today()
     week_ago = today - datetime.timedelta(days=6)
-    is_admin = current_user.get("role") == "admin" if current_user else True
+    is_admin = current_user.get("role") == "admin"
     owner_id = current_user["id"] if current_user and not is_admin else None
 
     with get_db_connection() as conn:
@@ -610,7 +615,7 @@ def get_volume_stats(keyword: str = "", current_user: dict = Depends(get_optiona
 
 
 @router.get("/api/today_summary")
-def get_today_summary(current_user: dict = Depends(get_optional_user)):
+def get_today_summary(current_user: dict = Depends(get_current_user)):
     """
     获取今日舆情 AI 摘要。
     WS4.6：无 token 视为 admin 看全部
@@ -629,7 +634,7 @@ def get_today_summary(current_user: dict = Depends(get_optional_user)):
     import sqlite3
 
     today = datetime.date.today().isoformat()
-    is_admin = current_user.get("role") == "admin" if current_user else True
+    is_admin = current_user.get("role") == "admin"
     user_id = current_user["id"] if current_user else None
 
     # 风险等级分布（从 topic_summary 统计）
@@ -757,6 +762,13 @@ def get_today_summary(current_user: dict = Depends(get_optional_user)):
         except Exception:
             pass
 
+        # v2.2 被压住的推送数量
+        try:
+            from .db_manager import get_today_suppressed_count
+            suppressed_count = get_today_suppressed_count(owner_id=user_id, is_admin=is_admin)
+        except Exception:
+            suppressed_count = 0
+
         return {
             "code": 200,
             "data": {
@@ -767,6 +779,7 @@ def get_today_summary(current_user: dict = Depends(get_optional_user)):
                 "hottest_topic": hottest_topic,
                 "escalating_topics": escalating,
                 "risk_distribution": risk_distribution,
+                "suppressed_count": suppressed_count,
             }
         }
 
@@ -856,7 +869,7 @@ def save_push_config(channel: str, req: PushConfigUpdateRequest, current_user: d
         cfg["webhook_url"] = req.webhook_url
 
     _db_save(current_user["id"], channel, cfg)
-    reload_registry()
+    reload_registry(owner_id=current_user["id"])
     return {"code": 200, "msg": f"{channel} 配置已保存"}
 
 
@@ -905,83 +918,89 @@ LLM_AGENTS = {
 
 
 @router.get("/api/llm/configs")
-def get_llm_configs():
-    """获取所有 LLM Agent 的当前配置（不含 api_key 明文）"""
-    from core.config import settings, get_effective_llm_config
+def get_llm_configs(current_user: dict = Depends(get_current_user)):
+    """获取当前用户所有 LLM Agent 的配置（v2.2 per-user）。
+    user 未配置的角色回退到系统默认（admin 在 .env / settings 设的 DEFAULT_*）。"""
+    from core.model_config_db import get_model_config, get_effective_config
+
+    owner_id = current_user["id"]
     result = {}
     for agent, info in LLM_AGENTS.items():
-        prefix = agent.upper()
-        api_key = getattr(settings, f"{prefix}_API_KEY", "") or ""
-        base_url = getattr(settings, f"{prefix}_BASE_URL", "") or ""
-        model = getattr(settings, f"{prefix}_MODEL", "") or ""
+        role_upper = agent.upper()
+        user_cfg = get_model_config(owner_id, role_upper) or {}
+        eff = get_effective_config(owner_id, role_upper)
 
-        if agent == "default":
-            effective_base_url = base_url
-            effective_model = model
-            uses_default = False
-        else:
-            eff = get_effective_llm_config(agent)
-            effective_base_url = eff["base_url"]
-            effective_model = eff["model"]
-            uses_default = not base_url or not model
+        # 仅当前用户的 api_key 才回显（脱敏成 ****xxxx）
+        user_api_key = user_cfg.get("api_key", "") or ""
+        api_key_masked = (
+            "****" + user_api_key[-4:] if user_api_key and len(user_api_key) >= 4
+            else ("***" if user_api_key else "")
+        )
 
         result[agent] = {
             "label": info["label"],
             "role": info["role"],
             "default_model": info["default_model"],
-            "api_key_masked": api_key[:4] + "****" if api_key else "",
-            "has_key": bool(api_key),
-            "base_url": base_url,
-            "model": model,
-            "effective_base_url": effective_base_url,
-            "effective_model": effective_model,
-            "uses_default": uses_default,
+            "api_key_masked": api_key_masked,
+            "has_key": bool(user_api_key),
+            "base_url": user_cfg.get("base_url", ""),
+            "model": user_cfg.get("model", ""),
+            "effective_base_url": eff.get("base_url", ""),
+            "effective_model": eff.get("model", ""),
+            "uses_default": not bool(user_cfg.get("model")),
         }
     return {"code": 200, "data": result}
 
 
 @router.post("/api/llm/config/{agent}")
-def update_llm_config(agent: str, req: LLMConfigUpdateRequest):
-    """更新指定 Agent 的 LLM 配置"""
-    from core.config import update_llm_config as do_update
+def update_llm_config(agent: str, req: LLMConfigUpdateRequest, current_user: dict = Depends(get_current_user)):
+    """更新当前用户指定 Agent 的 LLM 配置（v2.2 per-user，不影响他人）。"""
+    from core.model_config_db import upsert_model_config
 
     if agent not in LLM_AGENTS:
         return {"code": 400, "msg": f"无效 Agent：{agent}，支持: {list(LLM_AGENTS.keys())}"}
 
-    config = {}
-    if req.api_key:
-        config["api_key"] = req.api_key
+    role_upper = agent.upper()
+    # 仅传入非空字段；api_key=None 让 upsert 保留旧值
+    kwargs = {}
     if req.base_url:
-        config["base_url"] = req.base_url
+        kwargs["base_url"] = req.base_url
     if req.model:
-        config["model"] = req.model
+        kwargs["model"] = req.model
+    # api_key 显式为空串时表示清空；非空时更新；不传留旧
+    if req.api_key:
+        kwargs["api_key"] = req.api_key
 
-    if not config:
+    if not kwargs:
         return {"code": 400, "msg": "没有要更新的字段"}
 
-    ok = do_update(agent, config)
-    if ok:
-        return {"code": 200, "msg": f"{LLM_AGENTS[agent]['label']} 配置已保存"}
-    else:
+    try:
+        upsert_model_config(
+            owner_id=current_user["id"],
+            agent_role=role_upper,
+            **kwargs,
+        )
+    except ValueError as e:
+        return {"code": 400, "msg": str(e)}
+    except Exception as e:
+        logger.error(f"[LLMConfig] upsert failed: {e}")
         return {"code": 500, "msg": "更新失败"}
+
+    return {"code": 200, "msg": f"{LLM_AGENTS[agent]['label']} 配置已保存"}
 
 
 @router.post("/api/llm/test/{agent}")
-def test_llm_config(agent: str):
-    """测试指定 Agent 的 API 连通性（default agent 测试默认配置，其他 Agent 使用有效配置）"""
-    from core.config import settings, get_effective_llm_config
+def test_llm_config(agent: str, current_user: dict = Depends(get_current_user)):
+    """测试当前用户指定 Agent 的 API 连通性（v2.2 per-user）。"""
+    from core.model_config_db import get_effective_config
 
-    if agent == "default":
-        api_key = getattr(settings, "DEFAULT_API_KEY", "") or ""
-        base_url = getattr(settings, "DEFAULT_BASE_URL", "") or ""
-        model = getattr(settings, "DEFAULT_MODEL", "") or ""
-    elif agent in LLM_AGENTS:
-        eff = get_effective_llm_config(agent)
-        api_key = getattr(settings, f"{agent.upper()}_API_KEY", "") or ""
-        base_url = eff["base_url"]
-        model = eff["model"]
-    else:
+    if agent not in LLM_AGENTS:
         return {"code": 400, "msg": f"无效 Agent：{agent}"}
+
+    eff = get_effective_config(current_user["id"], agent.upper())
+    api_key = eff.get("api_key") or ""
+    base_url = eff.get("base_url") or ""
+    model = eff.get("model") or ""
 
     if not api_key or not base_url:
         return {"code": 400, "msg": "API Key 或 Base URL 未配置"}
@@ -1006,3 +1025,51 @@ def test_llm_config(agent: str):
             return {"code": 500, "msg": f"接口返回错误: {resp.status_code} - {resp.text[:100]}"}
     except Exception as e:
         return {"code": 500, "msg": f"连接失败: {str(e)}"}
+
+
+# ============================================================
+# RSS 通道端点（v2.2）
+# ============================================================
+
+@router.get("/rss/{token}.xml")
+def rss_feed(token: str, request: Request):
+    """
+    RSS 2.0 Feed 端点。
+
+    根据 token 查找对应用户的推送配置，
+    生成该用户订阅话题的 RSS XML。
+    """
+    from .db_manager import _ensure_push_settings_table
+    from core.database import get_db_connection
+    import sqlite3
+
+    # 查找 token 对应的 owner_id
+    _ensure_push_settings_table()
+    owner_id = None
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT owner_id FROM push_settings WHERE channel = 'rss' AND config_json LIKE ?",
+            (f'%{token}%',),
+        )
+        row = cursor.fetchone()
+        if row:
+            owner_id = row[0]
+
+    if not owner_id:
+        logger.warning(f"[RSS] 无效 token: {token[:10]}...")
+        return Response(
+            content='<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>无效订阅</title><description>RSS 链接无效或已过期，请重新从 MediaRadar 设置中获取。</description></channel></rss>',
+            media_type="application/rss+xml; charset=utf-8",
+        )
+
+    from .notifier.channel_rss import generate_rss_xml
+
+    base_url = str(request.base_url).rstrip("/")
+    xml_content = generate_rss_xml(owner_id, token, base_url=base_url)
+
+    return Response(
+        content=xml_content,
+        media_type="application/rss+xml; charset=utf-8",
+        headers={"Cache-Control": "no-cache"},
+    )

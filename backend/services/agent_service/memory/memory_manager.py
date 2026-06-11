@@ -28,15 +28,16 @@ class AgentMemoryManager:
         key, url, _ = get_agent_config()
         return OpenAI(api_key=key, base_url=url)
 
-    def build_working_memory(self, session_id: str) -> str:
+    def build_working_memory(self, session_id: str, owner_id: str = "") -> str:
         """
         对话开始时调用：检索长期记忆，构建【用户记忆】段落。
         修复 #4.2：>800 字符时降级（只保留 entity+fact 两段）
+        v2.2 P0#2：owner_id 必传，store 内部按 (session_id, owner_id) 隔离检索
         """
         parts = []
 
         # 检索高频实体
-        entities = self.store.get_frequent_entities(session_id, min_count=2)
+        entities = self.store.get_frequent_entities(session_id, owner_id, min_count=2)
         if entities:
             entity_lines = []
             for e in entities:
@@ -49,13 +50,13 @@ class AgentMemoryManager:
             parts.append("【用户高频关注实体】\n" + "\n".join(entity_lines))
 
         # 检索事实记忆
-        facts = self.store.get_valid_facts(session_id)
+        facts = self.store.get_valid_facts(session_id, owner_id)
         if facts:
             fact_lines = [f"- {f['entity']}: {f['content']}" for f in facts[:5]]
             parts.append("【已确认事实】\n" + "\n".join(fact_lines))
 
         # 检索行为模式
-        patterns = self.store.get_recent_patterns(session_id, days=7)
+        patterns = self.store.get_recent_patterns(session_id, owner_id, days=7)
         if patterns:
             pattern_lines = [f"- {p['pattern_type']}: {p['pattern_value']}" for p in patterns]
             parts.append("【用户偏好】\n" + "\n".join(pattern_lines))
@@ -81,29 +82,25 @@ class AgentMemoryManager:
         self,
         session_id: str,
         messages: List[Dict[str, str]],
-        outcome: str = None
+        outcome: str = None,
+        owner_id: str = "",
     ):
         """
-        对话结束时调用：提取实体、写入 fact_memory、更新 pattern_memory、生成摘要。
-        messages: [{"role": "user"/"assistant", "content": "..."}]
+        对话结束时调用（v2.2 per-user）：提取实体、写入 fact_memory、更新 pattern_memory、生成摘要。
+        v2.2 P0#2：owner_id 透传到所有 store 写入路径，避免多用户数据串读。
         """
-        # 1. LLM 生成摘要
         summary = self._summarize_conversation(messages)
-
-        # 2. 提取实体（jieba.posseg 取代硬编码白名单 — 修复 #4.1）
         entities = self._extract_entities(summary)
+        self.store.save_summary(session_id, summary, entities, outcome, owner_id)
 
-        # 3. 写入摘要
-        self.store.save_summary(session_id, summary, entities, outcome)
-
-        # 4. 写入实体记忆
+        # 4. 写入实体记忆（v2.2 P0#2：传 owner_id）
         for entity_text, entity_type in entities:
-            self.store.upsert_entity(session_id, entity_text, entity_type)
+            self.store.upsert_entity(session_id, entity_text, entity_type, owner_id=owner_id)
 
-        # 5. 分析并写入行为模式
-        self._analyze_and_write_patterns(session_id, messages)
+        # 5. 分析并写入行为模式（v2.2 P0#2：传 owner_id）
+        self._analyze_and_write_patterns(session_id, messages, owner_id=owner_id)
 
-        logger.info(f"[Memory] 已写入对话 {session_id} 的记忆：{len(entities)} 个实体")
+        logger.info(f"[Memory] 已写入对话 {session_id} 的记忆：{len(entities)} 个实体 (owner={owner_id[:8] if owner_id else 'legacy'})")
 
     def _summarize_conversation(self, messages: List[Dict[str, str]]) -> str:
         """LLM 生成 50 字对话摘要"""
@@ -177,8 +174,13 @@ class AgentMemoryManager:
 
         return found
 
-    def _analyze_and_write_patterns(self, session_id: str, messages: List[Dict[str, str]]):
-        """分析并写入行为模式"""
+    def _analyze_and_write_patterns(
+        self,
+        session_id: str,
+        messages: List[Dict[str, str]],
+        owner_id: str = ""
+    ):
+        """分析并写入行为模式（v2.2 P0#2：传 owner_id）"""
         user_messages = [m for m in messages if m.get("role") == "user"]
         if not user_messages:
             return
@@ -186,19 +188,19 @@ class AgentMemoryManager:
         # 简单模式识别
         last_msg = user_messages[-1]["content"]
         if len(last_msg) < 20:
-            self.store.upsert_pattern(session_id, "answer_length", "short")
+            self.store.upsert_pattern(session_id, "answer_length", "short", owner_id=owner_id)
         elif len(last_msg) < 100:
-            self.store.upsert_pattern(session_id, "answer_length", "medium")
+            self.store.upsert_pattern(session_id, "answer_length", "medium", owner_id=owner_id)
         else:
-            self.store.upsert_pattern(session_id, "answer_length", "long")
+            self.store.upsert_pattern(session_id, "answer_length", "long", owner_id=owner_id)
 
     def cleanup_expired_memory(self) -> int:
         """包装 store 调用，返回清理条数（修复 #4.3）"""
         return self.store.cleanup_expired_facts()
 
-    def delete_session(self, session_id: str):
-        """删除某次对话记忆"""
-        self.store.delete_session(session_id)
+    def delete_session(self, session_id: str, owner_id: str = "") -> int:
+        """删除某次对话记忆（v2.2 P0#2：传 owner_id 限定删除范围）"""
+        return self.store.delete_session(session_id, owner_id=owner_id)
 
     def get_stats(self) -> Dict[str, int]:
         """获取记忆统计"""

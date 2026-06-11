@@ -149,6 +149,15 @@ def init_radar_db():
         ''')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at DESC)')
 
+        # v2.2: audit_log 加 owner_id 列（幂等迁移，旧记录为空串=系统级事件）
+        try:
+            cursor.execute("ALTER TABLE audit_log ADD COLUMN owner_id TEXT DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass
+        cursor.execute(
+            'CREATE INDEX IF NOT EXISTS idx_audit_log_owner ON audit_log(owner_id)'
+        )
+
         # ── WS4.6：数据隔离 owner_id 迁移（幂等）────────────────────
         # 旧数据 owner_id = NULL（公共/历史数据，所有用户可见）
         for alter_sql in [
@@ -212,7 +221,7 @@ def init_radar_db():
         ''')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_model_config_owner ON model_config(owner_id)')
 
-        # ── v2.2：配额表（per-user）───────────────────────────────
+        # ── v2.2：配额表（per-user，含 v2.2 per-user 扫描配置）────
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS quota (
                 owner_id TEXT PRIMARY KEY,
@@ -221,7 +230,10 @@ def init_radar_db():
                 max_chat_per_month INTEGER DEFAULT 200,
                 used_chat_this_month INTEGER DEFAULT 0,
                 month_reset_at TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                scan_interval_min REAL DEFAULT 60,
+                scan_start_time TEXT DEFAULT '08:00',
+                scan_paused INTEGER DEFAULT 0
             )
         ''')
         # ────────────────────────────────────────────────────────────
@@ -478,17 +490,6 @@ def save_system_settings(config_dict):
         ''', (json.dumps(config_dict),))
 
 
-def update_ai_result_email_html(post_id: str, html: str):
-    """更新 ai_results 的 email_html 字段（LLM 生成后回填）"""
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE ai_results SET email_html = ? WHERE post_id = ?",
-            (html, post_id)
-        )
-        conn.commit()
-
-
 # ============================================================
 # 话题聚合 CRUD（任务1）
 # ============================================================
@@ -538,6 +539,7 @@ def create_or_update_topic_summary(
 
         if exists:
             # 更新：累加 post_count、scan_count，更新 last_seen（不动 owner_id）
+            # WS6-C2 v2.2: WHERE 加 owner_id 过滤，避免跨租户覆盖
             cursor.execute('''
                 UPDATE topic_summary SET
                     cluster_summary = COALESCE(NULLIF(?, ''), cluster_summary),
@@ -559,14 +561,14 @@ def create_or_update_topic_summary(
                     post_count = (
                         SELECT COUNT(*) FROM topic_posts WHERE topic_id = ?
                     )
-                WHERE topic_id = ?
+                WHERE topic_id = ? AND owner_id = ?
             ''', (
                 cluster_summary, risk_level, risk_level, risk_class,
                 alert_recommendation,
                 core_issue, report,
                 platforms_json,
                 risk_level, sentiment,
-                now, topic_id, topic_id
+                now, topic_id, topic_id, owner_id
             ))
             conn.commit()
             return False
@@ -587,8 +589,14 @@ def create_or_update_topic_summary(
             return True
 
 
-def add_post_to_topic(topic_id: str, post_id: str, is_current: int = 1):
-    """将帖子关联到话题"""
+def add_post_to_topic(topic_id: str, post_id: str, is_current: int = 1, owner_id: str = None):
+    """将帖子关联到话题
+
+    WS6-C2 v2.2: 必须传 owner_id，防止跨租户串改 ai_results.topic_id
+    和 topic_summary.post_count。
+    """
+    if not owner_id:
+        raise ValueError("add_post_to_topic 必须传 owner_id（WS6-C2 防越权）")
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute('''
@@ -596,19 +604,17 @@ def add_post_to_topic(topic_id: str, post_id: str, is_current: int = 1):
             VALUES (?, ?, ?)
         ''', (topic_id, post_id, is_current))
 
-        # 更新 ai_results 的 topic_id
         cursor.execute('''
             UPDATE ai_results SET topic_id = ?
-            WHERE post_id = ?
-        ''', (topic_id, post_id))
+            WHERE post_id = ? AND owner_id = ?
+        ''', (topic_id, post_id, owner_id))
 
-        # 更新 topic_summary 的 post_count
         cursor.execute('''
             UPDATE topic_summary SET post_count = (
                 SELECT COUNT(*) FROM topic_posts WHERE topic_id = ?
             )
-            WHERE topic_id = ?
-        ''', (topic_id, topic_id))
+            WHERE topic_id = ? AND owner_id = ?
+        ''', (topic_id, topic_id, owner_id))
         conn.commit()
 
 
@@ -769,13 +775,18 @@ def get_topic_posts(topic_id: str, owner_id: Optional[str] = None, is_admin: boo
     return [dict(r) for r in rows]
 
 
-def mark_topic_processed(topic_id: str) -> bool:
-    """标记话题为已处理"""
+def mark_topic_processed(topic_id: str, owner_id: str = None) -> bool:
+    """标记话题为已处理
+
+    WS6-C2 v2.2: 必须传 owner_id，防止跨租户标记。
+    """
+    if not owner_id:
+        raise ValueError("mark_topic_processed 必须传 owner_id（WS6-C2 防越权）")
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "UPDATE topic_summary SET is_processed = 1 WHERE topic_id = ?",
-            (topic_id,)
+            "UPDATE topic_summary SET is_processed = 1 WHERE topic_id = ? AND owner_id = ?",
+            (topic_id, owner_id)
         )
         conn.commit()
         return cursor.rowcount > 0
@@ -794,8 +805,11 @@ def _ensure_push_settings_table():
         cols = {row[1] for row in cursor.fetchall()}
 
         if cols and "owner_id" not in cols:
-            # 旧表（无 owner_id），按 v2.2 决策"重零开始"，直接 drop
-            logger.warning("[push_settings] 旧表无 owner_id，按 v2.2 决策 drop 后重建")
+            # 旧表（无 owner_id）→ 先备份到 push_settings_backup，再重建
+            logger.warning("[push_settings] 旧表无 owner_id，备份后重建")
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS push_settings_backup AS SELECT * FROM push_settings
+            """)
             cursor.execute("DROP TABLE push_settings")
             cols = set()
 
@@ -884,7 +898,62 @@ def get_all_push_configs(owner_id: Optional[str] = None) -> dict[str, dict]:
 
 
 # ============================================================
-# 审计日志（修复 #7.1）
+# v2.2 suppressed push tracking
+# ============================================================
+
+def record_suppressed_push(
+    owner_id: str,
+    keyword: str,
+    topic_id: str,
+    topic_name: str,
+    reason: str = "agent_decision",
+):
+    """
+    记录 Agent 压住的推送内容（push_mode=important 时 Agent 决定不推）。
+
+    reason:
+      - "agent_decision": Agent 判断为普通讨论，不值得推
+      - "frequency_throttle": 同一话题短时间内多次更新，只推一次
+    """
+    insert_audit_log(
+        action="suppressed_push",
+        detail={
+            "owner_id": owner_id,
+            "topic_name": topic_name,
+            "reason": reason,
+        },
+        keyword=keyword,
+        topic_id=topic_id,
+        level="INFO",
+        owner_id=owner_id,  # v2.2: 写入专列，便于高效过滤
+    )
+
+
+def get_today_suppressed_count(owner_id: Optional[str] = None, is_admin: bool = False) -> int:
+    """获取今日被 Agent 压住的推送数量（v2.2: 使用 owner_id 专列查询）。"""
+    import datetime
+    today = datetime.date.today().isoformat()
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        if is_admin:
+            cursor.execute(
+                "SELECT COUNT(*) as cnt FROM audit_log "
+                "WHERE action = 'suppressed_push' AND DATE(created_at) = ?",
+                (today,),
+            )
+        else:
+            cursor.execute(
+                "SELECT COUNT(*) as cnt FROM audit_log "
+                "WHERE action = 'suppressed_push' AND DATE(created_at) = ? "
+                "AND owner_id = ?",
+                (today, owner_id or ""),
+            )
+        row = cursor.fetchone()
+    return row[0] if row else 0
+
+
+# ============================================================
+# 审计日志
 # ============================================================
 
 def insert_audit_log(
@@ -894,16 +963,24 @@ def insert_audit_log(
     topic_id: str = "",
     risk_level: int = 0,
     level: str = "INFO",
+    owner_id: str = "",
 ) -> int:
-    """插入一条审计日志，返回 rowid。"""
+    """插入一条审计日志，返回 rowid。
+
+    v2.2: owner_id 单列存储（取代 detail.owner_id 的 json_extract 查询）。
+    系统级事件可传空串。
+    """
     init_radar_db()
+    # 兼容旧调用方：若 detail 里塞了 owner_id 而未显式传，则提升到列
+    if not owner_id and isinstance(detail, dict):
+        owner_id = str(detail.get("owner_id") or "")
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             """
             INSERT INTO audit_log
-                (action, keyword, topic_id, risk_level, level, detail, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                (action, keyword, topic_id, risk_level, level, detail, owner_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 action,
@@ -912,6 +989,7 @@ def insert_audit_log(
                 int(risk_level or 0),
                 level,
                 json.dumps(detail or {}, ensure_ascii=False),
+                owner_id,
                 datetime.now().isoformat(),
             ),
         )
@@ -919,33 +997,41 @@ def insert_audit_log(
         return cursor.lastrowid or 0
 
 
-def get_audit_log(limit: int = 50, action: str = None) -> list:
-    """查询审计日志（按时间倒序）。"""
+def get_audit_log(
+    limit: int = 50,
+    action: str = None,
+    owner_id: Optional[str] = None,
+) -> list:
+    """查询审计日志（按时间倒序）。
+
+    v2.2: owner_id 非 None 时仅返回该用户 + 系统级（owner_id 为空）的事件。
+    owner_id=None 视为 admin/全局视角（返回全部）。
+    """
     init_radar_db()
     with get_db_connection() as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
+        params: list = []
+        where_clauses: list[str] = []
         if action:
-            cursor.execute(
-                """
-                SELECT id, action, keyword, topic_id, risk_level, level, detail, created_at
-                FROM audit_log
-                WHERE action = ?
-                ORDER BY created_at DESC
-                LIMIT ?
-                """,
-                (action, int(limit)),
-            )
-        else:
-            cursor.execute(
-                """
-                SELECT id, action, keyword, topic_id, risk_level, level, detail, created_at
-                FROM audit_log
-                ORDER BY created_at DESC
-                LIMIT ?
-                """,
-                (int(limit),),
-            )
+            where_clauses.append("action = ?")
+            params.append(action)
+        if owner_id is not None:
+            # per-user 视角：自己的 + 系统级（owner_id 为空）
+            where_clauses.append("(owner_id = ? OR owner_id = '' OR owner_id IS NULL)")
+            params.append(owner_id)
+        where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+        params.append(int(limit))
+        cursor.execute(
+            f"""
+            SELECT id, action, keyword, topic_id, risk_level, level, detail, owner_id, created_at
+            FROM audit_log
+            {where_sql}
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            tuple(params),
+        )
         rows = [dict(r) for r in cursor.fetchall()]
     for r in rows:
         try:

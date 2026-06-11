@@ -197,26 +197,77 @@ def api_get_quota(current_user: dict = Depends(get_current_user)):
     return {"code": 200, "data": q}
 
 
-# ==================== Admin：用户管理 ====================
+# ==================== Admin：总览统计 ====================
 
-@router.get("/api/admin/users")
-def api_admin_list_users(
-    page: int = 1,
-    page_size: int = 20,
-    keyword: str = "",
-    _: dict = Depends(require_admin),
-):
-    """admin：分页列出所有用户"""
-    result = list_users(page=page, page_size=page_size, keyword=keyword)
+@router.get("/api/admin/stats")
+def api_admin_stats(_: dict = Depends(require_admin)):
+    """admin 总览统计：用户数、订阅数、活跃话题数、调度器状态"""
+    import datetime
+    from core.database import get_db_connection
+
+    result = {
+        "total_users": 0,
+        "total_subscriptions": 0,
+        "active_subscriptions": 0,
+        "today_topics": 0,
+        "scheduler_active": False,
+    }
+
+    # 用户数
+    try:
+        users = list_users(page=1, page_size=1)
+        result["total_users"] = users.get("total", 0)
+    except Exception as e:
+        logger.warning(f"[Admin Stats] 查询用户数失败: {e}")
+
+    # 订阅数
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) as cnt FROM subscription")
+            row = cursor.fetchone()
+            result["total_subscriptions"] = row[0] if row else 0
+            cursor.execute("SELECT COUNT(*) as cnt FROM subscription WHERE is_active = 1")
+            row = cursor.fetchone()
+            result["active_subscriptions"] = row[0] if row else 0
+    except Exception as e:
+        logger.warning(f"[Admin Stats] 查询订阅数失败: {e}")
+
+    # 今日话题
+    try:
+        today = datetime.date.today().isoformat()
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT COUNT(*) as cnt FROM topic_summary WHERE DATE(last_seen) >= ?",
+                (today,),
+            )
+            row = cursor.fetchone()
+            result["today_topics"] = row[0] if row else 0
+    except Exception as e:
+        logger.warning(f"[Admin Stats] 查询今日话题失败: {e}")
+
+    # 调度器状态
+    try:
+        from services.radar_service.scheduler import scheduler_status
+        s = scheduler_status()
+        result["scheduler_active"] = s.get("active", False)
+    except Exception:
+        pass
+
     return {"code": 200, "data": result}
 
+
+# ==================== Admin：用户管理 ====================
+# v2.2: /api/admin/users 列表端点统一由 auth_service/api.py 提供（含 password_hash strip）
+# 这里仅保留 user-specific 详情/配额接口
 
 @router.get("/api/admin/users/{user_id}")
 def api_admin_get_user(user_id: str, _: dict = Depends(require_admin)):
     user = get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail={"code": 404, "msg": "用户不存在", "data": None})
-    # 隐藏 password_hash
+    # 隐藏 password_hash（auth_db.get_user_by_id 已 strip，此处兜底）
     user.pop("password_hash", None)
     return {"code": 200, "data": user}
 

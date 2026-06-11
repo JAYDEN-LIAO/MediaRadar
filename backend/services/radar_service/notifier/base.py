@@ -1,6 +1,5 @@
 # backend/services/radar_service/notifier/base.py
 from abc import ABC, abstractmethod
-from typing import Optional
 from core.logger import get_logger
 from .models import AlertPayload, BatchAlertPayload, PushChannel
 

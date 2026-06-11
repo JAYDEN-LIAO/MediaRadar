@@ -575,10 +575,16 @@ class PipelineConfig:
     # 并发限制：Kimi 组织级别 max org concurrency=3，
     # 为保险起见设为 2（留一个余量给其他可能并发的请求）
     concurrent_limit: int = 2
-    screener_concurrency: int = 10  # 新增
-    vision_concurrency: int = 5    # 新增
+    screener_concurrency: int = 10
+    vision_concurrency: int = 5
     # WS4.6：数据归属（None = 公共/历史）
     owner_id: Optional[str] = None
+    # v2.2 Pipeline mode
+    mode: str = "trending"     # full / trending / fan_track / quick_search
+    persist: bool = True       # quick_search 强制 False
+    max_per_platform: int = 0  # 0 = 不限，仅 quick_search 生效
+    # v2.2 P1#29：推送模式（every=全部推，important=仅重要>=4级，silent=不推）
+    push_mode: str = "every"
 
 
 class RadarPipeline:
@@ -679,23 +685,41 @@ class RadarPipeline:
             return []
 
     async def _run_inner(self, posts: List[dict], background_tasks: list[asyncio.Task]) -> List[PipelineResult]:
-        """Pipeline 内部实现，不含超时控制（由 run() 统一包装）。"""
-        # Stage 1: Screener（asyncio 并发初筛）
+        """Pipeline 内部实现，不含超时控制（由 run() 统一包装）。
+
+        v2.2 mode 分支：
+          - quick_search：Screener → time-sorted, 限量, 不分析, 不落库
+          - fan_track：    Screener → time-sorted, 全量, 不分析, 不落库
+          - trending：     Screener → Vision(仅full) → Cluster → heat-sorted, 不分析, 不预警
+          - full：         完整链路含 LangGraph 分析 + 预警
+        """
+        # Stage 1: Screener（所有 mode 都走）
         screener_result = await self.screener.run(posts)
         if not screener_result.passed and not screener_result.needs_vision:
             logger.info("[Pipeline] Screener 阶段无相关帖子，全量过滤")
             return []
 
-        # Stage 2: Vision（条件触发，异步调用）
-        vision_passed = await self.vision.run(screener_result.needs_vision)
+        # ── quick_search：Screener 后直接返回时间排序结果 ──
+        if self.config.mode == "quick_search":
+            return self._to_search_results(screener_result.passed)
+
+        # ── fan_track：Screener 后直接返回时间排序（全量） ──
+        if self.config.mode == "fan_track":
+            return self._sort_by_time(screener_result.passed)
+
+        # Stage 2: Vision（仅 full mode 需要）
+        if self.config.mode == "full":
+            vision_passed = await self.vision.run(screener_result.needs_vision)
+        else:
+            vision_passed = []
 
         # 合并：纯文本通过 + 视觉二次通过
         final_screened = screener_result.passed + vision_passed
         if not final_screened:
-            logger.info("[Pipeline] Vision 阶段后无相关帖子，全量过滤")
+            logger.info("[Pipeline] 筛选后无相关帖子，全量过滤")
             return []
 
-        # Stage 3: Cluster
+        # Stage 3: Cluster（full / trending 都需要）
         clusters = self.cluster.run(final_screened)
 
         # 为每个 Cluster 注入 sensitivity（从 keyword_levels 查找）
@@ -706,7 +730,13 @@ class RadarPipeline:
             logger.info("[Pipeline] Cluster 阶段无有效话题")
             return []
 
-        # Stage 4: 并行分析（asyncio + Semaphore 限流，避免触发 Kimi 并发限制）
+        # ── trending：聚类后按热度排序，不分析不预警 ──
+        if self.config.mode == "trending":
+            return self._sort_by_heat(clusters)
+
+        # ── 以下仅 full mode ─────────────────────────
+
+        # Stage 4: 并行分析（asyncio + Semaphore 限流）
         tasks = [self._run_with_semaphore(c) for c in clusters]
         analysis_outputs = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -724,7 +754,17 @@ class RadarPipeline:
             cluster_results.append((cluster, result))
 
             # 高危预警（收集到 alerts_to_send，批量发送）
-            if result["status"] == "alert" and self.config.alert_negative:
+            # v2.2 P1#29：根据 push_mode 决定是否推送
+            #   - every: 全部推
+            #   - important: 仅 risk_level >= 4（高/严重）
+            #   - silent: 不推（仅供记录）
+            _push_mode = self.config.push_mode
+            _is_alert = result["status"] == "alert" and self.config.alert_negative
+            if _push_mode == "silent":
+                _is_alert = False
+            elif _push_mode == "important" and result.get("risk_level", 0) < 4:
+                _is_alert = False
+            if _is_alert:
                 from .notifier.models import AlertPayload
                 urls = [p.get("url", "") for p in cluster.posts if p.get("url")]
                 rl = result["risk_level"]
@@ -784,15 +824,111 @@ class RadarPipeline:
             try:
                 from .notifier import send_batch_alert
                 keyword = self.config.keywords[0] if self.config.keywords else "监控关键词"
-                send_batch_alert(
-                    keyword=keyword,
-                    platform=self.config.platform,
-                    alerts=alerts_to_send,
-                )
-                logger.info(f"[Pipeline] 批量预警发送完成，共 {len(alerts_to_send)} 条")
+                if not self.config.owner_id:
+                    logger.warning(
+                        "[Pipeline] 缺少 owner_id，跳过批量预警发送（避免跨用户泄漏）"
+                    )
+                else:
+                    send_batch_alert(
+                        owner_id=self.config.owner_id,
+                        keyword=keyword,
+                        platform=self.config.platform,
+                        alerts=alerts_to_send,
+                    )
+                    logger.info(f"[Pipeline] 批量预警发送完成，共 {len(alerts_to_send)} 条")
             except Exception as e:
                 logger.error(f"[Pipeline] 批量预警发送失败: {e}")
         # ─────────────────────────────────────────────────
 
         logger.info(f"[Pipeline] 完成，共产出 {len(final_results)} 条结果")
         return final_results
+
+    # ============================================================
+    # Mode helpers
+    # ============================================================
+
+    def _sort_by_time(self, screened: List[ScreenedPost]) -> List[PipelineResult]:
+        """fan_track：按时间排序，无分析，不落库。"""
+        sorted_posts = sorted(
+            screened,
+            key=lambda sp: sp.post.get("publish_time", ""),
+            reverse=True,
+        )
+        results = []
+        for sp in sorted_posts:
+            p = sp.post
+            results.append(PipelineResult(
+                post_id=p.get("post_id", ""),
+                platform=self.config.platform,
+                keyword=sp.matched_keyword,
+                title=p.get("title", ""),
+                content=p.get("content", ""),
+                url=p.get("url", ""),
+                risk_level=0,
+                core_issue="",
+                report="",
+                publish_time=p.get("publish_time", "未知时间"),
+                status="safe",
+                topic_name=sp.generated_title or p.get("title", "")[:30],
+            ))
+        logger.info(f"[Pipeline:fan_track] {len(results)} 条结果（时间排序）")
+        return results
+
+    def _to_search_results(self, screened: List[ScreenedPost]) -> List[PipelineResult]:
+        """quick_search：限量 + 时间排序，不落库。"""
+        max_n = self.config.max_per_platform or 5
+        sorted_posts = sorted(
+            screened,
+            key=lambda sp: sp.post.get("publish_time", ""),
+            reverse=True,
+        )[:max_n]
+        results = []
+        for sp in sorted_posts:
+            p = sp.post
+            results.append(PipelineResult(
+                post_id=p.get("post_id", ""),
+                platform=self.config.platform,
+                keyword=sp.matched_keyword,
+                title=p.get("title", ""),
+                content=p.get("content", ""),
+                url=p.get("url", ""),
+                risk_level=0,
+                core_issue="",
+                report="",
+                publish_time=p.get("publish_time", "未知时间"),
+                status="safe",
+                topic_name=sp.generated_title or p.get("title", "")[:30],
+            ))
+        logger.info(f"[Pipeline:quick_search] {len(results)} 条结果（限量 {max_n}）")
+        return results
+
+    def _sort_by_heat(self, clusters: List[Cluster]) -> List[PipelineResult]:
+        """trending：按热度（post_count）排序，无 LangGraph 分析。"""
+        sorted_clusters = sorted(
+            clusters,
+            key=lambda c: len(c.posts),
+            reverse=True,
+        )
+        results = []
+        for c in sorted_clusters:
+            for pid in c.post_ids:
+                post = next((p for p in c.posts if p.get("post_id") == pid), None)
+                if not post:
+                    continue
+                results.append(PipelineResult(
+                    post_id=pid,
+                    platform=self.config.platform,
+                    keyword=c.keyword,
+                    title=post.get("title", ""),
+                    content=post.get("content", ""),
+                    url=post.get("url", ""),
+                    risk_level=0,
+                    core_issue="",
+                    report="",
+                    publish_time=post.get("publish_time", "未知时间"),
+                    status="safe",
+                    topic_name=c.topic_name,
+                ))
+        heat_summary = {c.topic_name: len(c.posts) for c in sorted_clusters}
+        logger.info(f"[Pipeline:trending] {len(results)} 条结果，热度分布: {heat_summary}")
+        return results

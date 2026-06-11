@@ -91,7 +91,7 @@ class MemoryResponse(BaseModel):
 async def get_memory_stats(current_user: Dict = Depends(get_current_user)):
     """返回历史会话列表（前端侧边栏用）。P1 仍是全局视图，P-future 加 owner_id 过滤。"""
     try:
-        sessions = memory_manager.store.get_all_sessions(limit=50)
+        sessions = memory_manager.store.get_all_sessions(limit=50, owner_id=str(current_user["id"]))
         return {
             "success": True,
             "data": {
@@ -108,12 +108,13 @@ async def get_memory_stats(current_user: Dict = Depends(get_current_user)):
 async def get_session_memory(
     session_id: str, current_user: Dict = Depends(get_current_user)
 ):
-    """获取指定 session 的记忆详情"""
+    """获取指定 session 的记忆详情（v2.2 P0#2：owner 隔离，越权读取返回空）"""
     try:
-        summary = memory_manager.store.get_summary(session_id)
-        entities = memory_manager.store.get_frequent_entities(session_id, min_count=1)
-        facts = memory_manager.store.get_valid_facts(session_id)
-        patterns = memory_manager.store.get_recent_patterns(session_id, days=7)
+        owner_id = str(current_user["id"])
+        summary = memory_manager.store.get_summary(session_id, owner_id=owner_id)
+        entities = memory_manager.store.get_frequent_entities(session_id, owner_id, min_count=1)
+        facts = memory_manager.store.get_valid_facts(session_id, owner_id)
+        patterns = memory_manager.store.get_recent_patterns(session_id, owner_id, days=7)
 
         return {
             "success": True,
@@ -133,12 +134,21 @@ async def get_session_memory(
 async def clear_session_memory(
     session_id: str, current_user: Dict = Depends(get_current_user)
 ):
-    """清除指定 session 的所有记忆"""
+    """清除指定 session 的所有记忆（v2.2 P0#2：owner 隔离，仅删自己的 session）"""
     try:
-        memory_manager.delete_session(session_id)
+        owner_id = str(current_user["id"])
+        deleted = memory_manager.delete_session(session_id, owner_id=owner_id)
+        if deleted == 0:
+            # 0 行被删：可能是该 session 不属于当前 owner，或不存在
+            return {
+                "success": False,
+                "error": "session 不存在或不属于当前用户",
+                "deleted": 0,
+            }
         return {
             "success": True,
             "message": f"session {session_id} 的记忆已清除",
+            "deleted": deleted,
         }
     except Exception as e:
         logger.error(f"[clear_memory] {e}")

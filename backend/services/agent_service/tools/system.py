@@ -1,23 +1,16 @@
 """
-G 组（系统状态）+ 旧工具迁移过渡。
+G 组（系统状态）。
 
-P1.2 阶段：先把旧 tools.py 里的 3 个工具（get_system_status /
-trigger_background_crawl / get_recent_alerts）原样迁过来，验证
-@tool 装饰器骨架可用。这 3 个属于全局状态查询，不带 owner_id。
+P1.2 阶段：先把旧 tools.py 里的 2 个工具（get_system_status /
+get_recent_alerts）原样迁过来，验证 @tool 装饰器骨架可用。
 
-P1.8 阶段会在此文件追加 get_system_overview / get_recent_activity
-/ health_check 三个 per-user 视角的 G 组工具。
+P1.4 阶段：trigger_background_crawl 已废弃并移除，扫描入口统一由
+scan.trigger_scan（带 mode + owner 隔离）提供。
 
-P1.4 阶段会把 trigger_background_crawl 升级成正式的 trigger_scan
-（带 mode + owner 隔离）放到 tools/scan.py；届时这里只留过渡兼容。
+P1.8 阶段：追加 get_system_overview / get_recent_activity / health_check
+三个 per-user 视角的 G 组工具。
 """
 from __future__ import annotations
-
-import asyncio
-import json
-import threading
-import time
-import traceback
 
 from core.database import get_db_connection
 from core.logger import get_logger
@@ -29,20 +22,22 @@ logger = get_logger("agent.tools.system")
 
 
 # ───────────────────────────────────────────────────────────────
-# 1) get_system_status — 雷达全局状态（旧 tool 迁入，保持兼容）
+# 1) get_system_status — 雷达运行状态（v2.2 per-user 隔离）
 # ───────────────────────────────────────────────────────────────
 @tool(
     name="get_system_status",
-    description="获取当前舆情雷达系统的运行状态（是否正在抓取、上次抓取时间等）。无参数。",
+    description="获取当前用户的舆情雷达运行状态（是否正在抓取、上次抓取时间等）。无参数。",
     parameters=None,
     group="system",
 )
-def get_system_status() -> str:
+@with_owner
+def get_system_status(_owner_id: str) -> str:
     # 延迟 import 避免模块循环
-    from services.radar_service.main import radar_status
+    from services.radar_service.main import get_radar_status
 
     try:
-        data = radar_status.get_status_dict()
+        status = get_radar_status(owner_id=_owner_id)
+        data = status.get_status_dict()
         return json.dumps(
             {"success": True, "data": data, "error": "", "error_type": ""},
             ensure_ascii=False,
@@ -55,75 +50,7 @@ def get_system_status() -> str:
 
 
 # ───────────────────────────────────────────────────────────────
-# 2) trigger_background_crawl — 全局触发爬虫（旧 tool 迁入）
-#    P1.4 升级为正式 trigger_scan(mode=...)
-# ───────────────────────────────────────────────────────────────
-@tool(
-    name="trigger_background_crawl",
-    description=(
-        "当用户要求立刻抓取最新数据、或去各大平台看看最新动态时调用此工具。"
-        "它会在后台启动爬虫任务。"
-    ),
-    parameters={
-        "type": "object",
-        "properties": {
-            "keyword": {
-                "type": "string",
-                "description": "用户想要抓取或关注的特定品牌/关键字（如'华为'）。如果没提具体品牌则不填。",
-            }
-        },
-    },
-    group="system",
-)
-async def trigger_background_crawl(keyword: str = None) -> str:
-    """v2.2 P1.2 迁移：保留原 async + asyncio.create_task 派发逻辑。"""
-    from services.radar_service.main import radar_status, job, MONITOR_KEYWORDS
-
-    current_keyword = "、".join(MONITOR_KEYWORDS) if MONITOR_KEYWORDS else "全局词库"
-    target_msg = f"已收到专门针对【{keyword}】的探查请求，" if keyword else ""
-
-    async def _run():
-        if radar_status.is_running:
-            logger.info("[trigger_crawl] 任务已在运行中，跳过本次触发")
-            return
-        try:
-            radar_status.set_running_sync(f"Agent 主动触发监控: {current_keyword}")
-            logger.info(">>> 爬虫任务已启动，准备执行 job() <<<")
-            loop = asyncio.get_running_loop()
-            new_count = await loop.run_in_executor(None, lambda: job(keyword))
-            if new_count is not None:
-                radar_status.set_result_sync(
-                    new_count, time.strftime("%Y-%m-%d %H:%M:%S")
-                )
-            logger.info(">>> 爬虫任务 job() 执行完毕 <<<")
-        except Exception as e:
-            logger.error(f"Agent 触发爬虫任务失败: {e}")
-            logger.error(traceback.format_exc())
-        finally:
-            radar_status.set_idle_sync()
-
-    try:
-        asyncio.create_task(_run())
-    except RuntimeError:
-        # CLI 兜底
-        threading.Thread(target=lambda: job(keyword), daemon=True).start()
-
-    return json.dumps(
-        {
-            "success": True,
-            "data": {
-                "status": "started",
-                "message": f"{target_msg}指令已下达，爬虫任务已在后台启动。",
-            },
-            "error": "",
-            "error_type": "",
-        },
-        ensure_ascii=False,
-    )
-
-
-# ───────────────────────────────────────────────────────────────
-# 3) get_recent_alerts — 高危预警历史（旧 tool 迁入）
+# 2) get_recent_alerts — 高危预警历史（旧 tool 迁入）
 #    P1.5 升级为正式 search_alerts(filter=...)
 # ───────────────────────────────────────────────────────────────
 @tool(
@@ -140,7 +67,8 @@ async def trigger_background_crawl(keyword: str = None) -> str:
     },
     group="system",
 )
-def get_recent_alerts(limit: int = 5) -> str:
+@with_owner
+def get_recent_alerts(limit: int = 5, _owner_id: str = "") -> str:
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -149,51 +77,43 @@ def get_recent_alerts(limit: int = 5) -> str:
                 SELECT title, platform, keyword, risk_level, core_issue, report, publish_time
                 FROM ai_results
                 WHERE CAST(risk_level AS INTEGER) >= 3
+                  AND (owner_id = ? OR owner_id IS NULL)
                 ORDER BY create_time DESC
                 LIMIT ?
                 """,
-                (limit,),
+                (_owner_id, limit),
             )
             rows = cursor.fetchall()
 
         if not rows:
-            return json.dumps(
-                {"success": True, "data": [], "error": "", "error_type": ""},
-                ensure_ascii=False,
-            )
+            return ToolResult(
+                success=True,
+                data={"items": [], "total": 0},
+                ui={"type": "alert_list", "data": {"items": [], "total": 0}},
+            ).to_json()
 
         results = [
             {
-                "title": r[0],
-                "platform": r[1],
-                "keyword": r[2],
-                "risk_level": r[3],
-                "core_issue": r[4],
-                "report": r[5],
-                "time": r[6],
+                "title": r[0], "platform": r[1], "keyword": r[2],
+                "risk_level": r[3], "core_issue": r[4], "report": r[5], "time": r[6],
             }
             for r in rows
         ]
-        return json.dumps(
-            {"success": True, "data": results, "error": "", "error_type": ""},
-            ensure_ascii=False,
-        )
+        return ToolResult(
+            success=True,
+            data={"items": results, "total": len(results)},
+            ui={"type": "alert_list", "data": {"items": results, "total": len(results)}},
+        ).to_json()
     except Exception as e:
-        logger.error(f"DB Error in get_recent_alerts: {e}")
-        return json.dumps(
-            {
-                "success": False,
-                "data": None,
-                "error": f"数据库查询失败: {str(e)}",
-                "error_type": "data_empty",
-            },
-            ensure_ascii=False,
-        )
+        logger.error(f"[get_recent_alerts] DB Error: {e}")
+        return ToolResult(
+            success=False, data=None, error=f"查询失败: {e}", error_type="db_error",
+        ).to_json()
 
 
 # ===============================================================
 # P1.8 — G 组（per-user 系统状态）
-# 设计：AGENT_REDESIGN.md §4.G
+# G 组：per-user 系统状态
 # ===============================================================
 
 
@@ -343,14 +263,14 @@ def get_recent_activity_tool(_owner_id: str, minutes: int = 60) -> str:
                 "type": "alert",
                 "time": r[5],
                 "title": r[1],
-                "platform": r[0] if False else r[2],
+                "platform": r[2],
                 "keyword": r[3],
                 "risk_level": r[4],
             })
 
-    # 2) 审计日志（全局，P6 才能 per-owner 过滤）
+    # 2) 审计日志（v2.2 per-owner 过滤）
     try:
-        for log in get_audit_log(limit=50):
+        for log in get_audit_log(limit=50, owner_id=_owner_id):
             t = log.get("created_at")
             if t and t < since:
                 continue

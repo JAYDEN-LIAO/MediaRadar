@@ -1,0 +1,964 @@
+2026-06-10 11:16:10 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:16:10 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:16:28 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:16:28 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:27:30 - INFO - [agent:250] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 11:27:34 - INFO - [agent:402] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 11:27:38 - INFO - [agent.memory:106] - [Memory] 已写入对话 898a8ca1-37fe-4225-a896-810f39239bfa 的记忆：0 个实体
+2026-06-10 11:51:52 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:51:52 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:53:49 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:53:52 - INFO - [agent:49] - >>> 爬虫任务已启动，准备执行 job() <<<
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:53:52 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:54:13 - ERROR - [agent:430] - 记忆写入失败: write fail
+2026-06-10 11:54:14 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:54:14 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:54:15 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:54:15 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:54:15 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:54:15 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:54:15 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:54:15 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:54:15 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\tests\unit\_tmp_memory.db
+2026-06-10 11:54:15 - INFO - [agent.memory:266] - [MemoryStore] 清理过期 fact_memory: 1 条
+2026-06-10 11:54:16 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:54:16 - INFO - [agent:250] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 11:54:16 - INFO - [agent:277] - [Agent Core] 决定调用工具: get_system_status | 参数: {}
+2026-06-10 11:54:16 - INFO - [agent:250] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 11:54:16 - INFO - [agent:277] - [Agent Core] 决定调用工具: get_system_status | 参数: {}
+2026-06-10 11:54:40 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:54:40 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:55:21 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:55:21 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:55:44 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:55:44 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:56:17 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:56:17 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:59:16 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:59:16 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:59:37 - INFO - [agent:49] - >>> 爬虫任务已启动，准备执行 job() <<<
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:37 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 11:59:50 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:59:51 - ERROR - [agent:430] - 记忆写入失败: write fail
+2026-06-10 11:59:51 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:59:51 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:59:52 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:59:52 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:59:52 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:59:52 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:59:52 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:59:52 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:59:52 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\tests\unit\_tmp_memory.db
+2026-06-10 11:59:52 - INFO - [agent.memory:266] - [MemoryStore] 清理过期 fact_memory: 1 条
+2026-06-10 11:59:53 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 11:59:53 - INFO - [agent:250] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 11:59:53 - INFO - [agent:277] - [Agent Core] 决定调用工具: get_system_status | 参数: {}
+2026-06-10 11:59:53 - INFO - [agent:250] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 11:59:53 - INFO - [agent:277] - [Agent Core] 决定调用工具: get_system_status | 参数: {}
+2026-06-10 12:07:41 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 12:07:41 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 12:07:58 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 12:07:58 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 12:25:00 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 12:25:00 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 12:25:19 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 12:25:19 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 13:20:30 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 13:20:30 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 13:20:46 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 13:20:46 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 13:22:16 - INFO - [agent:250] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 13:22:18 - INFO - [agent:402] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 13:22:22 - INFO - [agent.memory:106] - [Memory] 已写入对话 5bd1ff05-f79a-473d-b3e8-b27325084b4b 的记忆：0 个实体
+2026-06-10 15:14:50 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 15:14:50 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 15:15:05 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 15:15:05 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 15:26:03 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 15:26:06 - INFO - [agent:49] - >>> 爬虫任务已启动，准备执行 job() <<<
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:06 - INFO - [agent:45] - [trigger_crawl] 任务已在运行中，跳过本次触发
+2026-06-10 15:26:22 - ERROR - [agent:430] - 记忆写入失败: write fail
+2026-06-10 15:26:23 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 15:26:23 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 15:26:24 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 15:26:24 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 15:26:24 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 15:26:24 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 15:26:24 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 15:26:24 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 15:26:24 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\tests\unit\_tmp_memory.db
+2026-06-10 15:26:24 - INFO - [agent.memory:266] - [MemoryStore] 清理过期 fact_memory: 1 条
+2026-06-10 15:26:24 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 15:26:24 - INFO - [agent:250] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 15:26:24 - INFO - [agent:277] - [Agent Core] 决定调用工具: get_system_status | 参数: {}
+2026-06-10 15:26:24 - INFO - [agent:250] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 15:26:24 - INFO - [agent:277] - [Agent Core] 决定调用工具: get_system_status | 参数: {}
+2026-06-10 15:28:32 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 15:28:52 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:07:39 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:07:39 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:08:26 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:08:26 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:09:15 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:09:15 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:12:10 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:12:10 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:17:51 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:17:51 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:21:48 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:21:48 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:22:02 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:22:02 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:23:04 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:23:04 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:31:16 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:31:16 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:33:03 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:33:03 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:34:22 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:34:22 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:38:50 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:38:50 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:39:42 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:39:42 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:40:27 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:40:27 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:41:12 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:41:12 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:41:58 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:41:58 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:43:20 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:43:20 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:43:39 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:43:39 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:45:20 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:45:20 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:46:20 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:46:20 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:46:21 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:46:21 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:53:35 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:53:36 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:53:47 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:53:47 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:53:55 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:53:55 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:55:40 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:55:40 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:56:17 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:56:17 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:56:22 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:56:22 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:56:56 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:56:56 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:56:56 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 17:56:56 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_subscriptions | 参数: {}
+2026-06-10 17:56:58 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: low | 工具返回的数据中订阅列表为空（count=0），无法回答用户“订阅了啥”的问题，因为没有任何订阅项信
+2026-06-10 17:57:00 - INFO - [agent.memory:106] - [Memory] 已写入对话 e8e76e5b-947e-4d31-a86c-5263cb366f86 的记忆：0 个实体
+2026-06-10 17:57:03 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:57:03 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:57:31 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:57:31 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:57:32 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 17:57:32 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_subscriptions | 参数: {}
+2026-06-10 17:57:34 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: low | 工具返回的数据中订阅列表为空（count=0），但用户问题“我订阅了啥”需要明确告知订阅内容，空数据
+2026-06-10 17:57:36 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:57:36 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:57:36 - INFO - [agent.memory:106] - [Memory] 已写入对话 ef308a5c-93d1-4a05-8c8d-41d1a30dc1e1 的记忆：0 个实体
+2026-06-10 17:58:12 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:58:12 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:58:17 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:58:17 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:58:51 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:58:51 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:58:51 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 17:58:51 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_subscriptions | 参数: {}
+2026-06-10 17:58:54 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: low | 工具返回的数据中订阅列表为空（count=0），但用户问题“我订阅了啥”隐含期望获取订阅内容，空数据
+2026-06-10 17:58:56 - INFO - [agent.memory:106] - [Memory] 已写入对话 e972f651-ac68-42e1-90a5-476eb9c084d5 的记忆：0 个实体
+2026-06-10 17:58:58 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:58:58 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:59:31 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:59:31 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:59:32 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 17:59:32 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_subscriptions | 参数: {}
+2026-06-10 17:59:34 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: low | 工具返回的数据中订阅列表为空（count=0），但用户问题“我订阅了啥”隐含期望获取具体的订阅内容，
+2026-06-10 17:59:36 - INFO - [agent.memory:106] - [Memory] 已写入对话 35d52178-d2f0-4eea-9670-50311b9498eb 的记忆：0 个实体
+2026-06-10 17:59:40 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 17:59:40 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:00:13 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:00:13 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:00:13 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 18:00:13 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_subscriptions | 参数: {}
+2026-06-10 18:00:16 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: low | 工具返回的数据中订阅列表为空（count:0），但用户问题“我订阅了啥”隐含期望获取具体的订阅内容，
+2026-06-10 18:00:18 - INFO - [agent.memory:106] - [Memory] 已写入对话 513855e9-ed9b-4d07-9811-4983dde57bf2 的记忆：0 个实体
+2026-06-10 18:00:21 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:00:21 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:01:13 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:01:13 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:01:13 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 18:01:13 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_subscriptions | 参数: {}
+2026-06-10 18:01:16 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: low | 工具返回的数据中订阅列表为空（count=0），但用户问题“我订阅了啥”期望获取具体的订阅内容，空数
+2026-06-10 18:01:18 - INFO - [agent.memory:106] - [Memory] 已写入对话 412938b5-4b97-40f4-b1d2-df2146a41dc0 的记忆：0 个实体
+2026-06-10 18:01:25 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:01:25 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:01:36 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:01:36 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:01:36 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 18:01:36 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_subscriptions | 参数: {}
+2026-06-10 18:01:38 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: low | 工具返回的数据中订阅列表为空（count=0），但用户问题“我订阅了啥”期望获取具体的订阅内容，空数
+2026-06-10 18:01:40 - INFO - [agent.memory:106] - [Memory] 已写入对话 eb732fa1-9970-40ed-b771-b655911a2e2d 的记忆：0 个实体
+2026-06-10 18:02:41 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:02:41 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 18:02:41 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_subscriptions | 参数: {}
+2026-06-10 18:02:44 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: low | 工具返回的数据中订阅列表为空（count=0），但用户问题“我订阅了啥”隐含期望看到具体的订阅内容，
+2026-06-10 18:02:45 - INFO - [agent.memory:106] - [Memory] 已写入对话 test-session 的记忆：0 个实体
+2026-06-10 18:03:43 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:03:43 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:03:43 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 18:03:43 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_subscriptions | 参数: {}
+2026-06-10 18:03:45 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: low | 工具返回的数据中订阅列表为空（count=0），无法回答用户“订阅了啥”的问题，因为没有任何订阅项信
+2026-06-10 18:03:48 - INFO - [agent.memory:106] - [Memory] 已写入对话 321cd8ab-7fbf-43bb-9834-32d83e984d6c 的记忆：0 个实体
+2026-06-10 18:03:50 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:03:50 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:04:14 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:04:14 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:04:14 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 18:04:14 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_subscriptions | 参数: {}
+2026-06-10 18:04:20 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:04:20 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:04:22 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: low | 工具返回的数据中订阅列表为空（count=0），但用户问题“我订阅了啥”隐含期望看到具体的订阅内容，
+2026-06-10 18:04:24 - INFO - [agent.memory:106] - [Memory] 已写入对话 727068cb-67af-4ac3-ba6d-27a23dbe951a 的记忆：0 个实体
+2026-06-10 18:04:53 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:04:53 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:04:53 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 18:04:53 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_subscriptions | 参数: {}
+2026-06-10 18:04:56 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: low | 工具返回的数据中订阅列表为空（count=0），无法确认用户是否真的没有订阅，还是数据获取失败或用户
+2026-06-10 18:04:58 - INFO - [agent.memory:106] - [Memory] 已写入对话 d3b7568f-3fde-4f27-a1bd-355be951f8fe 的记忆：0 个实体
+2026-06-10 18:05:03 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:05:03 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:05:24 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:05:24 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:05:24 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 18:05:24 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_subscriptions | 参数: {}
+2026-06-10 18:05:27 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: low | 工具返回的数据中订阅列表为空（count=0），但用户问题“我订阅了啥”隐含期望看到具体的订阅内容，
+2026-06-10 18:05:29 - INFO - [agent.memory:106] - [Memory] 已写入对话 053b3788-c12d-4c81-883e-c88d7a83d10a 的记忆：0 个实体
+2026-06-10 18:05:33 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:05:33 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:06:03 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:06:03 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:06:03 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 18:06:03 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_subscriptions | 参数: {}
+2026-06-10 18:06:06 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: low | 工具返回的数据中订阅列表为空（count=0），无法回答用户“订阅了啥”的问题，因为没有任何订阅项信
+2026-06-10 18:06:08 - INFO - [agent.memory:106] - [Memory] 已写入对话 ae42ca5f-938e-4fec-8a90-114d7689f95d 的记忆：0 个实体
+2026-06-10 18:06:15 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:06:15 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:06:34 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:06:34 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:06:34 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 18:06:34 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_subscriptions | 参数: {}
+2026-06-10 18:06:37 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: low | 工具返回的数据中订阅列表为空（count=0），但用户问题询问“我订阅了啥”，数据未提供任何订阅内容
+2026-06-10 18:06:39 - INFO - [agent.memory:106] - [Memory] 已写入对话 5f1de4fd-a0d0-4e32-bb5e-03df150aba2f 的记忆：0 个实体
+2026-06-10 18:06:44 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:06:44 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:06:56 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:06:56 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:06:56 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 18:06:56 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_subscriptions | 参数: {}
+2026-06-10 18:06:59 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: low | 工具返回的数据中订阅列表为空（count=0），但用户问题“我订阅了啥”隐含期望获取具体的订阅内容，
+2026-06-10 18:07:01 - INFO - [agent.memory:106] - [Memory] 已写入对话 09a04db5-bd09-446b-a806-1cc6c0e3ee69 的记忆：0 个实体
+2026-06-10 18:08:02 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:08:02 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:08:03 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 18:08:03 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_subscriptions | 参数: {}
+2026-06-10 18:08:05 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: low | 工具返回的数据中订阅列表为空（count=0），但用户问题“我订阅了啥”隐含期望获取具体的订阅内容，
+2026-06-10 18:08:07 - INFO - [agent.memory:106] - [Memory] 已写入对话 c34e8da2-0b20-48eb-8d88-ff34530af33f 的记忆：0 个实体
+2026-06-10 18:08:13 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:08:13 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:08:35 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:08:35 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:08:36 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 18:08:36 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_subscriptions | 参数: {}
+2026-06-10 18:08:38 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: low | 工具返回的数据中订阅列表为空（count=0），但用户问题“我订阅了啥”隐含期望获取具体的订阅内容，
+2026-06-10 18:08:40 - INFO - [agent.memory:106] - [Memory] 已写入对话 2c46a3da-b1ad-48e1-89d5-7f353f27cc31 的记忆：0 个实体
+2026-06-10 18:08:43 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:08:43 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:43:57 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:43:57 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:45:15 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:45:15 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:45:32 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:45:32 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:46:12 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:46:12 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:48:10 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:48:10 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:48:28 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:48:28 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:48:47 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:48:47 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:49:04 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:49:04 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:49:32 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:49:32 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:49:50 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:49:50 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:55:02 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:55:02 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:55:19 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:55:19 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:55:47 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:55:47 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:56:27 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:56:27 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:57:42 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 18:57:42 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 19:03:01 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:03:03 - INFO - [agent:321] - [Agent Core] 决定调用工具: get_system_overview | 参数: {}
+2026-06-10 19:03:05 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: high | 工具返回的数据包含了系统概览所需的所有关键信息，包括雷达状态、调度器配置、今日统计、通道健康度和LL
+2026-06-10 19:03:05 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:03:09 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:03:14 - INFO - [agent.memory:106] - [Memory] 已写入对话 5d8afa29-1722-4b00-bb57-30e60d883091 的记忆：0 个实体
+2026-06-10 19:03:16 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:03:18 - INFO - [agent:321] - [Agent Core] 决定调用工具: get_system_overview | 参数: {}
+2026-06-10 19:03:19 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: high | 工具返回的数据包含了系统概览所需的所有关键信息，包括雷达状态、调度器配置、今日统计、渠道健康度和LL
+2026-06-10 19:03:19 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:03:24 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:03:30 - INFO - [agent.memory:106] - [Memory] 已写入对话 d1f1f983-8460-4716-8124-bb9539a54074 的记忆：0 个实体
+2026-06-10 19:03:32 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:03:33 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_subscriptions | 参数: {}
+2026-06-10 19:03:35 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: high | 工具返回的数据明确显示订阅列表为空（count=0），这直接回答了用户“我的订阅有哪些”的问题，即当
+2026-06-10 19:03:35 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:03:36 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:03:40 - INFO - [agent.memory:106] - [Memory] 已写入对话 5e0595e6-9d39-4e8c-a9d8-01dc743ec65c 的记忆：0 个实体
+2026-06-10 19:03:42 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:03:43 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_push_channels | 参数: {}
+2026-06-10 19:03:45 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: high | 工具返回的数据完整列出了所有推送通道（email、wecom、feishu）及其状态（enabled
+2026-06-10 19:03:45 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:03:47 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:03:51 - INFO - [agent.memory:106] - [Memory] 已写入对话 934076cf-6f42-4038-a84c-fe32a3ff37cf 的记忆：0 个实体
+2026-06-10 19:03:53 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:03:55 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_models | 参数: {}
+2026-06-10 19:03:56 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: high | 工具返回的数据完整列出了所有角色（DEFAULT、ANALYST等）的模型配置详情，包括provid
+2026-06-10 19:03:57 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:04:00 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:04:06 - INFO - [agent.memory:106] - [Memory] 已写入对话 3e073356-0ea3-4f50-9d9c-79eab3becf3f 的记忆：0 个实体
+2026-06-10 19:04:08 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:04:09 - INFO - [agent:321] - [Agent Core] 决定调用工具: web_search | 参数: {'query': 'AI 人工智能 最新动态', 'platforms': [], 'max_per_platform': 5, 'time_range': '7d'}
+2026-06-10 19:04:09 - ERROR - [agent:345] - [Agent Core] 工具执行异常: Object of type function is not JSON serializable
+2026-06-10 19:04:11 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:04:12 - INFO - [agent:321] - [Agent Core] 决定调用工具: get_next_run_time | 参数: {}
+2026-06-10 19:04:14 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: low | 工具返回的next_run_at为null，无法直接回答用户关于下次扫描时间的问题，且interva
+2026-06-10 19:04:17 - INFO - [agent.memory:106] - [Memory] 已写入对话 bc04bce9-b518-4bd6-9150-a413a0d86414 的记忆：0 个实体
+2026-06-10 19:05:39 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 19:05:39 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 19:06:53 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 19:06:53 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 19:07:06 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:07:08 - INFO - [agent:321] - [Agent Core] 决定调用工具: get_system_overview | 参数: {}
+2026-06-10 19:07:09 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: high | 工具返回的数据包含了系统概览所需的核心信息，如雷达状态、调度器配置、今日统计、渠道健康度和LLM健康
+2026-06-10 19:07:09 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:07:13 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:07:20 - INFO - [agent.memory:106] - [Memory] 已写入对话 abaf381e-1468-41ab-a6db-1577a5fcc30b 的记忆：0 个实体
+2026-06-10 19:07:22 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:07:23 - INFO - [agent:321] - [Agent Core] 决定调用工具: get_system_overview | 参数: {}
+2026-06-10 19:07:25 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: high | 工具返回的数据包含了系统概览所需的所有关键信息，包括雷达状态、调度器配置、今日统计、通道健康度和LL
+2026-06-10 19:07:25 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:07:29 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:07:34 - INFO - [agent.memory:106] - [Memory] 已写入对话 086f8ed3-5141-4584-8fdd-66ad9a4b1ac1 的记忆：0 个实体
+2026-06-10 19:07:36 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:07:37 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_subscriptions | 参数: {}
+2026-06-10 19:07:39 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: high | 工具返回的数据明确显示订阅列表为空（count=0），直接回答了用户当前没有订阅的问题，信息完整且准
+2026-06-10 19:07:39 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:07:41 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:07:43 - INFO - [agent.memory:106] - [Memory] 已写入对话 e63e7979-c33c-40f2-8f2f-c8d2037587b4 的记忆：0 个实体
+2026-06-10 19:07:45 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:07:47 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_push_channels | 参数: {}
+2026-06-10 19:07:48 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: high | 工具返回的数据完整列出了所有推送通道（email、wecom、feishu）及其状态（enabled
+2026-06-10 19:07:48 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:07:52 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:07:56 - INFO - [agent.memory:106] - [Memory] 已写入对话 c3669057-af34-4ead-9417-87949b50c560 的记忆：0 个实体
+2026-06-10 19:07:58 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:07:59 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_models | 参数: {}
+2026-06-10 19:08:01 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: high | 工具返回的数据完整列出了所有角色（DEFAULT、ANALYST等）的模型配置详情，包括provid
+2026-06-10 19:08:02 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:08:06 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:08:11 - INFO - [agent.memory:106] - [Memory] 已写入对话 ee3f2331-b0f6-4a86-a7b6-3bf4c2bd3640 的记忆：0 个实体
+2026-06-10 19:08:13 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:08:15 - INFO - [agent:321] - [Agent Core] 决定调用工具: web_search | 参数: {'query': 'AI 最新动态', 'time_range': '7d', 'max_per_platform': 5}
+2026-06-10 19:08:15 - ERROR - [agent:345] - [Agent Core] 工具执行异常: Object of type function is not JSON serializable
+2026-06-10 19:08:17 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:08:18 - INFO - [agent:321] - [Agent Core] 决定调用工具: get_next_run_time | 参数: {}
+2026-06-10 19:08:20 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: medi | 数据中 next_run_at 为 null，虽然提供了 interval_min 为 3600 分
+2026-06-10 19:08:25 - INFO - [agent.memory:106] - [Memory] 已写入对话 bf979df8-6b13-402f-90e3-51a354b16b0b 的记忆：0 个实体
+2026-06-10 19:08:59 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:09:01 - INFO - [agent:321] - [Agent Core] 决定调用工具: web_search | 参数: {'query': 'AI 最新动态 2025', 'time_range': '7d', 'platforms': ['wb', 'zhihu', 'bili', 'xhs'], 'max_per_platform': 5}
+2026-06-10 19:09:01 - ERROR - [agent:345] - [Agent Core] 工具执行异常: Object of type function is not JSON serializable
+2026-06-10 19:09:57 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:09:58 - INFO - [agent:321] - [Agent Core] 决定调用工具: web_search | 参数: {'query': 'AI 人工智能 最新动态', 'time_range': '7d', 'max_per_platform': 5}
+2026-06-10 19:09:58 - ERROR - [agent:345] - [Agent Core] 工具执行异常: Object of type function is not JSON serializable
+2026-06-10 19:10:56 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 19:10:56 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 19:11:09 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:11:34 - INFO - [agent:321] - [Agent Core] 决定调用工具: get_system_overview | 参数: {}
+2026-06-10 19:11:35 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: high | 工具返回的数据包含了系统概览所需的所有关键信息，包括雷达状态、调度器配置、今日统计、通道健康度和LL
+2026-06-10 19:11:35 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:11:40 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:11:46 - INFO - [agent.memory:106] - [Memory] 已写入对话 de0e7c8b-670d-4def-a077-b21d6fb304d5 的记忆：0 个实体
+2026-06-10 19:11:48 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:11:49 - INFO - [agent:321] - [Agent Core] 决定调用工具: get_system_overview | 参数: {}
+2026-06-10 19:11:50 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: high | 工具返回的数据包含了系统概览所需的核心信息，如雷达状态、调度器配置、今日统计、渠道健康度和LLM健康
+2026-06-10 19:11:50 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:11:56 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:12:01 - INFO - [agent.memory:106] - [Memory] 已写入对话 aa510250-f908-4158-9b5a-cf6e5db2ca5d 的记忆：0 个实体
+2026-06-10 19:12:03 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:12:04 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_subscriptions | 参数: {}
+2026-06-10 19:12:06 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: high | 工具返回的数据明确显示订阅列表为空（count:0），直接回答了用户当前没有订阅的问题，信息完整且准
+2026-06-10 19:12:06 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:12:08 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:12:12 - INFO - [agent.memory:106] - [Memory] 已写入对话 66feacc2-2ec4-4570-bc26-3917d4df00db 的记忆：0 个实体
+2026-06-10 19:12:14 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:12:15 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_push_channels | 参数: {}
+2026-06-10 19:12:16 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: high | 工具返回的数据完整列出了所有推送通道（email、wecom、feishu）及其状态（enabled
+2026-06-10 19:12:16 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:12:20 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:12:23 - INFO - [agent.memory:106] - [Memory] 已写入对话 67d928f7-2b33-4ab3-9b7c-b358f1d1f642 的记忆：0 个实体
+2026-06-10 19:12:25 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:12:26 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_models | 参数: {}
+2026-06-10 19:12:28 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: high | 工具返回的数据完整列出了所有角色的模型配置信息，包括provider、model、base_url等
+2026-06-10 19:12:29 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:12:34 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:12:38 - INFO - [agent.memory:106] - [Memory] 已写入对话 230a8b29-428a-492e-b180-4b7704390ce7 的记忆：0 个实体
+2026-06-10 19:12:40 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:12:42 - INFO - [agent:321] - [Agent Core] 决定调用工具: web_search | 参数: {'query': 'AI 最新动态 2025', 'time_range': '7d', 'platforms': [], 'max_per_platform': 5}
+2026-06-10 19:12:42 - ERROR - [agent.tools.search:111] - [web_search] crawler error: module 'asyncio.subprocess' has no attribute 'CREATE_NO_WINDOW'
+2026-06-10 19:12:43 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: low | 工具返回的数据中 items 为空，total 为 0，没有返回任何关于 AI 最新动态的具体信息，
+2026-06-10 19:12:49 - INFO - [agent.memory:106] - [Memory] 已写入对话 a6715b85-f37a-42e6-8b91-4f7020423195 的记忆：0 个实体
+2026-06-10 19:12:51 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:12:52 - INFO - [agent:321] - [Agent Core] 决定调用工具: get_next_run_time | 参数: {}
+2026-06-10 19:12:53 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: medi | 数据中 next_run_at 为 null，虽然提供了 interval_min 为 3600，但
+2026-06-10 19:12:55 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:12:58 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:13:01 - INFO - [agent.memory:106] - [Memory] 已写入对话 305ef561-0ddc-4a91-81bb-ba9ff3704022 的记忆：0 个实体
+2026-06-10 19:13:57 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 19:13:57 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 19:14:29 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:14:30 - INFO - [agent:321] - [Agent Core] 决定调用工具: get_system_overview | 参数: {}
+2026-06-10 19:14:32 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: high | 工具返回的数据包含了系统概览所需的所有关键信息，包括雷达状态、调度器配置、今日统计、渠道健康度和LL
+2026-06-10 19:14:32 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:14:36 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:14:43 - INFO - [agent.memory:106] - [Memory] 已写入对话 39484d19-c64f-42e0-9034-2dd794df34c2 的记忆：0 个实体
+2026-06-10 19:14:45 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:14:46 - INFO - [agent:321] - [Agent Core] 决定调用工具: get_system_overview | 参数: {}
+2026-06-10 19:14:47 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: high | 工具返回的数据包含了系统概览所需的所有关键信息，包括雷达状态、调度器配置、今日统计、渠道健康度和LL
+2026-06-10 19:14:47 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:14:52 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:14:57 - INFO - [agent.memory:106] - [Memory] 已写入对话 db757420-c4a9-46f1-a73f-0902bd610c5d 的记忆：0 个实体
+2026-06-10 19:14:59 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:15:00 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_subscriptions | 参数: {}
+2026-06-10 19:15:02 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: high | 工具返回的数据明确显示订阅列表为空（count=0），直接回答了用户当前没有订阅的问题，信息完整且准
+2026-06-10 19:15:02 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:15:04 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:15:07 - INFO - [agent.memory:106] - [Memory] 已写入对话 156871cd-e225-47e2-bbef-144ba23cc3a0 的记忆：0 个实体
+2026-06-10 19:15:09 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:15:10 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_push_channels | 参数: {}
+2026-06-10 19:15:12 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: high | 工具返回的数据完整列出了所有推送通道（email、wecom、feishu）及其状态（enabled
+2026-06-10 19:15:12 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:15:15 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:15:19 - INFO - [agent.memory:106] - [Memory] 已写入对话 84dbf459-1b57-4c7b-b181-83e9c803639e 的记忆：0 个实体
+2026-06-10 19:15:21 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:15:22 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_models | 参数: {}
+2026-06-10 19:15:23 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: high | 工具返回的数据完整列出了所有角色（DEFAULT、ANALYST等）的模型配置详情，包括provid
+2026-06-10 19:15:24 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:15:29 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:15:33 - INFO - [agent.memory:106] - [Memory] 已写入对话 8b8a1ea8-b6bd-4dd2-8f69-5801cacf6c7f 的记忆：0 个实体
+2026-06-10 19:15:35 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:15:37 - INFO - [agent:321] - [Agent Core] 决定调用工具: web_search | 参数: {'query': 'AI 人工智能 最新动态 2025', 'time_range': '7d', 'max_per_platform': 5}
+2026-06-10 19:15:37 - ERROR - [agent.tools.search:111] - [web_search] crawler error: module 'asyncio.subprocess' has no attribute 'CREATE_NO_WINDOW'
+2026-06-10 19:15:38 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: low | 工具返回的数据中items为空，total为0，没有返回任何AI最新动态信息，无法回答用户问题。
+2026-06-10 19:15:42 - INFO - [agent.memory:106] - [Memory] 已写入对话 c814fd67-e371-47fb-8022-1d6c545ccc76 的记忆：0 个实体
+2026-06-10 19:15:44 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:15:45 - INFO - [agent:321] - [Agent Core] 决定调用工具: get_next_run_time | 参数: {}
+2026-06-10 19:15:47 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: low | 工具返回的next_run_at为null，无法直接回答用户关于“下次扫描时间”的具体时间点，仅提供
+2026-06-10 19:15:50 - INFO - [agent.memory:106] - [Memory] 已写入对话 23ff3af2-5339-4f39-a8d1-8350518f17b5 的记忆：0 个实体
+2026-06-10 19:17:16 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 19:17:16 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 19:17:37 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 19:17:37 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 19:18:10 - INFO - [agent:250] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:18:12 - INFO - [agent:402] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:18:19 - INFO - [agent.memory:106] - [Memory] 已写入对话 22e7e635-3228-4744-a02e-524cb188e332 的记忆：0 个实体
+2026-06-10 19:18:26 - INFO - [agent:250] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:18:28 - INFO - [agent:402] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:18:33 - INFO - [agent.memory:106] - [Memory] 已写入对话 4c612cee-8871-4df9-82e2-4761765d5568 的记忆：0 个实体
+2026-06-10 19:20:14 - INFO - [agent:250] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:20:17 - INFO - [agent:402] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:23:30 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 19:23:30 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 19:23:51 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 19:23:51 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 19:24:34 - INFO - [agent:250] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:24:37 - INFO - [agent:402] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:24:41 - INFO - [agent.memory:106] - [Memory] 已写入对话 556905ed-9c1c-4c17-87bd-2b4de724a3e4 的记忆：0 个实体
+2026-06-10 19:26:02 - INFO - [agent:250] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:26:06 - INFO - [agent:402] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:26:54 - INFO - [agent:250] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:26:57 - INFO - [agent:402] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:27:01 - INFO - [agent.memory:106] - [Memory] 已写入对话 2575fc2d-fd06-4cee-b6db-4ebd51f712da 的记忆：0 个实体
+2026-06-10 19:29:10 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:29:14 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:29:16 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:29:18 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:29:42 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:29:49 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:29:55 - INFO - [agent.memory:106] - [Memory] 已写入对话 c16c981a-582f-4ccf-b876-665306903773 的记忆：0 个实体
+2026-06-10 19:30:52 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:30:59 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:31:14 - INFO - [agent.memory:106] - [Memory] 已写入对话 86a4ff9f-0597-4d9c-adab-c0a6f0a90e07 的记忆：0 个实体
+2026-06-10 19:32:37 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:32:45 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:32:50 - INFO - [agent.memory:106] - [Memory] 已写入对话 6ae9e1aa-0b41-42d3-96aa-f1b5d3bb8fe3 的记忆：0 个实体
+2026-06-10 19:33:13 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:33:14 - INFO - [agent:321] - [Agent Core] 决定调用工具: get_system_overview | 参数: {}
+2026-06-10 19:33:16 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: high | 工具返回的数据包含了系统概览所需的核心信息，如雷达状态、调度器配置、今日统计、渠道健康度和LLM健康
+2026-06-10 19:33:16 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:33:21 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:33:26 - INFO - [agent.memory:106] - [Memory] 已写入对话 da979b93-0cc0-4c31-aa64-78720d0498ae 的记忆：0 个实体
+2026-06-10 19:33:28 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:33:30 - INFO - [agent:321] - [Agent Core] 决定调用工具: get_system_overview | 参数: {}
+2026-06-10 19:33:31 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: high | 工具返回的数据包含了系统概览所需的所有关键信息，包括雷达状态、调度器配置、今日统计、通道健康度和LL
+2026-06-10 19:33:31 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:33:36 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:33:41 - INFO - [agent.memory:106] - [Memory] 已写入对话 49961373-2344-421d-ba6c-ca23b34d9a88 的记忆：0 个实体
+2026-06-10 19:33:43 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:33:44 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_subscriptions | 参数: {}
+2026-06-10 19:33:45 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: high | 工具返回的数据明确显示订阅列表为空（count=0），这直接回答了用户“我的订阅有哪些”的问题，即当
+2026-06-10 19:33:45 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:33:47 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:33:50 - INFO - [agent.memory:106] - [Memory] 已写入对话 f3fb7401-051e-4cfd-a58a-81d9fa63eaef 的记忆：0 个实体
+2026-06-10 19:33:52 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:33:53 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_push_channels | 参数: {}
+2026-06-10 19:33:54 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: high | 工具返回的数据完整列出了所有推送通道（email、wecom、feishu）及其状态（enabled
+2026-06-10 19:33:54 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:33:58 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:34:02 - INFO - [agent.memory:106] - [Memory] 已写入对话 d0d1e8a3-2666-4524-b28f-56bc8851af69 的记忆：0 个实体
+2026-06-10 19:34:04 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:34:05 - INFO - [agent:321] - [Agent Core] 决定调用工具: list_models | 参数: {}
+2026-06-10 19:34:07 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: high | 工具返回的数据完整列出了所有角色（DEFAULT、ANALYST等）的模型配置详情，包括provid
+2026-06-10 19:34:08 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:34:13 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:34:18 - INFO - [agent.memory:106] - [Memory] 已写入对话 f4f6e50d-f4f5-45ca-8266-b4ebfa8d1470 的记忆：0 个实体
+2026-06-10 19:34:20 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:34:22 - INFO - [agent:321] - [Agent Core] 决定调用工具: web_search | 参数: {'query': 'AI 最新动态 2025', 'time_range': '7d', 'max_per_platform': 5}
+2026-06-10 19:34:22 - ERROR - [agent.tools.search:111] - [web_search] crawler error: module 'asyncio.subprocess' has no attribute 'CREATE_NO_WINDOW'
+2026-06-10 19:34:23 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: low | 工具返回的数据中 items 为空，total 为 0，没有返回任何关于 AI 最新动态的具体信息，
+2026-06-10 19:34:27 - INFO - [agent.memory:106] - [Memory] 已写入对话 8029c3b8-8b14-46fa-a46d-43dcd0a3f0a1 的记忆：0 个实体
+2026-06-10 19:34:29 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:34:30 - INFO - [agent:321] - [Agent Core] 决定调用工具: get_next_run_time | 参数: {}
+2026-06-10 19:34:32 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: low | 工具返回的next_run_at为null，无法直接回答用户关于下次扫描时间的问题，虽然interv
+2026-06-10 19:34:36 - INFO - [agent.memory:106] - [Memory] 已写入对话 b6a2afa4-0635-422e-8c87-beb69d5c1ef4 的记忆：0 个实体
+2026-06-10 19:35:30 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 19:35:30 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 19:35:45 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 19:35:45 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 19:36:21 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:36:27 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:36:34 - INFO - [agent.memory:106] - [Memory] 已写入对话 6c8e613d-7542-4d5d-a130-14f8e66361a5 的记忆：0 个实体
+2026-06-10 19:39:52 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:39:55 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:39:58 - INFO - [agent.memory:106] - [Memory] 已写入对话 b2497874-73e4-4595-ae75-f537e13daa61 的记忆：0 个实体
+2026-06-10 19:40:06 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:40:09 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:40:13 - INFO - [agent.memory:106] - [Memory] 已写入对话 a4b9f0b4-550a-42e7-b7fd-3f20d30ddbf5 的记忆：0 个实体
+2026-06-10 19:40:36 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:40:39 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:40:43 - INFO - [agent.memory:106] - [Memory] 已写入对话 fb549882-f3d6-4c7e-8f1f-525924d43a94 的记忆：0 个实体
+2026-06-10 19:43:29 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:43:35 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:43:41 - INFO - [agent.memory:106] - [Memory] 已写入对话 defae204-accf-4743-adc9-41079072ee51 的记忆：0 个实体
+2026-06-10 19:43:55 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:43:56 - INFO - [agent:321] - [Agent Core] 决定调用工具: get_recent_alerts | 参数: {'limit': 5}
+2026-06-10 19:43:59 - INFO - [agent.reflection:61] - [Reflection] 置信度评估: high | 工具返回的数据包含了多个高危话题的详细分析，包括风险等级、核心争议、传播预测和应对建议，直接且完整地
+2026-06-10 19:44:00 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 2 轮思考)...
+2026-06-10 19:44:07 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:44:13 - INFO - [agent.memory:106] - [Memory] 已写入对话 64d3243e-8cb8-49d4-8b20-81b3ca8fcbc5 的记忆：0 个实体
+2026-06-10 19:44:59 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 19:44:59 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 19:45:18 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 19:45:18 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 19:45:28 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:45:34 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:45:42 - INFO - [agent.memory:106] - [Memory] 已写入对话 fe3912b9-717b-40e9-9335-38b9e37a53a1 的记忆：0 个实体
+2026-06-10 19:59:20 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 19:59:25 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 19:59:30 - INFO - [agent.memory:106] - [Memory] 已写入对话 68bd8286-fd97-414d-939c-eb38e877eea1 的记忆：0 个实体
+2026-06-10 20:23:45 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 20:23:51 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 20:23:57 - INFO - [agent.memory:106] - [Memory] 已写入对话 2364c8af-ebc8-46d6-9eb0-02663fabdfdf 的记忆：0 个实体
+2026-06-10 20:26:26 - INFO - [agent:293] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 20:26:32 - INFO - [agent:456] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 20:26:37 - INFO - [agent.memory:106] - [Memory] 已写入对话 94900390-dbea-49c6-85e4-7a84b9ec3dab 的记忆：0 个实体
+2026-06-10 20:31:26 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 20:31:26 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 20:31:47 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 20:31:47 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 20:32:08 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 20:32:08 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 20:32:36 - INFO - [agent:292] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 20:32:43 - INFO - [agent:455] - [Agent Core] 思考完毕，正在生成最终流式总结...
+2026-06-10 20:32:50 - INFO - [agent.memory:106] - [Memory] 已写入对话 796d6140-86f9-4bed-95a6-b0051be1ecd0 的记忆：0 个实体
+2026-06-10 20:36:22 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 20:36:22 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 20:36:58 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 20:36:58 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 20:39:29 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 20:39:29 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 20:39:50 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 20:39:50 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 20:44:26 - INFO - [agent:292] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 20:44:33 - INFO - [agent:522] - [Agent Core] 无工具调用，流式内容已发出（797 字符）
+2026-06-10 20:44:36 - INFO - [agent.memory:106] - [Memory] 已写入对话 ea916a76-8240-4cfd-9ab3-8d578b1facee 的记忆：0 个实体
+2026-06-10 20:45:02 - INFO - [agent:292] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 20:45:06 - INFO - [agent:522] - [Agent Core] 无工具调用，流式内容已发出（237 字符）
+2026-06-10 20:45:07 - INFO - [agent.memory:106] - [Memory] 已写入对话 c03c78e7-e6d3-4651-8325-be53416b24ff 的记忆：0 个实体
+2026-06-10 20:45:34 - INFO - [agent:292] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 20:46:20 - INFO - [agent:292] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 20:46:27 - INFO - [agent:522] - [Agent Core] 无工具调用，流式内容已发出（777 字符）
+2026-06-10 20:46:28 - INFO - [agent.memory:106] - [Memory] 已写入对话 afb70d3a-66fb-4d66-85f2-f1ef411af0e0 的记忆：0 个实体
+2026-06-10 20:55:18 - INFO - [agent:292] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 20:55:21 - INFO - [agent:522] - [Agent Core] 无工具调用，流式内容已发出（265 字符）
+2026-06-10 20:55:23 - INFO - [agent.memory:106] - [Memory] 已写入对话 94dfd636-3418-4ff4-b76d-1b8fe4336e6d 的记忆：0 个实体
+2026-06-10 20:55:50 - INFO - [agent:292] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 20:55:56 - INFO - [agent:522] - [Agent Core] 无工具调用，流式内容已发出（685 字符）
+2026-06-10 20:55:57 - INFO - [agent.memory:106] - [Memory] 已写入对话 b1b9192a-0c09-4834-b609-68c9ab1f2de1 的记忆：0 个实体
+2026-06-10 21:06:15 - INFO - [agent:292] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 21:06:18 - INFO - [agent:522] - [Agent Core] 无工具调用，流式内容已发出（182 字符）
+2026-06-10 21:06:19 - INFO - [agent.memory:106] - [Memory] 已写入对话 a943f274-8107-444a-9f97-2a0034c771a5 的记忆：0 个实体
+2026-06-10 21:06:37 - INFO - [agent:292] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 21:14:07 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 21:14:07 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 21:14:22 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 21:14:22 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 21:16:07 - INFO - [agent:289] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 21:16:11 - INFO - [agent:519] - [Agent Core] 无工具调用，流式内容已发出（392 字符）
+2026-06-10 21:16:14 - INFO - [agent.memory:106] - [Memory] 已写入对话 342985c7-2087-4a79-b47b-255f994aa39a 的记忆：0 个实体
+2026-06-10 21:16:25 - INFO - [agent:289] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 21:16:30 - INFO - [agent:519] - [Agent Core] 无工具调用，流式内容已发出（632 字符）
+2026-06-10 21:16:35 - INFO - [agent.memory:106] - [Memory] 已写入对话 9c34c860-ea2c-4199-9658-baec00e1d912 的记忆：0 个实体
+2026-06-10 21:17:27 - INFO - [agent:289] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 21:17:31 - INFO - [agent:519] - [Agent Core] 无工具调用，流式内容已发出（438 字符）
+2026-06-10 21:17:33 - INFO - [agent.memory:106] - [Memory] 已写入对话 a6e78cd5-44fd-40b2-8d6b-2bf162e7f6d5 的记忆：0 个实体
+2026-06-10 21:17:59 - INFO - [agent:289] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 21:19:20 - INFO - [agent:289] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 21:19:23 - INFO - [agent:519] - [Agent Core] 无工具调用，流式内容已发出（220 字符）
+2026-06-10 21:19:24 - INFO - [agent.memory:106] - [Memory] 已写入对话 8b3fbd24-080f-43b7-b773-95a438eeab07 的记忆：0 个实体
+2026-06-10 21:20:28 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 21:20:28 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 21:21:40 - INFO - [agent:289] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 21:21:42 - INFO - [agent:539] - [Agent Core] 无工具调用，流式内容已发出（151 字符）
+2026-06-10 21:21:44 - INFO - [agent.memory:106] - [Memory] 已写入对话 f3a0d329-2d6f-43aa-a1e1-1eaa7be24acc 的记忆：0 个实体
+2026-06-10 21:21:55 - INFO - [agent:289] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 21:22:03 - INFO - [agent:539] - [Agent Core] 无工具调用，流式内容已发出（1152 字符）
+2026-06-10 21:22:04 - INFO - [agent.memory:106] - [Memory] 已写入对话 f501ffb7-a709-45cd-945b-6337aa51d004 的记忆：0 个实体
+2026-06-10 21:22:42 - INFO - [agent:289] - [Agent Core] 正在评估意图 (第 1 轮思考)...
+2026-06-10 21:24:12 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 21:24:12 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 21:25:58 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 21:25:58 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 23:59:16 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 23:59:16 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 23:59:32 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
+2026-06-10 23:59:32 - INFO - [agent.memory:84] - [MemoryStore] 数据库初始化完成: D:\JAYDEN\develop\work\MediaRadar\backend\data\agent_memory.db
